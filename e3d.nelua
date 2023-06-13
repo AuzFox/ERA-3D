@@ -1,0 +1,412 @@
+require("filestream")
+require("io")
+require("string")
+require("sequence")
+require("hashmap")
+require("stringbuilder")
+require("memory")
+require("allocators.default")
+require("math")
+require("coroutine")
+require("raylib")
+
+global e3d = @record{}
+
+-----------------------------
+--                         --
+--        CONSTANTS        --
+--                         --
+-----------------------------
+
+--[[ RAM logical memory map
+	heap:    8 MiB
+	tmem:    4 MiB  (2048*2048 pixels (32bpp))
+	globals: 256KiB (65536 words)
+	locals:  256KiB (65536 words)
+	args:    256KiB (65536 words)
+	rom:     64KiB  (65536 bytes)
+	TOTAL: 12 MiB + 832KiB
+
+	OLD, NEEDS UPDATE:
+	0x000000 - 0x7FFFFF: heap
+	0x800000 - 0xBFFFFF: t0mem
+	0xC00000 - 0xFFFFFF: t1mem
+]]
+
+global e3d.TMEM_WIDTH <comptime> = 2048
+global e3d.TMEM_HEIGHT <comptime> = 2048
+
+global e3d.HEAP_SIZE      <comptime> = (1024*1024*8) -- 8MiB
+global e3d.TMEM_SIZE      <comptime> = (e3d.TMEM_WIDTH*e3d.TMEM_HEIGHT) -- ?MiB (2048*2048 pixels (32bpp))
+global e3d.GLOBALS_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.LOCALS_SIZE    <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.ARGS_SIZE      <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.ROM_SIZE       <comptime> = 65536 -- 64KiB (65536 bytes)
+global e3d.OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
+global e3d.CALLSTACK_SIZE <comptime> = 256
+global e3d.API_FUNCS_SIZE <comptime> = 65536
+global e3d.CAMERAS_COUNT  <comptime> = 8
+
+global e3d.TMEM_START_ADDR <comptime> = 0x800000
+global e3d.GLOBALS_START_ADDR <comptime> = 0x800000
+global e3d.LOCALS_START_ADDR <comptime> = 0x800000
+global e3d.ARGS_START_ADDR <comptime> = 0x800000
+global e3d.RAM_MAX_ADDR <comptime> = 0x7FFFFF
+
+global e3d.Token = @enum {
+	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
+	FLOAT_LITERAL,
+	STRING,  -- string literal
+	VOID,
+	INT,
+	FLOAT,
+	VEC2,
+	VEC3,
+	STRUCT_ID, -- struct type id
+	STRUCT,
+	FUNCTION,
+	ENUM,
+	ID,
+	ELSE,
+	IF,
+	RETURN,
+	SIZEOF,
+	WHILE,
+	LNOT,
+	NOT,
+	ASSIGN,
+	COND,
+	LOR,
+	LAND,
+	OR,
+	XOR,
+	AND,
+	EQ,
+	NE,
+	LT,
+	GT,
+	LE,
+	GE,
+	LSHIFT,
+	RSHIFT,
+	ARSHIFT,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	MOD,
+	BRAK
+}
+
+global e3d.Opcode = @enum {
+	GET_G = 0,
+	GET_GX,
+	SET_G,
+	SET_GX,
+	NEW_L,
+	DEL_L,
+	GET_L,
+	GET_LX,
+	SET_L,
+	SET_LX,
+	GET_A,
+	GET_AX,
+	SET_A,
+	SET_AX,
+	GET_M,
+	GET_MX,
+	GET_MO,
+	GET_MOX,
+	SET_M,
+	SET_MX,
+	SET_MO,
+	SET_MOX,
+	ADDROF_G,
+	ADDROF_L,
+	ADDROF_A,
+	VEC2_NEW,
+	VEC3_NEW,
+	PUSH_ZERO,
+	PUSH_ONE,
+	PUSH_CHAR,
+	PUSH_INT,
+	PUSH_FLOAT,
+	PUSH_VEC2,
+	PUSH_VEC2_ZERO,
+	PUSH_VEC3,
+	PUSH_VEC3_ZERO,
+	ARG,
+	ARGX,
+	BIN_NOT,
+	BIN_OR,
+	BIN_XOR,
+	BIN_AND,
+	BIN_LSHIFT,
+	BIN_RSHIFT,
+	BIN_ARSHIFT,
+	NEG,
+	NEGF,
+	NEGV,
+	ADD,
+	ADDF,
+	ADDV,
+	ADDP,
+	SUB,
+	SUBF,
+	SUBV,
+	SUBP,
+	MUL,
+	MULF,
+	MULV,
+	DIV,
+	DIVU,
+	DIVF,
+	DIVV,
+	MOD,
+	MODU,
+	MODF,
+	LOGIC_NOT,
+	LOGIC_OR,
+	LOGIC_AND,
+	EQ,
+	EQF,
+	EQV,
+	NE,
+	NEF,
+	NEV,
+	LTI,
+	LTU,
+	LTF,
+	LTV,
+	GTI,
+	GTU,
+	GTF,
+	GTV,
+	LEI,
+	LEU,
+	LEF,
+	LEV,
+	GEI,
+	GEU,
+	GEF,
+	GEV,
+	JUMP,
+	JUMP_Z,
+	CALL,
+	CALL_PTR,
+	RETURN,
+	FTOI,
+	ITOF,
+	API
+}
+
+global e3d.Class = @enum {
+	KEYWORD = 0,
+	API,
+	CONSTANT,
+	STRUCT,
+	FUNCTION,
+	MEMORY, -- only used when writing values into memory using pointers
+	GLOBAL,
+	ARG,
+	LOCAL
+}
+
+global e3d.EVMType = @enum {
+	VOID = 0, -- only used for function declarations
+	INT,
+	FLOAT,
+	VEC2,
+	VEC3,
+	STRUCT,
+	STRING,
+	FUNC_POINTER,
+	POINTER = 16
+}
+
+global e3d.Hook = @enum {
+	INIT = 0,
+	UPDATE,
+	DRAW2D,
+	DRAW3D
+}
+
+global e3d.StatusCode = @enum {
+	OK = 0,
+	ERR_MISALIGNED_PTR,
+	ERR_OOB_PTR
+}
+
+-------------------------
+--                     --
+--        TYPES        --
+--                     --
+-------------------------
+
+global e3d.EVM <forwarddecl> = @record {}
+
+global e3d.Identifier <forwarddecl> = @record {}
+
+global e3d.APIFunction: type = @function(vm: *e3d.EVM): boolean
+
+global e3d.GPU = @record {
+	cameras: [e3d.CAMERAS_COUNT]rl.camera,
+	gfx_texture: rl.texture,
+	gfx_shader: rl.shader,
+
+	-- graphics state
+	current_camera: uinteger,
+	tex_x: cint,
+	tex_y: cint,
+	tex_w: cint,
+	tex_h: cint,
+	update_tex_rect: boolean,
+}
+
+global e3d.EVMValue = @union {
+	i: int32, -- int
+	u: uint32, -- pointer, string, func_ptr
+	f: float32
+}
+
+global e3d.CallFrame = @record {
+	pc: uinteger,
+	lbp: uinteger,
+	abp: uinteger
+}
+
+global e3d.Struct = @record {
+	is_complete: boolean,
+	size: uinteger,
+	name: string,
+	member_map: hashmap(string, uinteger),
+	members: sequence(*e3d.Identifier)
+}
+
+global e3d.TypeInfo = @record {
+	type_id: uinteger,
+	structref: *e3d.Struct -- only used when base_type is e3d.EVMType.STRUCT
+}
+
+e3d.Identifier = @record {
+	name: string,
+	token: uinteger,
+	class: uinteger,
+	index: uinteger,
+	type_info: e3d.TypeInfo,
+	const_val: uint32, -- only used for constants (enum values)
+	func: e3d.APIFunction, -- only used when registering api functions
+	argdata: sequence(e3d.TypeInfo) -- only used to track function arguments
+}
+
+e3d.EVM = @record {
+	-- vm vars
+	heap: [e3d.HEAP_SIZE]uint8,
+	tmem: [e3d.TMEM_SIZE]rl.color,
+	globals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
+	locals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
+	args: [e3d.ARGS_SIZE]e3d.EVMValue,
+	rom: [e3d.ROM_SIZE]uint8,
+	opstack: [e3d.OPSTACK_SIZE]e3d.EVMValue,
+	bytecode: [e3d.BYTECODE_SIZE]uint8,
+	callstack: [e3d.CALLSTACK_SIZE]e3d.CallFrame,
+	api_funcs: [e3d.API_FUNCS_SIZE]e3d.APIFunction,
+	cf: e3d.CallFrame,
+	rom_len: uinteger,
+	bytecode_len: uinteger,
+	globals_len: uinteger,
+	lsp: uinteger,
+	asp: uinteger,
+	ap: uinteger,
+	osp: uinteger,
+	csp: uinteger,
+	hook_addresses: [4]uint16,
+	hook_flags: [4]boolean,
+	
+	-- compiler vars
+	src: string,
+	src_index: uinteger,
+	token: uinteger,
+	token_val: uinteger,
+	token_valf: float32,
+	line: uinteger,
+	expr_type: e3d.TypeInfo,
+	local_index: uint16,
+	mlcomment_level: uinteger,
+	prev_opcode: uint8,
+	has_id: boolean,
+	skip_next_id_lookup: boolean,
+	compile_err: boolean,
+	current_id: *e3d.Identifier,
+	current_id_name: string,
+	current_func_id: *e3d.Identifier,
+	struct_vec2: *e3d.Struct,
+	struct_vec3: *e3d.Struct,
+	sb: stringbuilder,
+	keywords: hashmap(string, *e3d.Identifier),
+	api_ids: hashmap(string, *e3d.Identifier),
+	struct_ids: hashmap(string, *e3d.Identifier),
+	sym_tables: sequence(*hashmap(string, *e3d.Identifier)),
+	scope_sizes: sequence(uinteger),
+	
+	-- general vars
+	gpu: e3d.GPU,
+	error: string
+}
+
+---------------------------------------
+--                                   --
+--        NAMESPACE FUNCTIONS        --
+--                                   --
+---------------------------------------
+
+function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
+	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
+	
+	if type_pointed_to < e3d.EVMType.POINTER then
+		switch type_pointed_to do
+			case e3d.EVMType.INT, e3d.EVMType.FLOAT then
+				return 4
+			case e3d.EVMType.VEC2 then
+				return 8
+			case e3d.EVMType.VEC3 then
+				return 12
+			case e3d.EVMType.STRUCT then
+				return info.structref.size * 4
+		end
+	end
+	
+	return 4
+end
+
+function e3d.GPU:init(): void
+	rl.setConfigFlags(rl.configFlags.FLAG_VSYNC_HINT) -- enable vsync
+	--rl.setTraceLogLevel(rl.traceLogLevel.LOG_WARNING) -- only log errors and warnings
+
+	rl.initWindow(800, 600, "ERA-3D")
+	rl.setTargetFPS(30)
+
+	rl.setExitKey(rl.keyboardKey.KEY_NULL)
+
+	for i = 0, < #self.cameras do
+		self.cameras[i] = {
+			position={0,0,0},
+			target={0,0,0},
+			up={0,1,0},
+			fovy=45,
+			projection=rl.cameraProjection.CAMERA_PERSPECTIVE
+		}
+	end
+
+	self.cameras[0].position = {0,0,4} -- debug
+
+	self.current_camera = 0
+	self.gfx_texture = rl.loadTexture("test.png")
+end
+
+function e3d.GPU:cleanup(): void
+	rl.unloadTexture(self.gfx_texture)
+
+	rl.closeWindow()
+end

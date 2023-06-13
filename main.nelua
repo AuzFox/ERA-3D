@@ -1,0 +1,86 @@
+require("ecc")
+require("evm")
+
+global vm: *e3d.EVM
+global running_vm: boolean
+
+local function init(): void
+	vm = e3d.new_vm()
+	vm.gpu:init()
+
+	running_vm = false
+end
+
+local function update(): void
+	if running_vm then
+		if rl.isKeyPressed(rl.keyboardKey.KEY_ESCAPE) or not vm:call_hook(e3d.Hook.UPDATE) then
+			running_vm = false
+		end
+	else
+		if rl.isKeyPressed(rl.keyboardKey.KEY_C) then
+			if vm:compile_file("script.c") then
+				print("-- COMPILE SUCCESS --")
+			else
+				io.printf(vm.error)
+			end
+		elseif rl.isKeyPressed(rl.keyboardKey.KEY_B) then
+			print("-- BYTECODE --")
+			vm:_dump_bytecode()
+		elseif rl.isKeyPressed(rl.keyboardKey.KEY_R) then
+			vm:reset()
+			if vm:call_hook(e3d.Hook.INIT) then
+				running_vm = true
+			else
+				io.printf(vm.error)
+			end
+		end
+	end
+end
+
+local function draw(): void
+	if running_vm then
+		rl.clearBackground(rl.BLACK)
+
+		rl.beginMode3D(vm.gpu.cameras[vm.gpu.current_camera])
+
+		--rlgl.setTexture(vm.gpu.gfx_texture.id)
+		if not vm:call_hook(e3d.Hook.DRAW3D) then
+			running_vm = false
+			io.printf(vm.error)
+		end
+
+		rl.endMode3D()
+	else
+		rl.clearBackground(rl.RAYWHITE)
+
+		rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
+		rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
+		rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
+	end
+end
+
+local function run(): void
+	while not rl.windowShouldClose() do
+		update()
+
+		rl.beginDrawing()
+
+		draw()
+
+		rl.endDrawing()
+	end
+end
+
+--[[if vm:compile_file("script.c") then
+	--print("-- BYTECODE --")
+	--evm:_dump_bytecode()
+	print("\n-- PROGRAM OUTPUT --")
+	if not (init() and run()) then
+		io.printf(vm.error)
+	end
+else
+	io.printf(vm.error)
+end]]
+
+init()
+run()
