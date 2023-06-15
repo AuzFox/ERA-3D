@@ -1,0 +1,11 @@
+COMPILER:
+- better error messages
+- remove multi-variable declarations
+- improve end-of function return generation (return zero value if no explicit return is used)
+- push all args at once using one ARGX instruction
+- implement all operators: functionality and type checking
+- implement function/struct forward declarations
+- implement C-style for loop
+- implement break and continue
+- implement strings
+- implement varargs?

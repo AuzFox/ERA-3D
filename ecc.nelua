@@ -79,6 +79,7 @@ function e3d.EVM:_reset_compiler(): void
 	self.token = 0
 	self.token_val = 0
 	self.token_valf = 0
+	self.prev_token = 0
 	self.expr_type = {}
 	self.local_index = 0
 	self.mlcomment_level = 0
@@ -151,7 +152,7 @@ local function _getc(vm: *e3d.EVM): byte
 end
 
 local function _next(vm: *e3d.EVM): void
-	local last_pos: uinteger
+	vm.prev_token = vm.token
 
 	while _getc(vm) ~= 0 do
 		vm.src_index = vm.src_index + 1
@@ -369,7 +370,13 @@ local function _next(vm: *e3d.EVM): void
 			vm.token = e3d.Token.ADD
 			return
 		elseif vm.token == '-'_u8 then
-			vm.token = e3d.Token.SUB
+			if _getc(vm) == '>'_u8 then
+				vm.src_index = vm.src_index + 1
+				vm.token = e3d.Token.ARROW
+			else
+				vm.token = e3d.Token.SUB
+			end
+			
 			return
 		elseif vm.token == '*'_u8 then
 			vm.token = e3d.Token.MUL
@@ -449,7 +456,10 @@ local function _next(vm: *e3d.EVM): void
 		elseif vm.token == '?'_u8 then
 			vm.token = e3d.Token.COND
 			return
-		elseif (vm.token == ';'_u8 or vm.token == '{'_u8 or vm.token == '}'_u8 or vm.token == '('_u8 or vm.token == ')'_u8 or vm.token == ']'_u8 or vm.token == ','_u8 or vm.token == '.'_u8 or vm.token == ':'_u8) then
+		elseif vm.token == '.'_u8 then
+			vm.token = e3d.Token.DOT
+			return
+		elseif (vm.token == ';'_u8 or vm.token == '{'_u8 or vm.token == '}'_u8 or vm.token == '('_u8 or vm.token == ')'_u8 or vm.token == ']'_u8 or vm.token == ','_u8 or vm.token == ':'_u8) then
 			return
 		end
 	end
@@ -702,82 +712,56 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 		else
 			-- variable
 			if (id.class >= e3d.Class.GLOBAL) and (id.class <= e3d.Class.LOCAL) then
-				local base_id: *e3d.Identifier = id
-				local offset: uint16 = 0
-				
-				while vm.token == '.'_u8 do
-					vm.skip_next_id_lookup = true -- we need to look up member ids manually
-					_match(vm, '.'_u8)
-					_match(vm, e3d.Token.ID)
-
-					if id.type_info.type_id < e3d.EVMType.VEC2 or id.type_info.type_id > e3d.EVMType.STRUCT then
-						vm.error = string.format("ERROR: line %d: cannot index members of symbol '%s'\n", vm.line, id.name)
-						vm.compile_err = true
-						coroutine.yield()
-					end
-
-					-- lookup member
-					vm.has_id, vm.current_id = id.type_info.structref:_get_member(vm.current_id_name)
-					if not vm.has_id then
-						vm.error = string.format("ERROR: line %d: cannot index member '%s' of symbol '%s'\n", vm.line, vm.current_id_name, id.name)
-						vm.compile_err = true
-						coroutine.yield()
-					end
-
-					offset = offset + vm.current_id.index
-					id = vm.current_id
-				end
-
-				if base_id.class == e3d.Class.GLOBAL then
+				if id.class == e3d.Class.GLOBAL then
 					if id.type_info.type_id == e3d.EVMType.VEC2 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_GX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(2)
 					elseif id.type_info.type_id == e3d.EVMType.VEC3 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_GX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(3)
 					elseif id.type_info.type_id == e3d.EVMType.STRUCT then
 						vm:_bytecode_emitop(e3d.Opcode.GET_GX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(id.type_info.structref.size)
 					else
 						vm:_bytecode_emitop(e3d.Opcode.GET_G)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 					end
-				elseif base_id.class == e3d.Class.ARG then
+				elseif id.class == e3d.Class.ARG then
 					if id.type_info.type_id == e3d.EVMType.VEC2 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_AX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(2)
 					elseif id.type_info.type_id == e3d.EVMType.VEC3 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_AX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(3)
 					elseif id.type_info.type_id == e3d.EVMType.STRUCT then
 						vm:_bytecode_emitop(e3d.Opcode.GET_AX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(id.type_info.structref.size)
 					else
 						vm:_bytecode_emitop(e3d.Opcode.GET_A)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 					end
-				elseif base_id.class == e3d.Class.LOCAL then
+				elseif id.class == e3d.Class.LOCAL then
 					if id.type_info.type_id == e3d.EVMType.VEC2 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_LX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(2)
 					elseif id.type_info.type_id == e3d.EVMType.VEC3 then
 						vm:_bytecode_emitop(e3d.Opcode.GET_LX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(3)
 					elseif id.type_info.type_id == e3d.EVMType.STRUCT then
 						vm:_bytecode_emitop(e3d.Opcode.GET_LX)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 						vm:_bytecode_emit16(id.type_info.structref.size)
 					else
 						vm:_bytecode_emitop(e3d.Opcode.GET_L)
-						vm:_bytecode_emit16(base_id.index + offset)
+						vm:_bytecode_emit16(id.index)
 					end
 				end
 			else
@@ -821,7 +805,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 
 			_match(vm, ')'_u8)
 			
-			_expression(vm, e3d.Token.BRAK)
+			_expression(vm, e3d.Token.ARROW)
 
 			if vm.expr_type.type_id == e3d.EVMType.VOID then
 				vm.error = string.format("ERROR: line %d: cannot cast expression of type `void` to '%d'\n", vm.line, target_info.type_id)
@@ -866,7 +850,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 	elseif vm.token == e3d.Token.MUL then
 		_match(vm, e3d.Token.MUL)
 	    
-		_expression(vm, e3d.Token.BRAK)
+		_expression(vm, e3d.Token.ARROW)
 
 		if vm.expr_type.type_id > e3d.EVMType.POINTER then
 			vm.expr_type.type_id = vm.expr_type.type_id - e3d.EVMType.POINTER
@@ -879,22 +863,27 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 		switch vm.expr_type.type_id do
 			case e3d.EVMType.INT, e3d.EVMType.FLOAT then
 				vm:_bytecode_emitop(e3d.Opcode.GET_M)
+				vm:_bytecode_emit16(0)
 			case e3d.EVMType.VEC2 then
 				vm:_bytecode_emitop(e3d.Opcode.GET_MX)
+				vm:_bytecode_emit16(0)
 				vm:_bytecode_emit16(2)
 			case e3d.EVMType.VEC3 then
 				vm:_bytecode_emitop(e3d.Opcode.GET_MX)
+				vm:_bytecode_emit16(0)
 				vm:_bytecode_emit16(3)
 			case e3d.EVMType.STRUCT then
 				vm:_bytecode_emitop(e3d.Opcode.GET_MX)
+				vm:_bytecode_emit16(0)
 				vm:_bytecode_emit16(vm.expr_type.structref.size)
 			else
 				vm:_bytecode_emitop(e3d.Opcode.GET_M)				
+				vm:_bytecode_emit16(0)
 		end
 	elseif vm.token == e3d.Token.AND then
 		_match(vm, e3d.Token.AND)
 		
-		_expression(vm, e3d.Token.BRAK)
+		_expression(vm, e3d.Token.ARROW)
 
 		--[[
 			we've already emitted code for fetching the variable/value:
@@ -924,9 +913,11 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			vm.bytecode_len = vm.bytecode_len - 5
 			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
 		elseif op == e3d.Opcode.GET_M then
-			vm.bytecode_len = vm.bytecode_len - 1
-		elseif op == e3d.Opcode.GET_MX then
 			vm.bytecode_len = vm.bytecode_len - 3
+			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+		elseif op == e3d.Opcode.GET_MX then
+			vm.bytecode_len = vm.bytecode_len - 5
+			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
 		else
 			vm.error = string.format("ERROR: line %d: invalid rvalue for address-of\n", vm.line)
 			vm.compile_err = true
@@ -943,13 +934,31 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			case e3d.Opcode.GET_A, e3d.Opcode.GET_AX then
 				vm:_bytecode_emitop(e3d.Opcode.ADDROF_A)
 				vm:_bytecode_emit16(index)
+			case e3d.Opcode.GET_M, e3d.Opcode.GET_MX then
+				if index > 0 then
+					-- we were fetching with an offset, we need to add that offset to the pointer
+
+					-- optimize offset bytecode
+					if index == 1 then
+						vm:_bytecode_emitop(e3d.Opcode.PUSH_ONE)
+					elseif index < 256 then
+						vm:_bytecode_emitop(e3d.Opcode.PUSH_CHAR)
+						vm:_bytecode_emit8((@uint8)(index & 0xFF))
+					else
+						vm:_bytecode_emitop(e3d.Opcode.PUSH_INT)
+						vm:_bytecode_emit32(index)
+					end
+					
+					vm:_bytecode_emitop(e3d.Opcode.ADDP)
+					vm:_bytecode_emit16(1)
+				end
 		end
 
 		vm.expr_type.type_id = vm.expr_type.type_id + e3d.EVMType.POINTER
 	elseif vm.token == e3d.Token.LNOT then
 		_match(vm, e3d.Token.LNOT)
 
-		_expression(vm, e3d.Token.BRAK)
+		_expression(vm, e3d.Token.ARROW)
 
 		if vm.expr_type.type_id == e3d.EVMType.VOID then
 			vm.error = string.format("ERROR: line %d: cannot use expression of type `void` as rvalue\n", vm.line)
@@ -969,7 +978,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 	elseif vm.token == e3d.Token.NOT then
 		_match(vm, e3d.Token.NOT)
 		
-		_expression(vm, e3d.Token.BRAK)
+		_expression(vm, e3d.Token.ARROW)
 		
 		if vm.expr_type.type_id == e3d.EVMType.VOID then
 			vm.error = string.format("ERROR: line %d: cannot use expression of type `void` as rvalue\n", vm.line)
@@ -1016,7 +1025,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			_match(vm, e3d.Token.FLOAT_LITERAL)
 			vm.expr_type = {e3d.EVMType.FLOAT}
 		else
-			_expression(vm, e3d.Token.BRAK)
+			_expression(vm, e3d.Token.ARROW)
 
 			switch vm.expr_type.type_id do
 				case e3d.EVMType.VOID then
@@ -1081,10 +1090,12 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
 				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
 			elseif op == e3d.Opcode.GET_M then
-				vm.bytecode_len = vm.bytecode_len - 1
-			elseif op == e3d.Opcode.GET_MX then
 				vm.bytecode_len = vm.bytecode_len - 3
-				size = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			elseif op == e3d.Opcode.GET_MX then
+				vm.bytecode_len = vm.bytecode_len - 5
+				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
 			else
 				vm.error = string.format("ERROR: line %d: invalid lvalue in assignment\n", vm.line)
 				vm.compile_err = true
@@ -1144,6 +1155,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 						vm:_bytecode_emit16(index)
 					case e3d.Class.MEMORY then
 						vm:_bytecode_emitop(e3d.Opcode.SET_M)
+						vm:_bytecode_emit16(index)
 				end
 			else
 				if temp.type_id == e3d.EVMType.VEC2 or temp.type_id == e3d.EVMType.VEC3 then
@@ -1162,6 +1174,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 							vm:_bytecode_emit16(size)
 						case e3d.Class.MEMORY then
 							vm:_bytecode_emitop(e3d.Opcode.SET_MX)
+							vm:_bytecode_emit16(index)
 							vm:_bytecode_emit16(size)
 					end
 				elseif temp.type_id == e3d.EVMType.STRUCT then
@@ -1186,6 +1199,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 							vm:_bytecode_emit16(size)
 						case e3d.Class.MEMORY then
 							vm:_bytecode_emitop(e3d.Opcode.SET_MX)
+							vm:_bytecode_emit16(index)
 							vm:_bytecode_emit16(size)
 					end
 				else
@@ -1201,6 +1215,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 							vm:_bytecode_emit16(index)
 						case e3d.Class.MEMORY then
 							vm:_bytecode_emitop(e3d.Opcode.SET_M)
+							vm:_bytecode_emit16(index)
 					end
 				end
 			end
@@ -1584,6 +1599,153 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				vm.compile_err = true
 				coroutine.yield()
 			end
+		elseif vm.token == e3d.Token.ARROW then
+			if not (vm.expr_type.type_id >= (e3d.EVMType.VEC2 + e3d.EVMType.POINTER) and vm.expr_type.type_id <= (e3d.EVMType.STRUCT + e3d.EVMType.POINTER)) then
+				vm.error = string.format("ERROR: line %d: cannot index members of type '%d'\n", vm.line, vm.expr_type.type_id)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+
+			local op: uint8 = vm.prev_opcode
+			local class: uinteger
+			local index: uint16
+			local size: uint16 = 1
+			local valid_lvalue: boolean = false
+			
+			if op == e3d.Opcode.GET_G or op == e3d.Opcode.GET_L or op == e3d.Opcode.GET_A then
+				valid_lvalue = true
+				--index = 0
+			elseif op == e3d.Opcode.GET_M then
+				valid_lvalue = true
+				--vm.bytecode_len = vm.bytecode_len - 3
+				--index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			end
+
+			if not valid_lvalue then
+				vm.error = string.format("ERROR: line %d: invalid lvalue for member index\n", vm.line)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+			
+			vm.skip_next_id_lookup = true -- we need to look up member ids manually
+			_match(vm, e3d.Token.ARROW)
+			_match(vm, e3d.Token.ID)
+	
+			-- lookup member
+			vm.has_id, vm.current_id = vm.expr_type.structref:_get_member(vm.current_id_name)
+			if not vm.has_id then
+				vm.error = string.format("ERROR: line %d: cannot index member '%s' of symbol '%s'\n", vm.line, vm.current_id_name, id.name)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+
+			if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRUCT then
+				vm:_bytecode_emitop(e3d.Opcode.GET_MX)
+				--vm:_bytecode_emit16(index + vm.current_id.index)
+				vm:_bytecode_emit16(vm.current_id.index)
+				vm:_bytecode_emit16(vm.current_id.type_info.structref.size)
+			else
+				vm:_bytecode_emitop(e3d.Opcode.GET_M)
+				--vm:_bytecode_emit16(index + vm.current_id.index)
+				vm:_bytecode_emit16(vm.current_id.index)
+			end
+
+			vm.expr_type = vm.current_id.type_info
+		elseif vm.token == e3d.Token.DOT then
+			id = vm.current_id
+			
+			if not (vm.expr_type.type_id >= e3d.EVMType.VEC2 and vm.expr_type.type_id <= e3d.EVMType.STRUCT) then
+				vm.error = string.format("ERROR: line %d: cannot index members of type '%d'\n", vm.line, vm.expr_type.type_id)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+
+			local op: uint8 = vm.prev_opcode
+			local class: uinteger
+			local index: uint16
+			local size: uint16 = 1
+			local valid_lvalue: boolean = false
+			
+			if (vm.prev_token == e3d.Token.ID) and (op == e3d.Opcode.GET_GX or op == e3d.Opcode.GET_LX or op == e3d.Opcode.GET_AX) then
+				valid_lvalue = true
+				vm.bytecode_len = vm.bytecode_len - 5
+				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+			elseif op == e3d.Opcode.GET_MX then
+				valid_lvalue = true
+				vm.bytecode_len = vm.bytecode_len - 5
+				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+			end
+
+			if not valid_lvalue then
+				vm.error = string.format("ERROR: line %d: invalid lvalue for member index\n", vm.line)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+
+			switch op do
+				case e3d.Opcode.GET_GX then
+					class = e3d.Class.GLOBAL
+				case e3d.Opcode.GET_LX then
+					class = e3d.Class.LOCAL
+				case e3d.Opcode.GET_AX then
+					class = e3d.Class.ARG
+				case e3d.Opcode.GET_MX then
+					class = e3d.Class.MEMORY
+			end
+			
+			vm.skip_next_id_lookup = true -- we need to look up member ids manually
+			_match(vm, e3d.Token.DOT)
+			_match(vm, e3d.Token.ID)
+	
+			-- lookup member
+			vm.has_id, vm.current_id = id.type_info.structref:_get_member(vm.current_id_name)
+			if not vm.has_id then
+				vm.error = string.format("ERROR: line %d: cannot index member '%s' of symbol '%s'\n", vm.line, vm.current_id_name, id.name)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+
+			if class == e3d.Class.GLOBAL then
+				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRUCT then
+					vm:_bytecode_emitop(e3d.Opcode.GET_GX)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+					vm:_bytecode_emit16(vm.current_id.type_info.structref.size)
+				else
+					vm:_bytecode_emitop(e3d.Opcode.GET_G)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+				end
+			elseif class == e3d.Class.ARG then
+				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRUCT then
+					vm:_bytecode_emitop(e3d.Opcode.GET_AX)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+					vm:_bytecode_emit16(vm.current_id.type_info.structref.size)
+				else
+					vm:_bytecode_emitop(e3d.Opcode.GET_A)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+				end
+			elseif class == e3d.Class.LOCAL then
+				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRUCT then
+					vm:_bytecode_emitop(e3d.Opcode.GET_LX)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+					vm:_bytecode_emit16(vm.current_id.type_info.structref.size)
+				else
+					vm:_bytecode_emitop(e3d.Opcode.GET_L)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+				end
+			elseif class == e3d.Class.MEMORY then
+				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRUCT then
+					vm:_bytecode_emitop(e3d.Opcode.GET_MX)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+					vm:_bytecode_emit16(vm.current_id.type_info.structref.size)
+				else
+					vm:_bytecode_emitop(e3d.Opcode.GET_M)
+					vm:_bytecode_emit16(index + vm.current_id.index)
+				end
+			end
+
+			vm.expr_type = vm.current_id.type_info
 		elseif vm.token == e3d.Token.BRAK then
 			-- TODO: complete this
 		else

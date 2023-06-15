@@ -96,6 +96,8 @@ global e3d.Token = @enum {
 	MUL,
 	DIV,
 	MOD,
+	ARROW,
+	DOT,
 	BRAK
 }
 
@@ -116,12 +118,8 @@ global e3d.Opcode = @enum {
 	SET_AX,
 	GET_M,
 	GET_MX,
-	GET_MO,
-	GET_MOX,
 	SET_M,
 	SET_MX,
-	SET_MO,
-	SET_MOX,
 	ADDROF_G,
 	ADDROF_L,
 	ADDROF_A,
@@ -330,6 +328,7 @@ e3d.EVM = @record {
 	token: uinteger,
 	token_val: uinteger,
 	token_valf: float32,
+	prev_token: uinteger,
 	line: uinteger,
 	expr_type: e3d.TypeInfo,
 	local_index: uint16,
@@ -362,22 +361,23 @@ e3d.EVM = @record {
 ---------------------------------------
 
 function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
+	-- returns size in words
 	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
 	
 	if type_pointed_to < e3d.EVMType.POINTER then
 		switch type_pointed_to do
 			case e3d.EVMType.INT, e3d.EVMType.FLOAT then
-				return 4
+				return 1
 			case e3d.EVMType.VEC2 then
-				return 8
+				return 2
 			case e3d.EVMType.VEC3 then
-				return 12
+				return 3
 			case e3d.EVMType.STRUCT then
-				return info.structref.size * 4
+				return info.structref.size
 		end
 	end
 	
-	return 4
+	return 1
 end
 
 function e3d.GPU:init(): void

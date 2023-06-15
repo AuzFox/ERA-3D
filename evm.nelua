@@ -231,6 +231,8 @@ function e3d.EVM:_get_ramw(addr: uint32): (integer, uint32)
 		return e3d.StatusCode.ERR_MISALIGNED_PTR, 0
 	end
 
+	--io.printf("fetching word at address 0x%08X\n", addr)
+
 	-- TODO: texture memory must not enforce big endian!
 	-- TODO: implement stack/globals read/write, don't allow reads/writes above lsp!
 
@@ -242,6 +244,7 @@ function e3d.EVM:_get_ramw(addr: uint32): (integer, uint32)
 end
 
 function e3d.EVM:_get_ramx(addr: uint32, n: uint16): integer
+	--io.printf("fetching %d words at address 0x%08X\n", n, addr)
 	return e3d.StatusCode.ERR_OOB_PTR
 end
 
@@ -268,6 +271,8 @@ function e3d.EVM:_set_ramw(addr: uint32, val: uint32): integer
 
 	-- TODO: texture memory must not enforce big endian!
 	-- TODO: implement stack/globals read/write, don't allow reads/writes above lsp!
+
+	--io.printf("setting word at address 0x%08X\n", addr)
 	
 	self.heap[addr] = (@uint8)(val >> 24)
 	self.heap[addr + 1] = (@uint8)((val & 0xFF0000) >> 16)
@@ -278,6 +283,7 @@ function e3d.EVM:_set_ramw(addr: uint32, val: uint32): integer
 end
 
 function e3d.EVM:_set_ramx(addr: uint32, n: uint16): integer
+	io.printf("setting %d words at address 0x%08X\n", n, addr)
 	return e3d.StatusCode.ERR_OOB_PTR
 end
 
@@ -507,29 +513,19 @@ function e3d.EVM:_dump_bytecode(): void
 				local n: uint16 = self:_bytecode_next16()
 				io.printf("SET_AX %d %d\n", index, n)
 			case e3d.Opcode.GET_M then
-				io.printf("GET_M\n")
+				index = self:_bytecode_next16()
+				io.printf("GET_M %d\n", index)
 			case e3d.Opcode.GET_MX then
 				index = self:_bytecode_next16()
-				io.printf("GET_MX %d\n", index)
-			case e3d.Opcode.GET_MO then
-				index = self:_bytecode_next16()
-				io.printf("GET_MO %d\n", index)
-			case e3d.Opcode.GET_MOX then
-				index = self:_bytecode_next16()
-				local offset: uint16 = self:_bytecode_next16()
-				io.printf("GET_MOX %d\n", index, offset)
+				local n: uint16 = self:_bytecode_next16()
+				io.printf("GET_MX %d %d\n", index, n)
 			case e3d.Opcode.SET_M then
-				io.printf("SET_M\n")
+				index = self:_bytecode_next16()
+				io.printf("SET_M %d\n", index)
 			case e3d.Opcode.SET_MX then
 				index = self:_bytecode_next16()
-				io.printf("SET_MX %d\n", index)
-			case e3d.Opcode.SET_MO then
-				index = self:_bytecode_next16()
-				io.printf("SET_MO %d\n", index)
-			case e3d.Opcode.SET_MOX then
-				index = self:_bytecode_next16()
-				local offset: uint16 = self:_bytecode_next16()
-				io.printf("SET_MOX %d\n", index, offset)
+				local n: uint16 = self:_bytecode_next16()
+				io.printf("SET_MX %d %d\n", index, n)
 			case e3d.Opcode.ADDROF_G then
 				index = self:_bytecode_next16()
 				io.printf("ADDROF_G %d\n", index)
@@ -756,11 +752,12 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local n: uint16 = self:_bytecode_next16()
 				self:_pop_args(index, n)
 			case e3d.Opcode.GET_M then
-				local ptr: uint32 = self:popu()
+				index = self:_bytecode_next16() -- offset in words
+				local ptr: int32 = self:popi()
 				local status: integer
 				local v: uint32
 
-				status, v = self:_get_ramw(ptr)
+				status, v = self:_get_ramw((@uint32)(ptr + (@int32)(index) * 4))
 				
 				switch status do
 					case e3d.StatusCode.OK then
@@ -773,11 +770,12 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 				end
 			case e3d.Opcode.GET_MX then
-				index = self:_bytecode_next16()
-				local ptr: uint32 = self:popu()
+				index = self:_bytecode_next16() -- offset in words
+				local size: uint16 = self:_bytecode_next16()
+				local ptr: int32 = self:popi()
 				local status: integer
 
-				status = self:_get_ramx(ptr, index)
+				status = self:_get_ramx((@uint32)(ptr + (@int32)(index) * 4), size)
 				
 				switch status do
 					case e3d.StatusCode.ERR_MISALIGNED_PTR then
@@ -788,10 +786,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 				end
 			case e3d.Opcode.SET_M then
+				index = self:_bytecode_next16() -- offset in words
 				local v: uint32 = self:popu()
-				local ptr: uint32 = self:popu()
+				local ptr: int32 = self:popi()
 				
-				switch self:_set_ramw(ptr, v) do
+				switch self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v) do
 					case e3d.StatusCode.ERR_MISALIGNED_PTR then
 						self.error = string.format("ERROR: misaligned word write address 0x%08X\n", ptr)
 						return false
@@ -800,11 +799,16 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 				end
 			case e3d.Opcode.SET_MX then
-				index = self:_bytecode_next16()
-				local ptr: uint32 = self:popu() -- TODO: get pointer from underneath values on stack
+				-- stack:
+				-- > osp
+				-- struct ($size words)
+				-- ptr
+				index = self:_bytecode_next16() -- offset in words
+				local size: uint16 = self:_bytecode_next16()
+				local ptr: int32 = self.opstack[(self.osp - 1) - size].i
 				local status: integer
 
-				status = self:_set_ramx(ptr, index)
+				status = self:_set_ramx((@uint32)(ptr + (@int32)(index) * 4), size)
 				
 				switch status do
 					case e3d.StatusCode.ERR_MISALIGNED_PTR then
@@ -814,22 +818,6 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
 						return false
 				end
-			case e3d.Opcode.SET_MO then
-				index = self:_bytecode_next16()
-				local ptr: uint32 = self:popu() -- TODO: get pointer from underneath values on stack
-				local status: integer
-
-				status = self:_set_ramx(ptr, index)
-				
-				switch status do
-					case e3d.StatusCode.ERR_MISALIGNED_PTR then
-						self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
-						return false
-					case e3d.StatusCode.ERR_OOB_PTR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
-						return false
-				end
-			case e3d.Opcode.SET_MOX then
 			case e3d.Opcode.ADDROF_G then
 				index = self:_bytecode_next16()
 				self:pushu(self:_address_of_global(index))
@@ -938,10 +926,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 							a.z + b.z})
 				end
 			case e3d.Opcode.ADDP then
-				index = self:_bytecode_next16() -- size of type pointed to (in bytes)
+				index = self:_bytecode_next16() -- size of type pointed to (in words)
 				local v: int32 = self:popi()
 				local p: int32 = self:popi()
-				self:pushi(p + v * index)
+				self:pushi(p + (v * (index * 4)))
 			case e3d.Opcode.SUB then
 				local b: int32 = self:popi()
 				local a: int32 = self:popi()
@@ -968,10 +956,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 							a.z - b.z})
 				end
 			case e3d.Opcode.SUBP then
-				index = self:_bytecode_next16() -- size of type pointed to (in bytes)
+				index = self:_bytecode_next16() -- size of type pointed to (in words)
 				local v: int32 = self:popi()
 				local p: int32 = self:popi()
-				self:pushi(p - v * index)
+				self:pushi(p - (v * (index * 4)))
 			case e3d.Opcode.MUL then
 				local b: int32 = self:popi()
 				local a: int32 = self:popi()
@@ -1282,6 +1270,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				end
 			else
 				-- invalid opcode
+				self.error = string.format("ERROR: attempt to execute invalid opcode %d\n", op)
 				return false
 		end
 
