@@ -211,89 +211,74 @@ function e3d.EVM:reset(): void
 	-- TODO: reset GPU
 end
 
-function e3d.EVM:_get_ramc(addr: uint32): (boolean, uint32)
-	--[[
-	if addr > e3d.RAM_MAX_ADDR then
-		return false, 0
+-- get one word from the vm RAM, does not do bounds or alignment checking!
+function e3d.EVM:_get_ramw(addr: uint32): uint32
+	if addr < e3d.TMEM_START_ADDR then
+		-- heap
+		return ((@uint32)(self.heap[addr]) << 24) | ((@uint32)(self.heap[addr + 1]) << 16) | ((@uint32)(self.heap[addr + 2]) << 8) | (@uint32)(self.heap[addr + 3])
+	elseif addr < e3d.GLOBALS_START_ADDR then
+		-- tmem
+		local col: rl.color = self.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
+		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
+	elseif addr < e3d.LOCALS_START_ADDR then
+		-- globals
+		return self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u
+	elseif addr < e3d.ARGS_START_ADDR then
+		-- locals
+		return self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u
+	elseif addr < e3d.ROM_START_ADDR then
+		-- args
+		return self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u
+	else
+		-- rom
+		addr = (addr - e3d.ROM_START_ADDR) /// 4
+		return ((@uint32)(self.rom[addr]) << 24) | ((@uint32)(self.rom[addr + 1]) << 16) | ((@uint32)(self.rom[addr + 2]) << 8) | (@uint32)(self.rom[addr + 3])
 	end
-
-	-- TODO: don't allow char read/write in texture memory or stack/globals!
-	
-	return true, (@uint32)(self.ram[addr])
-	]]
-	return false, 0
 end
 
-function e3d.EVM:_get_ramw(addr: uint32): (integer, uint32)
-	if addr > e3d.RAM_MAX_ADDR then
-		return e3d.StatusCode.ERR_OOB_PTR, 0
-	elseif (addr & 0b11) ~= 0 then
-		return e3d.StatusCode.ERR_MISALIGNED_PTR, 0
+-- set one word in the vm RAM, does not do bounds or alignment checking!
+function e3d.EVM:_set_ramw(addr: uint32, val: uint32): void
+	if addr < e3d.TMEM_START_ADDR then
+		-- heap
+		self.heap[addr] = val >> 24
+		self.heap[addr + 1] = (val & 0xFF0000) >> 16
+		self.heap[addr + 2] = (val & 0x00FF00) >> 8
+		self.heap[addr + 3] = val & 0xFF
+	elseif addr < e3d.GLOBALS_START_ADDR then
+		-- tmem
+		local col: rl.color
+		addr = (addr - e3d.TMEM_START_ADDR) /// 4
+		col.r = val >> 24
+		col.g = (val & 0xFF0000) >> 16
+		col.b = (val & 0x00FF00) >> 8
+		col.a = val & 0xFF
+		self.tmem[addr] = col
+	elseif addr < e3d.LOCALS_START_ADDR then
+		-- globals
+		self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u = val
+	elseif addr < e3d.ARGS_START_ADDR then
+		-- locals
+		self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u = val
+	elseif addr < e3d.ROM_START_ADDR then
+		-- args
+		self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u = val
+	else
+		-- rom
+		addr = (addr - e3d.ROM_START_ADDR) /// 4
+		self.rom[addr] = val >> 24
+		self.rom[addr + 1] = (val & 0xFF0000) >> 16
+		self.rom[addr + 2] = (val & 0x00FF00) >> 8
+		self.rom[addr + 3] = val & 0xFF
 	end
-
-	--io.printf("fetching word at address 0x%08X\n", addr)
-
-	-- TODO: texture memory must not enforce big endian!
-	-- TODO: implement stack/globals read/write, don't allow reads/writes above lsp!
-
-	local v: uint32
-
-	v = ((@uint32)(self.heap[addr]) << 24) | ((@uint32)(self.heap[addr + 1]) << 16) | ((@uint32)(self.heap[addr + 2]) << 8) | (@uint32)(self.heap[addr + 3])
-
-	return e3d.StatusCode.OK, v
 end
 
-function e3d.EVM:_get_ramx(addr: uint32, n: uint16): integer
-	--io.printf("fetching %d words at address 0x%08X\n", n, addr)
-	return e3d.StatusCode.ERR_OOB_PTR
-end
-
-function e3d.EVM:_set_ramc(addr: uint32, val: uint32): boolean
-	--[[
-	if addr > e3d.RAM_MAX_ADDR then
-		return false
-	end
-	
-	-- TODO: don't allow char read/write in texture memory or stack/globals!
-	
-	self.ram[addr] = (@uint8)(val)
-	return true
-	]]
-	return false
-end
-
-function e3d.EVM:_set_ramw(addr: uint32, val: uint32): integer
-	if addr > e3d.RAM_MAX_ADDR then
-		return e3d.StatusCode.ERR_OOB_PTR
-	elseif (addr & 0b11) ~= 0 then -- words are aligned to 4 byte adresses
-		return e3d.StatusCode.ERR_MISALIGNED_PTR
-	end
-
-	-- TODO: texture memory must not enforce big endian!
-	-- TODO: implement stack/globals read/write, don't allow reads/writes above lsp!
-
-	--io.printf("setting word at address 0x%08X\n", addr)
-	
-	self.heap[addr] = (@uint8)(val >> 24)
-	self.heap[addr + 1] = (@uint8)((val & 0xFF0000) >> 16)
-	self.heap[addr + 2] = (@uint8)((val & 0x00FF00) >> 8)
-	self.heap[addr + 3] = (@uint8)(val & 0xFF)
-
-	return e3d.StatusCode.OK
-end
-
-function e3d.EVM:_set_ramx(addr: uint32, n: uint16): integer
-	io.printf("setting %d words at address 0x%08X\n", n, addr)
-	return e3d.StatusCode.ERR_OOB_PTR
-end
-
-function e3d.EVM:_push_globals(start: uint16, n: uint16): void
+function e3d.EVM:_get_globals(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.globals[start + i])
 	end
 end
 
-function e3d.EVM:_pop_globals(start: uint16, n: uint16): void
+function e3d.EVM:_set_globals(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -302,13 +287,13 @@ function e3d.EVM:_pop_globals(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:_push_locals(start: uint16, n: uint16): void
+function e3d.EVM:_get_locals(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.locals[self.cf.lbp + start + i])
 	end
 end
 
-function e3d.EVM:_pop_locals(start: uint16, n: uint16): void
+function e3d.EVM:_set_locals(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -317,21 +302,13 @@ function e3d.EVM:_pop_locals(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:_push_args(start: uint16, n: uint16): void
+function e3d.EVM:_get_args(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.args[self.ap + start + i])
 	end
 end
 
-function e3d.EVM:_push_argsx(n: uint16): void
-	for i = 0, < n do
-		self.args[self.asp + i] = self.opstack[self.osp - n + i]
-	end
-	self.asp = self.asp + n
-	self.osp = self.osp - n
-end
-
-function e3d.EVM:_pop_args(start: uint16, n: uint16): void
+function e3d.EVM:_set_args(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -340,58 +317,32 @@ function e3d.EVM:_pop_args(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:_push_arg(val: e3d.EVMValue): void
-	self.args[self.asp] = val
-	self.asp = self.asp + 1
+function e3d.EVM:_push_args(n: uint16): void
+	for i = 0, < n do
+		self.args[self.asp + i] = self.opstack[(self.osp - n) + i]
+	end
+	self.asp = self.asp + n
+	self.osp = self.osp - n
 end
 
-function e3d.EVM:_push_argi(val: int32): void
-	self.args[self.asp] = {i=val}
-	self.asp = self.asp + 1
-end
-
-function e3d.EVM:_push_argu(val: uint32): void
-	self.args[self.asp] = {u=val}
-	self.asp = self.asp + 1
-end
-
-function e3d.EVM:_push_argf(val: float32): void
-	self.args[self.asp] = {f=val}
-	self.asp = self.asp + 1
-end
-
-function e3d.EVM:_push_argv2(val: rl.vector2): void
-	self:_push_argf(val.x)
-	self:_push_argf(val.y)
-end
-
-function e3d.EVM:_push_argv3(val: rl.vector3): void
-	self:_push_argf(val.x)
-	self:_push_argf(val.y)
-	self:_push_argf(val.z)
-end
-
-function e3d.EVM:_push_callframe(): void
+function e3d.EVM:_push_callframe(argc: uint16): void
 	self.callstack[self.csp] = self.cf
 	self.csp = self.csp + 1
 	
-	self.ap = self.cf.abp
 	self.cf.lbp = self.lsp
-	self.cf.abp = self.asp
+	self.cf.argc = argc
+
+	self.ap = self.asp - argc
 end
 
 function e3d.EVM:_pop_callframe(): void
+	self.lsp = self.cf.lbp
+	self.asp = self.asp - self.cf.argc
+	
 	self.csp = self.csp - 1
 	self.cf = self.callstack[self.csp]
-
-	if self.csp > 0 then
-		self.ap = self.callstack[self.csp - 1].abp
-	else
-		self.ap = 0
-	end
 	
-	self.lsp = self.cf.lbp
-	self.asp = self.cf.abp
+	self.ap = self.asp - self.cf.argc
 end
 
 function e3d.EVM:_address_of_global(index: uint16): uint32
@@ -559,11 +510,6 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("PUSH_VEC3 (%f, %f, %f)\n", v.x, v.y, v.z)
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				io.printf("PUSH_VEC3_ZERO\n")
-			case e3d.Opcode.ARG then
-				io.printf("ARG\n")
-			case e3d.Opcode.ARGX then
-				index = self:_bytecode_next16()
-				io.printf("ARGX %d\n", index)
 			case e3d.Opcode.BIN_NOT then
 				io.printf("BIN_NOT\n")
 			case e3d.Opcode.BIN_OR then
@@ -675,7 +621,9 @@ function e3d.EVM:_dump_bytecode(): void
 			case e3d.Opcode.JUMP_Z then
 				io.printf("JUMP_Z 0x%04X\n", self:_bytecode_next16())
 			case e3d.Opcode.CALL then
-				io.printf("CALL 0x%04X\n", self:_bytecode_next16())
+				index = self:_bytecode_next16()
+				local argc: uint16 = self:_bytecode_next16()
+				io.printf("CALL 0x%04X %d\n", index, argc)
 			case e3d.Opcode.CALL_PTR then
 				io.printf("CALL_PTR\n")
 			case e3d.Opcode.RETURN then
@@ -685,7 +633,9 @@ function e3d.EVM:_dump_bytecode(): void
 			case e3d.Opcode.ITOF then
 				io.printf("ITOF\n")
 			case e3d.Opcode.API then
-				io.printf("API 0x%04X\n", self:_bytecode_next16())
+				index = self:_bytecode_next16()
+				local argc: uint16 = self:_bytecode_next16()
+				io.printf("API 0x%04X %d\n", index, argc)
 			else
 				-- invalid opcode
 				io.printf("!!! INVALID OPCODE !!!\n")
@@ -711,14 +661,14 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.GET_GX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_push_globals(index, n)
+				self:_get_globals(index, n)
 			case e3d.Opcode.SET_G then
 				index = self:_bytecode_next16()
 				self:set_global(index, self:pop())
 			case e3d.Opcode.SET_GX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_pop_globals(index, n)
+				self:_set_globals(index, n)
 			case e3d.Opcode.NEW_L then
 				self.lsp = self.lsp + self:_bytecode_next16()
 			case e3d.Opcode.DEL_L then
@@ -729,95 +679,113 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.GET_LX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_push_locals(index, n)
+				self:_get_locals(index, n)
 			case e3d.Opcode.SET_L then
 				index = self:_bytecode_next16()
 				self:set_local(index, self:pop())
 			case e3d.Opcode.SET_LX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_pop_locals(index, n)
+				self:_set_locals(index, n)
 			case e3d.Opcode.GET_A then
 				index = self:_bytecode_next16()
 				self:push(self:get_arg(index))
 			case e3d.Opcode.GET_AX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_push_args(index, n)
+				self:_get_args(index, n)
 			case e3d.Opcode.SET_A then
 				index = self:_bytecode_next16()
 				self:set_arg(index, self:pop())
 			case e3d.Opcode.SET_AX then
 				index = self:_bytecode_next16()
 				local n: uint16 = self:_bytecode_next16()
-				self:_pop_args(index, n)
+				self:_set_args(index, n)
 			case e3d.Opcode.GET_M then
 				index = self:_bytecode_next16() -- offset in words
 				local ptr: int32 = self:popi()
 				local status: integer
 				local v: uint32
 
-				status, v = self:_get_ramw((@uint32)(ptr + (@int32)(index) * 4))
-				
-				switch status do
-					case e3d.StatusCode.OK then
-						self:pushu(v)
-					case e3d.StatusCode.ERR_MISALIGNED_PTR then
-						self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
-						return false
-					case e3d.StatusCode.ERR_OOB_PTR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
-						return false
+				if ptr > e3d.RAM_MAX_ADDR then
+					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					return false
+				elseif (ptr & 0b11) ~= 0 then
+					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					return false
 				end
+				
+				self:pushu(self:_get_ramw((@uint32)(ptr + (@int32)(index) * 4)))
 			case e3d.Opcode.GET_MX then
 				index = self:_bytecode_next16() -- offset in words
 				local size: uint16 = self:_bytecode_next16()
 				local ptr: int32 = self:popi()
-				local status: integer
 
-				status = self:_get_ramx((@uint32)(ptr + (@int32)(index) * 4), size)
-				
-				switch status do
-					case e3d.StatusCode.ERR_MISALIGNED_PTR then
-						self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+				if ptr > e3d.RAM_MAX_ADDR then
+					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					return false
+				elseif (ptr & 0b11) ~= 0 then
+					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					return false
+				end
+
+				local start: uint32 = (@uint32)(ptr + (@int32)(index) * 4)
+				for i = 0, < size do
+					local addr: uint32 = start + i * 4
+
+					if addr > e3d.RAM_MAX_ADDR then
+						self.error = string.format("ERROR: invalid word read address 0x%08X\n", addr)
 						return false
-					case e3d.StatusCode.ERR_OOB_PTR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
-						return false
+					end
+					
+					self:pushu(self:_get_ramw(addr))
 				end
 			case e3d.Opcode.SET_M then
 				index = self:_bytecode_next16() -- offset in words
 				local v: uint32 = self:popu()
 				local ptr: int32 = self:popi()
-				
-				switch self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v) do
-					case e3d.StatusCode.ERR_MISALIGNED_PTR then
-						self.error = string.format("ERROR: misaligned word write address 0x%08X\n", ptr)
-						return false
-					case e3d.StatusCode.ERR_OOB_PTR then
-						self.error = string.format("ERROR: invalid word write address 0x%08X\n", ptr)
-						return false
+
+				if ptr > e3d.RAM_MAX_ADDR then
+					self.error = string.format("ERROR: invalid word write address 0x%08X\n", ptr)
+					return false
+				elseif (ptr & 0b11) ~= 0 then
+					self.error = string.format("ERROR: misaligned word write address 0x%08X\n", ptr)
+					return false
 				end
+				
+				self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v)
 			case e3d.Opcode.SET_MX then
 				-- stack:
 				-- > osp
-				-- struct ($size words)
+				-- struct (size words)
 				-- ptr
 				index = self:_bytecode_next16() -- offset in words
 				local size: uint16 = self:_bytecode_next16()
 				local ptr: int32 = self.opstack[(self.osp - 1) - size].i
-				local status: integer
 
-				status = self:_set_ramx((@uint32)(ptr + (@int32)(index) * 4), size)
-				
-				switch status do
-					case e3d.StatusCode.ERR_MISALIGNED_PTR then
-						self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
-						return false
-					case e3d.StatusCode.ERR_OOB_PTR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
-						return false
+				if ptr > e3d.RAM_MAX_ADDR then
+					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					return false
+				elseif (ptr & 0b11) ~= 0 then
+					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					return false
 				end
+
+				local start_addr: uint32 = (@uint32)(ptr + (@int32)(index) * 4)
+				local struct_start: uinteger = self.osp - size
+				for i = 0, < size do
+					local mem_addr: uint32 = start_addr + i * 4
+					local struct_word_index: uint32 = struct_start + i
+
+					if mem_addr > e3d.RAM_MAX_ADDR then
+						self.error = string.format("ERROR: invalid word read address 0x%08X\n", mem_addr)
+						return false
+					end
+					
+					self:_set_ramw(mem_addr, self.opstack[struct_word_index].u)
+				end
+
+				self.osp = (self.osp - 1) - size -- pop ptr and struct from stack
 			case e3d.Opcode.ADDROF_G then
 				index = self:_bytecode_next16()
 				self:pushu(self:_address_of_global(index))
@@ -856,11 +824,6 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushv3(self:_bytecode_nextv3())
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				self:pushv3({0,0,0})
-			case e3d.Opcode.ARG then
-				self:_push_arg(self:pop())
-			case e3d.Opcode.ARGX then
-				index = self:_bytecode_next16()
-				self:_push_argsx(index)
 			case e3d.Opcode.BIN_NOT then
 				self:pushu(~self:popu())
 			case e3d.Opcode.BIN_OR then
@@ -1028,7 +991,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushf(math.fmod(a, b))
 			case e3d.Opcode.LOGIC_NOT then
 				local v: uint32 = self:popu()
-				self:pushu(v ~= 0 and 1 or 0)
+				self:pushu(v == 0 and 1 or 0)
 			case e3d.Opcode.LOGIC_OR then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
@@ -1233,7 +1196,9 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				end
 			case e3d.Opcode.CALL then
 				index = self:_bytecode_next16()
-				self:_push_callframe()
+				local argc: uint16 = self:_bytecode_next16()
+				self:_push_args(argc)
+				self:_push_callframe(argc)
 				self.cf.pc = index
 			case e3d.Opcode.CALL_PTR then
 				local addr: uint32 = self:popu()
@@ -1257,9 +1222,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushf((@float32)(self:popi()))
 			case e3d.Opcode.API then
 				index = self:_bytecode_next16()
+				local argc: uint16 = self:_bytecode_next16()
 				local func: e3d.APIFunction = self.api_funcs[index]
 				if func ~= nilptr then
-					self:_push_callframe()
+					self:_push_args(argc)
+					self:_push_callframe(argc)
 					if not func(self) then
 						return false
 					end
@@ -1288,7 +1255,7 @@ end
 function e3d.EVM:call_hook(hook: integer): boolean
 	if self.hook_flags[hook] then
 		self.cf.pc = self.hook_addresses[hook]
-		return self:run(1000)
+		return self:run(0)
 	end
 	return true
 end
@@ -1417,6 +1384,26 @@ local function api_print_vec3(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function api_btnd(vm: *e3d.EVM): boolean
+	local btns: []cint = {
+		rl.keyboardKey.KEY_UP,
+		rl.keyboardKey.KEY_DOWN,
+		rl.keyboardKey.KEY_LEFT,
+		rl.keyboardKey.KEY_RIGHT,
+		rl.keyboardKey.KEY_A,
+		rl.keyboardKey.KEY_S,
+		rl.keyboardKey.KEY_Q,
+		rl.keyboardKey.KEY_W,
+		rl.keyboardKey.KEY_Z,
+	}
+	
+	local b: uint32 = vm:get_argi(0)
+
+	vm:pushi(rl.isKeyPressed(btns[b]) and 1 or 0)
+	
+	return true
+end
+
 -- math functions
 local function api_imin(vm: *e3d.EVM): boolean
 	-- signature:
@@ -1425,7 +1412,11 @@ local function api_imin(vm: *e3d.EVM): boolean
 	local a: int32 = vm:get_argi(0)
 	local b: int32 = vm:get_argi(1)
 	
-	vm:pushf(math.min(a, b))
+	if a < b then
+		vm:pushi(a)
+	else
+		vm:pushi(b)
+	end
 	
 	return true
 end
@@ -1437,21 +1428,60 @@ local function api_imax(vm: *e3d.EVM): boolean
 	local a: int32 = vm:get_argi(0)
 	local b: int32 = vm:get_argi(1)
 	
-	vm:pushf(math.max(a, b))
+	if a < b then
+		vm:pushi(a)
+	else
+		vm:pushi(b)
+	end
 	
 	return true
 end
 
-local function api_iclamp(vm: *e3d.EVM): boolean
+local function api_imid(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int iclamp(int v, int min, int max);
+	-- int imid(int a, int b, int c);
 
-	local v: uint32 = vm:get_argi(0)
-	local min: uint32 = vm:get_argi(1)
-	local max: uint32 = vm:get_argi(2)
+	local a: int32 = vm:get_argi(0)
+	local b: int32 = vm:get_argi(1)
+	local c: int32 = vm:get_argi(2)
 
-	vm:pushf(math.clamp(v, min, max))
+	if b < a then
+		local t: int32 = a
+		a = b
+		b = t
+	end
+	if c < b then
+		local t: int32 = c
+		c = b
+		b = t
+	end
+	if b < a then
+		local t: int32 = a
+		a = b
+		b = t
+	end
+	
+	vm:pushi(b)
 
+	return true
+end
+
+local function api_iwrap(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int iwrap(int v, int min, int max);
+
+	local v: int32 = vm:get_argi(0)
+	local min: int32 = vm:get_argi(1)
+	local max: int32 = vm:get_argi(2)
+	
+	local range_size: int32 = max - min + 1;
+
+	if v < min then
+		v = v + range_size * ((min - v) /// range_size + 1)
+	end
+
+	vm:pushi(min + (v - min) % range_size)
+	
 	return true
 end
 
@@ -1462,7 +1492,11 @@ local function api_fmin(vm: *e3d.EVM): boolean
 	local a: float32 = vm:get_argf(0)
 	local b: float32 = vm:get_argf(1)
 
-	vm:pushf(math.min(a, b))
+	if a < b then
+		vm:pushf(a)
+	else
+		vm:pushf(b)
+	end
 
 	return true
 end
@@ -1474,21 +1508,60 @@ local function api_fmax(vm: *e3d.EVM): boolean
 	local a: float32 = vm:get_argf(0)
 	local b: float32 = vm:get_argf(1)
 
-	vm:pushf(math.max(a, b))
+	if a > b then
+		vm:pushf(a)
+	else
+		vm:pushf(b)
+	end
 
 	return true
 end
 
-local function api_fclamp(vm: *e3d.EVM): boolean
+local function api_fmid(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int fclamp(float v, float min, float max);
+	-- int fmid(float a, float b, float c);
+
+	local a: float32 = vm:get_argf(0)
+	local b: float32 = vm:get_argf(1)
+	local c: float32 = vm:get_argf(2)
+
+	if b < a then
+	    local t: float32 = a
+	    a = b
+	    b = t
+	end
+	if c < b then
+	    local t: float32 = c
+	    c = b
+	    b = t
+	end
+	if b < a then
+	    local t: float32 = a
+	    a = b
+	    b = t
+	end
+	
+	vm:pushf(b)
+
+	return true
+end
+
+local function api_fwrap(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int fwrap(int v, float min, float max);
 
 	local v: float32 = vm:get_argf(0)
 	local min: float32 = vm:get_argf(1)
 	local max: float32 = vm:get_argf(2)
+	
+	local range_size: float32 = max - min + 1;
 
-	vm:pushf(math.clamp(v, min, max))
+	if v < min then
+		v = v + range_size * ((min - v) / range_size + 1)
+	end
 
+	vm:pushf(min + (v - min) % range_size)
+	
 	return true
 end
 
@@ -1915,13 +1988,17 @@ function e3d.new_vm(): *e3d.EVM
 		{name="print_vec2",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_print_vec2},
 		{name="print_vec3",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},                           func=api_print_vec3},
 		
-		{name="imin",   type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_imin},
-		{name="imax",   type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_imax},
-		{name="iclamp", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_iclamp},
+		{name="btnd", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}}, func=api_btnd},
+		
+		{name="imin",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_imin},
+		{name="imax",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_imax},
+		{name="imid",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_imid},
+		{name="iwrap", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_iwrap},
 
-		{name="fmin",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_fmin},
-		{name="fmax",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_fmax},
-		{name="fclamp", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_fclamp},
+		{name="fmin",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_fmin},
+		{name="fmax",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_fmax},
+		{name="fmid",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_fmid},
+		{name="fwrap", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_fwrap},
 		
 		{name="deg", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_deg},
 		{name="rad", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_rad},

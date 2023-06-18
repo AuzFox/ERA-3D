@@ -598,6 +598,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			local target_argc: isize = #id.argdata
 			local target_info: e3d.TypeInfo
 			local argc: isize = 0
+			local size: uint16 = 0
 
 			if target_argc == 0 then
 				if vm.token ~= ')'_u8 then
@@ -654,16 +655,13 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 
 					if constructor_index == -1 then
 						if vm.expr_type.type_id == e3d.EVMType.VEC2 then
-							vm:_bytecode_emitop(e3d.Opcode.ARGX)
-							vm:_bytecode_emit16(2)
+							size = size + 2
 						elseif vm.expr_type.type_id == e3d.EVMType.VEC3 then
-							vm:_bytecode_emitop(e3d.Opcode.ARGX)
-							vm:_bytecode_emit16(3)
+							size = size + 3
 						elseif vm.expr_type.type_id == e3d.EVMType.STRUCT then
-							vm:_bytecode_emitop(e3d.Opcode.ARGX)
-							vm:_bytecode_emit16(vm.expr_type.structref.size)
+							size = size + vm.expr_type.structref.size
 						else
-							vm:_bytecode_emitop(e3d.Opcode.ARG)
+							size = size + 1
 						end
 					end
 
@@ -688,10 +686,12 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				else
 					vm:_bytecode_emitop(e3d.Opcode.API)
 					vm:_bytecode_emit16(id.index)
+					vm:_bytecode_emit16(size)
 				end
 			elseif id.class == e3d.Class.FUNCTION then
 				vm:_bytecode_emitop(e3d.Opcode.CALL)
 				vm:_bytecode_emit16(id.index)
+				vm:_bytecode_emit16(size)
 			end
 
 			vm.expr_type = id.type_info
@@ -966,7 +966,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			coroutine.yield()
 		end
 		
-		if vm.expr_type == e3d.EVMType.INT then
+		if vm.expr_type.type_id == e3d.EVMType.INT then
 			vm:_bytecode_emitop(e3d.Opcode.LOGIC_NOT)
 		else
 			vm.error = string.format("ERROR: line %d: cannot use operator `!` on type '%d'\n", vm.line, vm.expr_type.type_id)
@@ -986,7 +986,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			coroutine.yield()
 		end
 		
-		if vm.expr_type == e3d.EVMType.INT then
+		if vm.expr_type.type_id == e3d.EVMType.INT then
 			vm:_bytecode_emitop(e3d.Opcode.BIN_NOT)
 		else
 			vm.error = string.format("ERROR: line %d: cannot use operator `~` on type '%d'\n", vm.line, vm.expr_type.type_id)
@@ -1868,11 +1868,20 @@ local function _statement(vm: *e3d.EVM): void
 				vm:_bytecode_emitop(e3d.Opcode.SET_L)
 				vm:_bytecode_emit16(id.index)
 			else
-				-- TODO: add logic for assigning structs!
 				if var_type == e3d.EVMType.VEC2 or var_type == e3d.EVMType.VEC3 then
 					vm:_bytecode_emitop(e3d.Opcode.SET_LX)
 					vm:_bytecode_emit16(id.index)
 					vm:_bytecode_emit16(size)
+				elseif var_type == e3d.EVMType.STRUCT then
+					if structref ~= vm.expr_type.structref then
+						vm.error = string.format("ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n", vm.line, vm.expr_type.structref.name, structref.name)
+						vm.compile_err = true
+						coroutine.yield()
+					end
+					
+					vm:_bytecode_emitop(e3d.Opcode.SET_LX)
+					vm:_bytecode_emit16(id.index)
+					vm:_bytecode_emit16(id.type_info.structref.size)
 				else
 					vm:_bytecode_emitop(e3d.Opcode.SET_L)
 					vm:_bytecode_emit16(id.index)

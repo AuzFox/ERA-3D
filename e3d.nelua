@@ -20,21 +20,23 @@ global e3d = @record{}
 
 --[[ RAM logical memory map
 	heap:    8 MiB
-	tmem:    4 MiB  (2048*2048 pixels (32bpp))
+	tmem:    4 MiB  (1024*1024 pixels (32bpp))
 	globals: 256KiB (65536 words)
 	locals:  256KiB (65536 words)
 	args:    256KiB (65536 words)
 	rom:     64KiB  (65536 bytes)
 	TOTAL: 12 MiB + 832KiB
 
-	OLD, NEEDS UPDATE:
 	0x000000 - 0x7FFFFF: heap
-	0x800000 - 0xBFFFFF: t0mem
-	0xC00000 - 0xFFFFFF: t1mem
+	0x800000 - 0xBFFFFF: tmem
+	0xC00000 - 0xC3FFFF: globals
+	0xC40000 - 0xC7FFFF: locals
+	0xC80000 - 0xCBFFFF: args
+	0xCC0000 - 0xCCFFFF: rom
 ]]
 
-global e3d.TMEM_WIDTH <comptime> = 2048
-global e3d.TMEM_HEIGHT <comptime> = 2048
+global e3d.TMEM_WIDTH <comptime> = 1024
+global e3d.TMEM_HEIGHT <comptime> = 1024
 
 global e3d.HEAP_SIZE      <comptime> = (1024*1024*8) -- 8MiB
 global e3d.TMEM_SIZE      <comptime> = (e3d.TMEM_WIDTH*e3d.TMEM_HEIGHT) -- ?MiB (2048*2048 pixels (32bpp))
@@ -49,10 +51,11 @@ global e3d.API_FUNCS_SIZE <comptime> = 65536
 global e3d.CAMERAS_COUNT  <comptime> = 8
 
 global e3d.TMEM_START_ADDR <comptime> = 0x800000
-global e3d.GLOBALS_START_ADDR <comptime> = 0x800000
-global e3d.LOCALS_START_ADDR <comptime> = 0x800000
-global e3d.ARGS_START_ADDR <comptime> = 0x800000
-global e3d.RAM_MAX_ADDR <comptime> = 0x7FFFFF
+global e3d.GLOBALS_START_ADDR <comptime> = 0xC00000
+global e3d.LOCALS_START_ADDR <comptime> = 0xC40000
+global e3d.ARGS_START_ADDR <comptime> = 0xC80000
+global e3d.ROM_START_ADDR <comptime> = 0xCC0000
+global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
 
 global e3d.Token = @enum {
 	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
@@ -134,8 +137,6 @@ global e3d.Opcode = @enum {
 	PUSH_VEC2_ZERO,
 	PUSH_VEC3,
 	PUSH_VEC3_ZERO,
-	ARG,
-	ARGX,
 	BIN_NOT,
 	BIN_OR,
 	BIN_XOR,
@@ -271,7 +272,7 @@ global e3d.EVMValue = @union {
 global e3d.CallFrame = @record {
 	pc: uinteger,
 	lbp: uinteger,
-	abp: uinteger
+	argc: uint16
 }
 
 global e3d.Struct = @record {
@@ -316,7 +317,7 @@ e3d.EVM = @record {
 	globals_len: uinteger,
 	lsp: uinteger,
 	asp: uinteger,
-	ap: uinteger,
+	ap: uinteger,   -- ap for current function
 	osp: uinteger,
 	csp: uinteger,
 	hook_addresses: [4]uint16,
@@ -399,7 +400,7 @@ function e3d.GPU:init(): void
 		}
 	end
 
-	self.cameras[0].position = {0,0,4} -- debug
+	self.cameras[0].position = {0,0,80} -- debug
 
 	self.current_camera = 0
 	self.gfx_texture = rl.loadTexture("test.png")
