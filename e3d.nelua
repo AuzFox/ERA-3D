@@ -253,6 +253,10 @@ global e3d.GPU = @record {
 	cameras: [e3d.CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
+	tex_x_loc: cint,
+	tex_y_loc: cint,
+	tex_w_loc: cint,
+	tex_h_loc: cint,
 
 	-- graphics state
 	current_camera: uinteger,
@@ -381,6 +385,20 @@ function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 	return 1
 end
 
+function e3d.GPU:texture(x: int32, y: int32, w: int32, h: int32): void
+	-- TODO: bounds check!
+
+	self.tex_x = (@cint)(x)
+	self.tex_y = (@cint)(y)
+	self.tex_w = (@cint)(w)
+	self.tex_h = (@cint)(h)
+	
+	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
+end
+
 function e3d.GPU:init(): void
 	rl.setConfigFlags(rl.configFlags.FLAG_VSYNC_HINT) -- enable vsync
 	--rl.setTraceLogLevel(rl.traceLogLevel.LOG_WARNING) -- only log errors and warnings
@@ -404,9 +422,18 @@ function e3d.GPU:init(): void
 
 	self.current_camera = 0
 	self.gfx_texture = rl.loadTexture("test.png")
+	self.gfx_shader = rl.loadShader(nilptr, "shader.fs")
+
+	self.tex_x_loc = rl.getShaderLocation(self.gfx_shader, "texX")
+	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
+	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
+	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
+
+	self:texture(0, 0, 32, 32)
 end
 
 function e3d.GPU:cleanup(): void
+	rl.unloadShader(self.gfx_shader)
 	rl.unloadTexture(self.gfx_texture)
 
 	rl.closeWindow()

@@ -1211,7 +1211,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				end
 			case e3d.Opcode.RETURN then
 				-- if returning from first function call, halt the program
-				if self.csp == 0 then
+				if self.csp == 1 then
 					return true
 				else
 					self:_pop_callframe()
@@ -1228,6 +1228,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					self:_push_args(argc)
 					self:_push_callframe(argc)
 					if not func(self) then
+						self:_pop_callframe()
 						return false
 					end
 					self:_pop_callframe()
@@ -1255,7 +1256,10 @@ end
 function e3d.EVM:call_hook(hook: integer): boolean
 	if self.hook_flags[hook] then
 		self.cf.pc = self.hook_addresses[hook]
-		return self:run(0)
+		self:_push_callframe(0)
+		local result: boolean = self:run(0)
+		self:_pop_callframe()
+		return result
 	end
 	return true
 end
@@ -1354,6 +1358,11 @@ end
 	// i/o
 	// ...
 ]]
+
+local function api_halt(vm: *e3d.EVM): boolean
+	vm.error = "- PROGRAM HALTED -\n"
+	return false
+end
 
 local function api_print_int(vm: *e3d.EVM): boolean
 	local v: int32 = vm:get_argi(0)
@@ -1817,7 +1826,12 @@ local function api_texture(vm: *e3d.EVM): boolean
 	local w: int32 = vm:get_argi(2)
 	local h: int32 = vm:get_argi(3)
 
-	-- TODO: implement
+	w = math.clamp(w, 1, 256)
+	h = math.clamp(h, 1, 256)
+	x = math.clamp(x, 0, 1024 - w)
+	y = math.clamp(y, 0, 1024 - h)
+
+	vm.gpu:texture(x, y, w, h)
 
 	return true
 end
@@ -1839,6 +1853,8 @@ local function api_meshbegin(vm: *e3d.EVM): boolean
 			return false
 	end
 
+	rl.beginShaderMode(vm.gpu.gfx_shader)
+
 	rlgl.setTexture(vm.gpu.gfx_texture.id)
 	
 	rlgl.beginMesh(mode)
@@ -1851,6 +1867,8 @@ local function api_meshend(vm: *e3d.EVM): boolean
 	-- void meshend();
 
 	rlgl.endMesh()
+
+	rl.endShaderMode()
 	
 	return true
 end
@@ -1983,6 +2001,8 @@ function e3d.new_vm(): *e3d.EVM
 	}
 	
 	local api_ids: []e3d.Identifier = {
+		{name="halt", type_info={e3d.EVMType.VOID}, func=api_halt},
+		
 		{name="print_int",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_print_int},
 		{name="print_float", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}},                          func=api_print_float},
 		{name="print_vec2",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_print_vec2},

@@ -119,11 +119,134 @@ enum {
 	GRID_H = 64,
 
 	// color constants
-	RED   = 0xFF0000FF,
 	BLACK = 0x000000FF,
+	RED   = 0xFF0000FF,
+	GREEN = 0x00FF00FF,
+	BLUE  = 0x0000FFFF,
 	WHITE = 0xFFFFFFFF
 };
 
+// textures:
+// 0: grass
+// 128: brick
+// 256: wood
+// 384: tile
+
+// texture fx:
+// front: normal with vertex colors
+// left: scale 0x-1.5x
+// right: scroll
+// back: cycling texture
+
+int frames;
+float left_offset;
+float left_scale;
+float right_scroll;
+int back_index;
+vec3 cube_rot;
+
+void init() {
+	left_offset = 0.0;
+	right_scroll = 0.0;
+	back_index = 0;
+	cube_rot = v3zero();
+	frames = 0;
+}
+
+void update() {
+	left_offset = fwrap(left_offset + 0.05, 0.0, 100.0);
+	left_scale = sin(left_offset);
+	right_scroll = fwrap(right_scroll + 0.0125, 0.0, 1.0);
+
+	if (frames % 16 == 0) {
+		back_index = iwrap(back_index + 1, 0, 3);
+	}
+
+	cube_rot.y = cube_rot.y + 0.5;
+}
+
+void draw3d() {
+	pushmatrix();
+		rotate(cube_rot);
+		
+		// front
+		texture(128, 0, 128, 128);
+		meshbegin(QUADS);
+			color(RED);
+			texcoord(v2(0.0, 0.0));
+			vertex(v3(-10.0, 10.0, 10.0));
+
+			color(GREEN);
+			texcoord(v2(0.0, 1.0));
+			vertex(v3(-10.0, -10.0, 10.0));
+
+			color(BLUE);
+			texcoord(v2(1.0, 1.0));
+			vertex(v3(10.0, -10.0, 10.0));
+
+			color(WHITE);
+			texcoord(v2(1.0, 0.0));
+			vertex(v3(10.0, 10.0, 10.0));
+		meshend();
+
+		// left
+		vec2 midpoint = v2(0.5, 0.5);
+		texture(256, 0, 128, 128);
+		meshbegin(QUADS);
+			color(WHITE);
+			texcoord(midpoint - v2(left_scale, left_scale));
+			vertex(v3(-10.0, 10.0, -10.0));
+
+			texcoord(midpoint + v2(-left_scale, left_scale));
+			vertex(v3(-10.0, -10.0, -10.0));
+
+			texcoord(midpoint + v2(left_scale, left_scale));
+			vertex(v3(-10.0, -10.0, 10.0));
+
+			texcoord(midpoint + v2(left_scale, -left_scale));
+			vertex(v3(-10.0, 10.0, 10.0));
+		meshend();
+
+		// right
+		vec2 scrollv = v2(right_scroll, right_scroll);
+		texture(384, 0, 128, 128);
+		meshbegin(QUADS);
+			color(WHITE);
+			texcoord(v2(0.0, 0.0) + scrollv);
+			vertex(v3(10.0, 10.0, 10.0));
+
+			texcoord(v2(0.0, 1.0) + scrollv);
+			vertex(v3(10.0, -10.0, 10.0));
+
+			texcoord(v2(1.0, 1.0) + scrollv);
+			vertex(v3(10.0, -10.0, -10.0));
+
+			texcoord(v2(1.0, 0.0) + scrollv);
+			vertex(v3(10.0, 10.0, -10.0));
+		meshend();
+
+		// back
+		texture(back_index * 128, 0, 128, 128);
+		meshbegin(QUADS);
+			color(WHITE);
+			texcoord(v2(0.0, 0.0));
+			vertex(v3(10.0, 10.0, -10.0));
+
+			texcoord(v2(0.0, 1.0));
+			vertex(v3(10.0, -10.0, -10.0));
+
+			texcoord(v2(1.0, 1.0));
+			vertex(v3(-10.0, -10.0, -10.0));
+
+			texcoord(v2(1.0, 0.0));
+			vertex(v3(-10.0, 10.0, -10.0));
+		meshend();
+	popmatrix();
+
+	frames = frames + 1;
+}
+
+/*
 int GRID_SIZE;
 
 int* cur_grid;
@@ -201,13 +324,13 @@ void draw_cell(int x, int y, int cell) {
 	}
 
 	color(col);
-	texcoord(v2(0.1, 0.98));
+	texcoord(v2(0.0, 0.0));
 	vertex(pos + v3(-0.5, 0.5, 0.0));
-	texcoord(v2(0.0, 0.99));
+	texcoord(v2(0.0, 1.0));
 	vertex(pos + v3(-0.5, -0.5, 0.0));
-	texcoord(v2(0.1, 1.0));
+	texcoord(v2(1.0, 1.0));
 	vertex(pos + v3(0.5, -0.5, 0.0));
-	texcoord(v2(0.2, 0.99));
+	texcoord(v2(1.0, 0.0));
 	vertex(pos + v3(0.5, 0.5, 0.0));
 }
 
@@ -332,6 +455,7 @@ void draw3d() {
 
 	// draw current grid
 	pushmatrix();
+		texture(8,8,8,8);
 		meshbegin(QUADS);
 			while (y < GRID_H) {
 				x = 0;

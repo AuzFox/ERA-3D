@@ -13,8 +13,14 @@ end
 
 local function update(): void
 	if running_vm then
-		if rl.isKeyPressed(rl.keyboardKey.KEY_ESCAPE) or not vm:call_hook(e3d.Hook.UPDATE) then
+		if rl.isKeyPressed(rl.keyboardKey.KEY_ESCAPE) then
 			running_vm = false
+			return
+		end
+		
+		if not vm:call_hook(e3d.Hook.UPDATE) then
+			running_vm = false
+			io.printf(vm.error)
 		end
 	else
 		if rl.isKeyPressed(rl.keyboardKey.KEY_C) then
@@ -42,13 +48,10 @@ local function draw(): void
 		rl.clearBackground(rl.BLACK)
 
 		rl.beginMode3D(vm.gpu.cameras[vm.gpu.current_camera])
-
-		--rlgl.setTexture(vm.gpu.gfx_texture.id)
-		if not vm:call_hook(e3d.Hook.DRAW3D) then
-			running_vm = false
-			io.printf(vm.error)
-		end
-
+			if not vm:call_hook(e3d.Hook.DRAW3D) then
+				running_vm = false
+				io.printf(vm.error)
+			end
 		rl.endMode3D()
 	else
 		rl.clearBackground(rl.RAYWHITE)
@@ -57,6 +60,8 @@ local function draw(): void
 		rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
 		rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
 	end
+
+	rl.drawFPS(0,0)
 end
 
 local function run(): void
