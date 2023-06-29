@@ -10,7 +10,7 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
 // custom uniforms:
-//uniform int texMode;
+uniform int texMode;
 uniform int texX;
 uniform int texY;
 uniform int texW;
@@ -19,8 +19,14 @@ uniform int texH;
 void main()
 {
 	// wrap/clamp coords into range
-	vec2 wrappedCoord = mod(fragTexCoord, vec2(1.0f, 1.0f));
-	//vec2 wrappedCoord = clamp(fragTexCoord, vec2(0.0f, 0.0f), vec2(0.99f, 0.99f));
+	vec2 wrappedCoord;
+
+	if (texMode == 0) {
+		wrappedCoord = mod(fragTexCoord, vec2(1.0f, 1.0f));
+	}
+	else {
+		wrappedCoord = clamp(fragTexCoord, vec2(0.0f, 0.0f), vec2(0.99f, 0.99f));
+	}
 	
 	// create vectors
 	vec2 tMin = vec2(float(texX), float(texY));
@@ -28,8 +34,8 @@ void main()
 	vec2 tSize = vec2(1024.0f, 1024.0f);
 
 	// get mapped uv coords
-	vec2 mappedTexCoord = mix(tMin, tMax, wrappedCoord) / tSize;
+	vec2 mappedCoord = mix(tMin, tMax, wrappedCoord) / tSize;
 	
 	// sample color from texture
-    finalColor = texture(texture0, mappedTexCoord) * fragColor;
+    finalColor = texture(texture0, mappedCoord) * fragColor;
 }

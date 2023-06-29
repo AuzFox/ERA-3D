@@ -1,3 +1,4 @@
+require("arg")
 require("ecc")
 require("evm")
 
@@ -6,35 +7,37 @@ global running_vm: boolean
 
 local function init(): void
 	vm = e3d.new_vm()
-	vm.gpu:init()
+	e3d.set_default_btnmap()
 
 	running_vm = false
 end
 
 local function update(): void
 	if running_vm then
-		if rl.isKeyPressed(rl.keyboardKey.KEY_ESCAPE) then
+		if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
 			running_vm = false
 			return
 		end
 		
-		if not vm:call_hook(e3d.Hook.UPDATE) then
+		vm:pushf(rl.getFrameTime())
+		vm:_push_args(1)
+		if not vm:call_hook(e3d.Hook.UPDATE, 1) then
 			running_vm = false
 			io.printf(vm.error)
 		end
 	else
-		if rl.isKeyPressed(rl.keyboardKey.KEY_C) then
-			if vm:compile_file("script.c") then
+		if rl.isKeyPressed(rl.keyboardKey.C) then
+			if vm:compile_file(arg[1]) then
 				print("-- COMPILE SUCCESS --")
 			else
 				io.printf(vm.error)
 			end
-		elseif rl.isKeyPressed(rl.keyboardKey.KEY_B) then
+		elseif rl.isKeyPressed(rl.keyboardKey.B) then
 			print("-- BYTECODE --")
 			vm:_dump_bytecode()
-		elseif rl.isKeyPressed(rl.keyboardKey.KEY_R) then
-			vm:reset()
-			if vm:call_hook(e3d.Hook.INIT) then
+		elseif rl.isKeyPressed(rl.keyboardKey.R) then
+			vm:reset(true)
+			if vm:call_hook(e3d.Hook.INIT, 0) then
 				running_vm = true
 			else
 				io.printf(vm.error)
@@ -45,47 +48,64 @@ end
 
 local function draw(): void
 	if running_vm then
-		rl.clearBackground(rl.BLACK)
-
-		rl.beginMode3D(vm.gpu.cameras[vm.gpu.current_camera])
-			if not vm:call_hook(e3d.Hook.DRAW3D) then
+		rl.beginTextureMode(vm.gpu.gfx_rendertex)
+			vm.gpu:enable_render_state()
+			
+			rl.clearBackground(vm.gpu.bgcolor)
+			
+			rl.beginMode3D(vm.gpu.cameras[vm.gpu.current_camera])
+			if not vm:call_hook(e3d.Hook.DRAW3D, 0) then
 				running_vm = false
 				io.printf(vm.error)
 			end
-		rl.endMode3D()
-	else
-		rl.clearBackground(rl.RAYWHITE)
+			rl.endMode3D()
+			
+			if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D, 0)) then
+				running_vm = false
+				io.printf(vm.error)
+			end
 
-		rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
-		rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
-		rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
+			vm.gpu:disable_render_state()
+		rl.endTextureMode()
+		
+		rl.beginDrawing()
+			rl.clearBackground(rl.BLACK)
+
+			local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.VSCREEN_W), -(@float32)(e3d.VSCREEN_H) };
+		    local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.SCREEN_W), (@float32)(e3d.SCREEN_H) };
+
+			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+			rl.drawFPS(0,0)
+		rl.endDrawing()
+	else
+		rl.beginDrawing()
+			rl.clearBackground(rl.RAYWHITE)
+			
+			rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
+			rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
+			rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
+		rl.endDrawing()
 	end
 
-	rl.drawFPS(0,0)
 end
 
 local function run(): void
 	while not rl.windowShouldClose() do
 		update()
 
-		rl.beginDrawing()
+		if running_vm and vm.gpu.update_tex then
+			vm.gpu.update_tex = false
+
+			rl.updateTexture(vm.gpu.gfx_texture, &vm.tmem)
+		end
 
 		draw()
-
-		rl.endDrawing()
 	end
 end
 
---[[if vm:compile_file("script.c") then
-	--print("-- BYTECODE --")
-	--evm:_dump_bytecode()
-	print("\n-- PROGRAM OUTPUT --")
-	if not (init() and run()) then
-		io.printf(vm.error)
-	end
+if #arg == 1 then
+	init()
+	run()
 else
-	io.printf(vm.error)
-end]]
-
-init()
-run()
+	print("SYNTAX: era-3d <script>")
+end

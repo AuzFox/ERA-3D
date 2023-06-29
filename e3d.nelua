@@ -9,6 +9,7 @@ require("allocators.default")
 require("math")
 require("coroutine")
 require("raylib")
+require("rlgl")
 
 global e3d = @record{}
 
@@ -35,6 +36,11 @@ global e3d = @record{}
 	0xCC0000 - 0xCCFFFF: rom
 ]]
 
+global e3d.VSCREEN_W <comptime> = 320
+global e3d.VSCREEN_H <comptime> = 240
+global e3d.SCREEN_W <comptime> = (e3d.VSCREEN_W * 3)
+global e3d.SCREEN_H <comptime> = (e3d.VSCREEN_H * 3)
+
 global e3d.TMEM_WIDTH <comptime> = 1024
 global e3d.TMEM_HEIGHT <comptime> = 1024
 
@@ -57,6 +63,25 @@ global e3d.ARGS_START_ADDR <comptime> = 0xC80000
 global e3d.ROM_START_ADDR <comptime> = 0xCC0000
 global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
 
+-- emulate a PS1-like controller
+global e3d.ControllerButtons = @enum {
+	UP = 0,
+	DOWN,
+	LEFT,
+	RIGHT,
+	TRIANGLE,
+	CROSS,
+	SQUARE,
+	CIRCLE,
+	L1,
+	L2,
+	R1,
+	R2,
+	SELECT,
+	START,
+	COUNT -- not an actual button; used to count the number of buttons
+}
+
 global e3d.Token = @enum {
 	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
 	FLOAT_LITERAL,
@@ -75,6 +100,7 @@ global e3d.Token = @enum {
 	IF,
 	RETURN,
 	SIZEOF,
+	FOR,
 	WHILE,
 	LNOT,
 	NOT,
@@ -126,16 +152,12 @@ global e3d.Opcode = @enum {
 	ADDROF_G,
 	ADDROF_L,
 	ADDROF_A,
-	VEC2_NEW,
-	VEC3_NEW,
 	PUSH_ZERO,
 	PUSH_ONE,
 	PUSH_CHAR,
 	PUSH_INT,
 	PUSH_FLOAT,
-	PUSH_VEC2,
 	PUSH_VEC2_ZERO,
-	PUSH_VEC3,
 	PUSH_VEC3_ZERO,
 	BIN_NOT,
 	BIN_OR,
@@ -224,6 +246,28 @@ global e3d.EVMType = @enum {
 	POINTER = 16
 }
 
+global e3d.MulVMode = @enum {
+	INT_V2 = 0,
+	INT_V3,
+	FLOAT_V2,
+	FLOAT_V3,
+	V2_INT,
+	V2_FLOAT,
+	V2_V2,
+	V3_INT,
+	V3_FLOAT,
+	V3_V3
+}
+
+global e3d.DivVMode = @enum {
+	V2_INT = 0,
+	V2_FLOAT,
+	V2_V2,
+	V3_INT,
+	V3_FLOAT,
+	V3_V3
+}
+
 global e3d.Hook = @enum {
 	INIT = 0,
 	UPDATE,
@@ -253,18 +297,31 @@ global e3d.GPU = @record {
 	cameras: [e3d.CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
+	gfx_rendertex: rl.renderTexture,
+	
+	tex_mode_loc: cint,
 	tex_x_loc: cint,
 	tex_y_loc: cint,
 	tex_w_loc: cint,
 	tex_h_loc: cint,
-
+	update_tex: boolean,
+	
+	triangle_mode: boolean,
+	triangle_vert_index: integer,
+	triangle_vert_color: rl.color,
+	triangle_vert_uv: rl.vector2,
+	triangle_vert_pos: rl.vector3,
+	
 	-- graphics state
 	current_camera: uinteger,
+	cullmode: uinteger,
+	wiremode: boolean,
+	tex_mode: cint,
 	tex_x: cint,
 	tex_y: cint,
 	tex_w: cint,
 	tex_h: cint,
-	update_tex_rect: boolean,
+	bgcolor: rl.color
 }
 
 global e3d.EVMValue = @union {
@@ -326,6 +383,7 @@ e3d.EVM = @record {
 	csp: uinteger,
 	hook_addresses: [4]uint16,
 	hook_flags: [4]boolean,
+	current_hook: uinteger,
 	
 	-- compiler vars
 	src: string,
@@ -359,11 +417,38 @@ e3d.EVM = @record {
 	error: string
 }
 
+global e3d.btnmap: [e3d.ControllerButtons.COUNT]cint
+
 ---------------------------------------
 --                                   --
 --        NAMESPACE FUNCTIONS        --
 --                                   --
 ---------------------------------------
+
+function e3d.set_default_btnmap(): void
+	e3d.btnmap[e3d.ControllerButtons.UP]       = rl.keyboardKey.UP
+	e3d.btnmap[e3d.ControllerButtons.DOWN]     = rl.keyboardKey.DOWN
+	e3d.btnmap[e3d.ControllerButtons.LEFT]     = rl.keyboardKey.LEFT
+	e3d.btnmap[e3d.ControllerButtons.RIGHT]    = rl.keyboardKey.RIGHT
+	e3d.btnmap[e3d.ControllerButtons.TRIANGLE] = rl.keyboardKey.W
+	e3d.btnmap[e3d.ControllerButtons.CROSS]    = rl.keyboardKey.S
+	e3d.btnmap[e3d.ControllerButtons.SQUARE]   = rl.keyboardKey.A
+	e3d.btnmap[e3d.ControllerButtons.CIRCLE]   = rl.keyboardKey.D
+	e3d.btnmap[e3d.ControllerButtons.L1]       = rl.keyboardKey.Q
+	e3d.btnmap[e3d.ControllerButtons.L2]       = rl.keyboardKey.ONE
+	e3d.btnmap[e3d.ControllerButtons.R1]       = rl.keyboardKey.E
+	e3d.btnmap[e3d.ControllerButtons.R2]       = rl.keyboardKey.THREE
+	e3d.btnmap[e3d.ControllerButtons.SELECT]   = rl.keyboardKey.RIGHT_SHIFT
+	e3d.btnmap[e3d.ControllerButtons.START]    = rl.keyboardKey.ENTER
+end
+
+function e3d.get_btn_keycode(btn: integer): cint
+	return e3d.btnmap[btn]
+end
+
+function e3d.set_btn_keycode(btn: integer, keycode: cint): void
+	e3d.btnmap[btn] = keycode
+end
 
 function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 	-- returns size in words
@@ -386,55 +471,99 @@ function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 end
 
 function e3d.GPU:texture(x: int32, y: int32, w: int32, h: int32): void
-	-- TODO: bounds check!
-
 	self.tex_x = (@cint)(x)
 	self.tex_y = (@cint)(y)
 	self.tex_w = (@cint)(w)
 	self.tex_h = (@cint)(h)
 	
-	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.SHADER_UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function e3d.GPU:init(): void
-	rl.setConfigFlags(rl.configFlags.FLAG_VSYNC_HINT) -- enable vsync
-	--rl.setTraceLogLevel(rl.traceLogLevel.LOG_WARNING) -- only log errors and warnings
+function e3d.GPU:enable_render_state(): void
+	switch self.cullmode do
+		case 0 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+		case 1 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
+		else
+			rlgl.disableBackfaceCulling()
+	end
 
-	rl.initWindow(800, 600, "ERA-3D")
-	rl.setTargetFPS(30)
+	if self.wiremode then
+		rlgl.enableWireMode()
+	else
+		rlgl.disableWireMode()
+	end
+end
 
-	rl.setExitKey(rl.keyboardKey.KEY_NULL)
+function e3d.GPU:disable_render_state(): void
+	rlgl.enableBackfaceCulling()
+	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+	rlgl.disableWireMode()
+end
 
+function e3d.GPU:reset(): void
 	for i = 0, < #self.cameras do
 		self.cameras[i] = {
 			position={0,0,0},
 			target={0,0,0},
 			up={0,1,0},
 			fovy=45,
-			projection=rl.cameraProjection.CAMERA_PERSPECTIVE
+			projection=rl.cameraProjection.PERSPECTIVE
 		}
 	end
 
-	self.cameras[0].position = {0,0,80} -- debug
-
 	self.current_camera = 0
-	self.gfx_texture = rl.loadTexture("test.png")
-	self.gfx_shader = rl.loadShader(nilptr, "shader.fs")
+	self.tex_mode = 0
+	self.cullmode = 0
+	self.wiremode = false
+	self.bgcolor = {0x00, 0x00, 0x00, 0xFF}
+	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
 
+	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
+
+	self:texture(0, 0, 64, 64)
+end
+
+function e3d.GPU:init(tmem: *rl.color): void
+	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_HIGHDPI) -- enable vsync and HighDPI
+	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+
+	rl.initWindow(e3d.SCREEN_W, e3d.SCREEN_H, "ERA-3D")
+	rl.setTargetFPS(30)
+
+	rl.setExitKey(rl.keyboardKey.NULL)
+
+	self.gfx_rendertex = rl.loadRenderTexture(e3d.VSCREEN_W, e3d.VSCREEN_H)
+
+	local img: rl.image = rl.loadImage("test.png")
+	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
+		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
+	end
+	memory.copy(tmem, img.data, e3d.TMEM_SIZE * #rl.color)
+	self.gfx_texture = rl.loadTextureFromImage(img)
+	rl.unloadImage(img)
+	
+	self.gfx_shader = rl.loadShader(nilptr, "shader.fs")
+	
+	self.tex_mode_loc = rl.getShaderLocation(self.gfx_shader, "texMode")
 	self.tex_x_loc = rl.getShaderLocation(self.gfx_shader, "texX")
 	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
 	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
 	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
 
-	self:texture(0, 0, 32, 32)
+	self:reset()
 end
 
 function e3d.GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
 	rl.unloadTexture(self.gfx_texture)
+	rl.unloadRenderTexture(self.gfx_rendertex)
 
 	rl.closeWindow()
 end

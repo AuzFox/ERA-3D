@@ -198,7 +198,7 @@ function e3d.EVM:popv3(): rl.vector3
 	return v
 end
 
-function e3d.EVM:reset(): void
+function e3d.EVM:reset(reset_gpu: boolean): void
 	-- TODO: free all vm program memory, clear ram
 
 	self.cf = {}
@@ -208,7 +208,9 @@ function e3d.EVM:reset(): void
 	self.osp = 0
 	self.csp = 0
 
-	-- TODO: reset GPU
+	if reset_gpu then
+		self.gpu:reset()
+	end
 end
 
 -- get one word from the vm RAM, does not do bounds or alignment checking!
@@ -237,7 +239,7 @@ function e3d.EVM:_get_ramw(addr: uint32): uint32
 end
 
 -- set one word in the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:_set_ramw(addr: uint32, val: uint32): void
+function e3d.EVM:_set_ramw(addr: uint32, val: uint32): boolean
 	if addr < e3d.TMEM_START_ADDR then
 		-- heap
 		self.heap[addr] = val >> 24
@@ -253,6 +255,7 @@ function e3d.EVM:_set_ramw(addr: uint32, val: uint32): void
 		col.b = (val & 0x00FF00) >> 8
 		col.a = val & 0xFF
 		self.tmem[addr] = col
+		self.gpu.update_tex = true
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
 		self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u = val
@@ -263,13 +266,11 @@ function e3d.EVM:_set_ramw(addr: uint32, val: uint32): void
 		-- args
 		self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u = val
 	else
-		-- rom
-		addr = (addr - e3d.ROM_START_ADDR) /// 4
-		self.rom[addr] = val >> 24
-		self.rom[addr + 1] = (val & 0xFF0000) >> 16
-		self.rom[addr + 2] = (val & 0x00FF00) >> 8
-		self.rom[addr + 3] = val & 0xFF
+		-- rom, can't write here!
+		return false
 	end
+
+	return true
 end
 
 function e3d.EVM:_get_globals(start: uint16, n: uint16): void
@@ -486,10 +487,6 @@ function e3d.EVM:_dump_bytecode(): void
 			case e3d.Opcode.ADDROF_A then
 				index = self:_bytecode_next16()
 				io.printf("ADDROF_A %d\n", index)
-			case e3d.Opcode.VEC2_NEW then
-				io.printf("VEC2_NEW\n")
-			case e3d.Opcode.VEC3_NEW then
-				io.printf("VEC3_NEW\n")
 			case e3d.Opcode.PUSH_ZERO then
 				io.printf("PUSH_ZERO\n")
 			case e3d.Opcode.PUSH_ONE then
@@ -500,14 +497,8 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("PUSH_INT %d\n", (@int32)(self:_bytecode_next32()))
 			case e3d.Opcode.PUSH_FLOAT then
 				io.printf("PUSH_FLOAT %f\n", self:_bytecode_nextf())
-			case e3d.Opcode.PUSH_VEC2 then
-				local v: rl.vector2 = self:_bytecode_nextv2()
-				io.printf("PUSH_VEC2 (%f, %f)\n", v.x, v.y)
 			case e3d.Opcode.PUSH_VEC2_ZERO then
 				io.printf("PUSH_VEC2_ZERO\n")
-			case e3d.Opcode.PUSH_VEC3 then
-				local v: rl.vector3 = self:_bytecode_nextv3()
-				io.printf("PUSH_VEC3 (%f, %f, %f)\n", v.x, v.y, v.z)
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				io.printf("PUSH_VEC3_ZERO\n")
 			case e3d.Opcode.BIN_NOT then
@@ -753,7 +744,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 				
-				self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v)
+				if not self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v) then
+					self.error = string.format("ERROR: cannot write word to ROM address 0x%08X\n", ptr)
+					return false
+				end
 			case e3d.Opcode.SET_MX then
 				-- stack:
 				-- > osp
@@ -795,17 +789,6 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.ADDROF_A then
 				index = self:_bytecode_next16()
 				self:pushu(self:_address_of_arg(index))
-			case e3d.Opcode.VEC2_NEW then
-				local y: float32 = self:popf()
-				local x: float32 = self:popf()
-
-				self:pushv2({x,y})
-			case e3d.Opcode.VEC3_NEW then
-				local z: float32 = self:popf()
-				local y: float32 = self:popf()
-				local x: float32 = self:popf()
-
-				self:pushv3({x,y,z})
 			case e3d.Opcode.PUSH_ZERO then
 				self:pushu(0)
 			case e3d.Opcode.PUSH_ONE then
@@ -816,12 +799,8 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushi((@int32)(self:_bytecode_next32()))
 			case e3d.Opcode.PUSH_FLOAT then
 				self:pushf(self:_bytecode_nextf())
-			case e3d.Opcode.PUSH_VEC2 then
-				self:pushv2(self:_bytecode_nextv2())
 			case e3d.Opcode.PUSH_VEC2_ZERO then
 				self:pushv2({0,0})
-			case e3d.Opcode.PUSH_VEC3 then
-				self:pushv3(self:_bytecode_nextv3())
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				self:pushv3({0,0,0})
 			case e3d.Opcode.BIN_NOT then
@@ -934,19 +913,91 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.MULV then
 				index = (@uint16)(self:_bytecode_next8())
 				switch index do
-					case 0 then -- vec2 * vec2
+					case e3d.MulVMode.INT_V2 then
+						local a: rl.vector2 = self:popv2()
+						local b: int32 = self:popi()
+						self:pushv2({
+								a.x * (@float32)(b),
+								a.y * (@float32)(b)
+							}
+						)
+					case e3d.MulVMode.INT_V3 then
+						local a: rl.vector3 = self:popv3()
+						local b: int32 = self:popi()
+						self:pushv3({
+								a.x * (@float32)(b),
+								a.y * (@float32)(b),
+								a.z * (@float32)(b)
+							}
+						)
+					case e3d.MulVMode.FLOAT_V2 then
+						local a: rl.vector2 = self:popv2()
+						local b: float32 = self:popf()
+						self:pushv2({
+								a.x * b,
+								a.y * b
+							}
+						)
+					case e3d.MulVMode.FLOAT_V3 then
+						local a: rl.vector3 = self:popv3()
+						local b: float32 = self:popf()
+						self:pushv3({
+								a.x * b,
+								a.y * b,
+								a.z * b
+							}
+						)
+					case e3d.MulVMode.V2_INT then
+						local b: int32 = self:popi()
+						local a: rl.vector2 = self:popv2()
+						self:pushv2({
+								a.x * (@float32)(b),
+								a.y * (@float32)(b)
+							}
+						)
+					case e3d.MulVMode.V2_FLOAT then
+						local b: float32 = self:popf()
+						local a: rl.vector2 = self:popv2()
+						self:pushv2({
+								a.x * b,
+								a.y * b
+							}
+						)
+					case e3d.MulVMode.V2_V2 then
 						local b: rl.vector2 = self:popv2()
 						local a: rl.vector2 = self:popv2()
 						self:pushv2({
-							a.x * b.x,
-							a.y * b.y})
-					case 1 then -- vec3 * vec3
+								a.x * b.x,
+								a.y * b.y
+							}
+						)
+					case e3d.MulVMode.V3_INT then
+						local b: int32 = self:popi()
+						local a: rl.vector3 = self:popv3()
+						self:pushv3({
+								a.x * (@float32)(b),
+								a.y * (@float32)(b),
+								a.z * (@float32)(b)
+							}
+						)
+					case e3d.MulVMode.V3_FLOAT then
+						local b: float32 = self:popf()
+						local a: rl.vector3 = self:popv3()
+						self:pushv3({
+								a.x * b,
+								a.y * b,
+								a.z * b
+							}
+						)
+					case e3d.MulVMode.V3_V3 then
 						local b: rl.vector3 = self:popv3()
 						local a: rl.vector3 = self:popv3()
 						self:pushv3({
-							a.x * b.x,
-							a.y * b.y,
-							a.z * b.z})
+								a.x * b.x,
+								a.y * b.y,
+								a.z * b.z
+							}
+						)
 				end
 			case e3d.Opcode.DIV then
 				local b: int32 = self:popi()
@@ -963,19 +1014,57 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.DIVV then
 				index = (@uint16)(self:_bytecode_next8())
 				switch index do
-					case 0 then -- vec2 / vec2
+					case e3d.DivVMode.V2_INT then
+						local b: int32 = self:popi()
+						local a: rl.vector2 = self:popv2()
+						self:pushv2({
+								a.x / (@float32)(b),
+								a.y / (@float32)(b)
+							}
+						)
+					case e3d.DivVMode.V2_FLOAT then
+						local b: float32 = self:popf()
+						local a: rl.vector2 = self:popv2()
+						self:pushv2({
+								a.x / b,
+								a.y / b
+							}
+						)
+					case e3d.DivVMode.V2_V2 then
 						local b: rl.vector2 = self:popv2()
 						local a: rl.vector2 = self:popv2()
 						self:pushv2({
-							a.x / b.x,
-							a.y / b.y})
-					case 1 then -- vec3 / vec3
+								a.x / b.x,
+								a.y / b.y
+							}
+						)
+					case e3d.DivVMode.V3_INT then
+						local b: int32 = self:popi()
+						local a: rl.vector3 = self:popv3()
+						self:pushv3({
+								a.x / (@float32)(b),
+								a.y / (@float32)(b),
+								a.z / (@float32)(b)
+							}
+						)
+					case e3d.DivVMode.V3_FLOAT then
+						local b: float32 = self:popf()
+						local a: rl.vector3 = self:popv3()
+						self:pushv3({
+								a.x / b,
+								a.y / b,
+								a.z / b
+							}
+						)
+					case e3d.DivVMode.V3_V3 then
 						local b: rl.vector3 = self:popv3()
 						local a: rl.vector3 = self:popv3()
 						self:pushv3({
-							a.x / b.x,
-							a.y / b.y,
-							a.z / b.z})
+								a.x / b.x,
+								a.y / b.y,
+								a.z / b.z
+							}
+						)
 				end
 			case e3d.Opcode.MOD then
 				local b: int32 = self:popi()
@@ -1203,7 +1292,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.CALL_PTR then
 				local addr: uint32 = self:popu()
 				if addr < e3d.BYTECODE_SIZE then
-					self:_push_callframe()
+					self:_push_callframe(0)
 					self.cf.pc = addr
 				else
 					self.error = string.format("ERROR: invalid call address 0x%08X\n", addr)
@@ -1253,10 +1342,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 	return true
 end
 
-function e3d.EVM:call_hook(hook: integer): boolean
+function e3d.EVM:call_hook(hook: integer, argc: uint16): boolean
 	if self.hook_flags[hook] then
+		self.current_hook = hook
 		self.cf.pc = self.hook_addresses[hook]
-		self:_push_callframe(0)
+		self:_push_callframe(argc)
 		local result: boolean = self:run(0)
 		self:_pop_callframe()
 		return result
@@ -1310,6 +1400,17 @@ end
 	int btnu(int id);
 	int btnd(int id);
 	float axis(int id);
+
+	// camera
+	void setcam(int id);
+	void setcampos(vec3 pos);
+	void setcamtarget(vec3 target);
+	void setcamup(vec3 rot);
+	void setcamfov(float fov);
+	void setcamproj(int mode);
+	vec3 getcamright();
+	vec3 getcamup();
+	vec3 getcamforward();
 	
 	// basic graphics
 	void bgcolor(int color);
@@ -1393,22 +1494,26 @@ local function api_print_vec3(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_btnd(vm: *e3d.EVM): boolean
-	local btns: []cint = {
-		rl.keyboardKey.KEY_UP,
-		rl.keyboardKey.KEY_DOWN,
-		rl.keyboardKey.KEY_LEFT,
-		rl.keyboardKey.KEY_RIGHT,
-		rl.keyboardKey.KEY_A,
-		rl.keyboardKey.KEY_S,
-		rl.keyboardKey.KEY_Q,
-		rl.keyboardKey.KEY_W,
-		rl.keyboardKey.KEY_Z,
-	}
-	
-	local b: uint32 = vm:get_argi(0)
+local function api_btn(vm: *e3d.EVM): boolean
+	local b: int32 = math.clamp(vm:get_argi(0), e3d.ControllerButtons.UP, e3d.ControllerButtons.START)
 
-	vm:pushi(rl.isKeyPressed(btns[b]) and 1 or 0)
+	vm:pushi(rl.isKeyDown(e3d.btnmap[b]) and 1 or 0)
+	
+	return true
+end
+
+local function api_btnu(vm: *e3d.EVM): boolean
+	local b: int32 = math.clamp(vm:get_argi(0), e3d.ControllerButtons.UP, e3d.ControllerButtons.START)
+
+	vm:pushi(rl.isKeyReleased(e3d.btnmap[b]) and 1 or 0)
+	
+	return true
+end
+
+local function api_btnd(vm: *e3d.EVM): boolean
+	local b: int32 = math.clamp(vm:get_argi(0), e3d.ControllerButtons.UP, e3d.ControllerButtons.START)
+
+	vm:pushi(rl.isKeyPressed(e3d.btnmap[b]) and 1 or 0)
 	
 	return true
 end
@@ -1557,19 +1662,26 @@ end
 
 local function api_fwrap(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int fwrap(int v, float min, float max);
+	-- float fwrap(float x, float min, float max);
 
-	local v: float32 = vm:get_argf(0)
+	local x: float32 = vm:get_argf(0)
 	local min: float32 = vm:get_argf(1)
 	local max: float32 = vm:get_argf(2)
 	
-	local range_size: float32 = max - min + 1;
+	if min == max then
+        vm:pushf(min)
+		return true
+    elseif min > max then
+        min, max = max, min
+    end
 
-	if v < min then
-		v = v + range_size * ((min - v) / range_size + 1)
-	end
+    -- TODO: code solution for when range is all negative
+    if max < 0 then
+        -- ???
+    end
 
-	vm:pushf(min + (v - min) % range_size)
+    local temp: float32 = max - min
+    vm:pushf(min + ((temp + ((x - min) %%% temp)) %%% temp))
 	
 	return true
 end
@@ -1606,10 +1718,16 @@ local function api_cos(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function api_time(vm: *e3d.EVM): boolean
+	vm:pushf((@float32)(rl.getTime()))
+	
+	return true
+end
+
 -- vector functions
-local function api_v2len(vm: *e3d.EVM): boolean
+local function api_vec2len(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2len(vec2 v);
+	-- float vec2len(vec2 v);
 
 	local v: rl.vector2 = vm:get_argv2(0)
 
@@ -1618,9 +1736,9 @@ local function api_v2len(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2lensq(vm: *e3d.EVM): boolean
+local function api_vec2lensq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2lensq(vec2 v);
+	-- float vec2lensq(vec2 v);
 
 	local v: rl.vector2 = vm:get_argv2(0)
 
@@ -1629,9 +1747,9 @@ local function api_v2lensq(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2norm(vm: *e3d.EVM): boolean
+local function api_vec2norm(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec2 v2norm(vec2 v);
+	-- vec2 vec2norm(vec2 v);
 
 	local v: rl.vector2 = vm:get_argv2(0)
 
@@ -1648,9 +1766,9 @@ local function api_v2norm(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2dot(vm: *e3d.EVM): boolean
+local function api_vec2dot(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2dot(vec2 a, vec2 b);
+	-- float vec2dot(vec2 a, vec2 b);
 	
 	local a: rl.vector2 = vm:get_argv2(0)
 	local b: rl.vector2 = vm:get_argv2(2)
@@ -1660,9 +1778,9 @@ local function api_v2dot(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2cross(vm: *e3d.EVM): boolean
+local function api_vec2cross(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2cross(vec2 a, vec2 b);
+	-- float vec2cross(vec2 a, vec2 b);
 	
 	local a: rl.vector2 = vm:get_argv2(0)
 	local b: rl.vector2 = vm:get_argv2(2)
@@ -1672,9 +1790,9 @@ local function api_v2cross(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2dist(vm: *e3d.EVM): boolean
+local function api_vec2dist(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2dist(vec2 a, vec2 b);
+	-- float vec2dist(vec2 a, vec2 b);
 
 	local a: rl.vector2 = vm:get_argv2(0)
 	local b: rl.vector2 = vm:get_argv2(2)
@@ -1684,9 +1802,9 @@ local function api_v2dist(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v2distsq(vm: *e3d.EVM): boolean
+local function api_vec2distsq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v2distsq(vec2 a, vec2 b);
+	-- float vec2distsq(vec2 a, vec2 b);
 
 	local a: rl.vector2 = vm:get_argv2(0)
 	local b: rl.vector2 = vm:get_argv2(2)
@@ -1696,9 +1814,9 @@ local function api_v2distsq(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3len(vm: *e3d.EVM): boolean
+local function api_vec3len(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v3len(vec3 v);
+	-- float vec3len(vec3 v);
 	
 	local v: rl.vector3 = vm:get_argv3(0)
 
@@ -1711,9 +1829,9 @@ local function api_v3len(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3lensq(vm: *e3d.EVM): boolean
+local function api_vec3lensq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v3lensq(vec3 v);
+	-- float vec3lensq(vec3 v);
 
 	local v: rl.vector3 = vm:get_argv3(0)
 
@@ -1726,9 +1844,9 @@ local function api_v3lensq(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3norm(vm: *e3d.EVM): boolean
+local function api_vec3norm(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 v3norm(vec3 v);
+	-- vec3 vec3norm(vec3 v);
 
 	local v: rl.vector3 = vm:get_argv3(0)
 
@@ -1750,9 +1868,9 @@ local function api_v3norm(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3dot(vm: *e3d.EVM): boolean
+local function api_vec3dot(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v3dot(vec3 a, vec3 b);
+	-- float vec3dot(vec3 a, vec3 b);
 	
 	local a: rl.vector3 = vm:get_argv3(0)
 	local b: rl.vector3 = vm:get_argv3(3)
@@ -1762,9 +1880,9 @@ local function api_v3dot(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3cross(vm: *e3d.EVM): boolean
+local function api_vec3cross(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 v3cross(vec3 a, vec3 b);
+	-- vec3 vec3cross(vec3 a, vec3 b);
 	
 	local a: rl.vector3 = vm:get_argv3(0)
 	local b: rl.vector3 = vm:get_argv3(3)
@@ -1780,9 +1898,9 @@ local function api_v3cross(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3dist(vm: *e3d.EVM): boolean
+local function api_vec3dist(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v3dist(vec3 a, vec3 b);
+	-- float vec3dist(vec3 a, vec3 b);
 
 	local a: rl.vector3 = vm:get_argv3(0)
 	local b: rl.vector3 = vm:get_argv3(3)
@@ -1798,9 +1916,9 @@ local function api_v3dist(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_v3distsq(vm: *e3d.EVM): boolean
+local function api_vec3distsq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float v3distsq(vec3 a, vec3 b);
+	-- float vec3distsq(vec3 a, vec3 b);
 
 	local a: rl.vector3 = vm:get_argv3(0)
 	local b: rl.vector3 = vm:get_argv3(3)
@@ -1813,6 +1931,209 @@ local function api_v3distsq(vm: *e3d.EVM): boolean
 
 	vm:pushf(x + y + z)
 	
+	return true
+end
+
+local function api_camera(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camera(int id);
+
+	local id: int32 = vm:get_argi(0)
+
+	vm.gpu.current_camera = math.clamp(id, 0, e3d.CAMERAS_COUNT - 1)
+
+	return true
+end
+
+local function api_campos(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void campos(vec3 pos);
+
+	local pos: rl.vector3 = vm:get_argv3(0)
+
+	vm.gpu.cameras[vm.gpu.current_camera].position = pos
+
+	return true
+end
+
+local function api_camtarget(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camtarget(vec3 target);
+
+	local target: rl.vector3 = vm:get_argv3(0)
+
+	vm.gpu.cameras[vm.gpu.current_camera].target = target
+
+	return true
+end
+
+local function api_camup(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camup(vec3 up);
+
+	local up: rl.vector3 = vm:get_argv3(0)
+
+	vm.gpu.cameras[vm.gpu.current_camera].up = up
+
+	return true
+end
+
+local function api_camfov(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camfov(float fov);
+
+	local fov: float32 = vm:get_argf(0)
+
+	vm.gpu.cameras[vm.gpu.current_camera].fovy = fov
+
+	return true
+end
+
+local function api_camproj(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camproj(int mode);
+
+	local proj: float32 = vm:get_argi(0)
+
+	vm.gpu.cameras[vm.gpu.current_camera].projection = (@cint)(math.clamp(proj, 0, 1))
+
+	return true
+end
+
+local function _v3norm(v: rl.vector3): rl.vector3
+	local x: float32 = v.x * v.x
+	local y: float32 = v.y * v.y
+	local z: float32 = v.z * v.z
+	local l: float32 = x + y + z
+
+	if l == 0.0 then
+		return {0,0,0}
+	else
+		local l: float32 = math.sqrt(l)
+		v.x = v.x / l
+		v.y = v.y / l
+		v.z = v.z / l
+		return v
+	end
+end
+
+local function api_camright(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec3 camright();
+
+	-- get camera
+	local cam: rl.camera = vm.gpu.cameras[vm.gpu.current_camera]
+
+	-- calculate forward vector
+	local forward: rl.vector3 = _v3norm({
+			cam.target.x - cam.position.x,
+			cam.target.y - cam.position.y,
+			cam.target.z - cam.position.z
+		}
+	)
+
+	-- get normalized up vector
+    local up: rl.vector3 = _v3norm(cam.up)
+
+	-- calculate cross of forward and up
+	vm:pushv3({
+			(forward.y * up.z) - (forward.z * up.y),
+			(forward.z * up.x) - (forward.x * up.z),
+			(forward.x * up.y) - (forward.y * up.x)
+		}
+	)
+
+	return true
+end
+
+local function api_camforward(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec3 camforward();
+
+	local cam: rl.camera = vm.gpu.cameras[vm.gpu.current_camera]
+
+	vm:pushv3(
+		_v3norm({
+				cam.target.x - cam.position.x,
+				cam.target.y - cam.position.y,
+				cam.target.z - cam.position.z
+			}
+		)
+	)
+
+	return true
+end
+
+local function api_bgcolor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void bgcolor(int col);
+
+	local col: uint32 = vm:get_argu(0)
+	
+	vm.gpu.bgcolor = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		0xFF
+	}
+
+	return true
+end
+
+local function api_texturemode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void texturemode(int mode);
+
+	local mode: uint32 = vm:get_argu(0)
+
+	if mode > 1 then
+		mode = 1
+	end
+
+	vm.gpu.tex_mode = (@cint)(mode)
+	
+	rl.setShaderValue(vm.gpu.gfx_shader, vm.gpu.tex_mode_loc, &vm.gpu.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
+
+	return true
+end
+
+local function api_cullmode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void cullmode(int mode);
+
+	local mode: uint32 = vm:get_argu(0)
+
+	switch mode do
+		case 0 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+		case 1 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
+		else
+			rlgl.disableBackfaceCulling()
+			mode = 2
+	end
+
+	vm.gpu.cullmode = mode
+
+	return true
+end
+
+local function api_wiremode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void wiremode(int mode);
+
+	local enable: boolean = vm:get_argu(0) ~= 0
+
+	if enable then
+		rlgl.enableWireMode()
+	else
+		rlgl.disableWireMode()
+	end
+
+	vm.gpu.wiremode = enable
+
 	return true
 end
 
@@ -1836,28 +2157,80 @@ local function api_texture(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function api_sprite2d(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void sprite2d(int srcx, int srcy, int srcw, int srch, int destx, int desy);
+
+	local srcx: int32 = vm:get_argi(0)
+	local srcy: int32 = vm:get_argi(1)
+	local srcw: int32 = vm:get_argi(2)
+	local srch: int32 = vm:get_argi(3)
+	local destx: int32 = vm:get_argi(4)
+	local desty: int32 = vm:get_argi(5)
+
+	srcw = math.clamp(srcw, 1, 256)
+	srch = math.clamp(srch, 1, 256)
+	srcx = math.clamp(srcx, 0, 1024 - srcw)
+	srcy = math.clamp(srcy, 0, 1024 - srch)
+
+	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
+	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(srcw), (@float32)(srch) };
+
+	rl.drawTexturePro(vm.gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+
+	return true
+end
+
+local function api_ssprite2d(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void ssprite2d(int srcx, int srcy, int srcw, int srch, int destx, int desy, int destw, int desth);
+
+	local srcx: int32 = vm:get_argi(0)
+	local srcy: int32 = vm:get_argi(1)
+	local srcw: int32 = vm:get_argi(2)
+	local srch: int32 = vm:get_argi(3)
+	local destx: int32 = vm:get_argi(4)
+	local desty: int32 = vm:get_argi(5)
+	local destw: int32 = vm:get_argi(6)
+	local desth: int32 = vm:get_argi(7)
+
+	srcw = math.clamp(srcw, 1, 256)
+	srch = math.clamp(srch, 1, 256)
+	srcx = math.clamp(srcx, 0, 1024 - srcw)
+	srcy = math.clamp(srcy, 0, 1024 - srch)
+
+	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
+	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(destw), (@float32)(desth) };
+
+	rl.drawTexturePro(vm.gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+
+	return true
+end
+
 local function api_meshbegin(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void meshbegin(int mode);
 
-	local mode: int32 = vm:get_argi(0)
+	local mode: uint32 = vm:get_argu(0)
 
 	switch mode do
 		case 0 then
-			mode = rlgl.RL_LINES
+			vm.gpu.triangle_mode = false
+			mode = rlgl.LINES
 		case 1 then
-			mode = rlgl.RL_TRIANGLES
-		case 2 then
-			mode = rlgl.RL_QUADS
+			vm.gpu.triangle_mode = true
+			vm.gpu.triangle_vert_index = 0
+			mode = rlgl.QUADS
 		else
-			return false
+			vm.gpu.triangle_mode = false
+			mode = rlgl.QUADS
 	end
 
 	rl.beginShaderMode(vm.gpu.gfx_shader)
 
 	rlgl.setTexture(vm.gpu.gfx_texture.id)
 	
-	rlgl.beginMesh(mode)
+	rlgl.begin(mode)
 	
 	return true
 end
@@ -1866,7 +2239,7 @@ local function api_meshend(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void meshend();
 
-	rlgl.endMesh()
+	rlgl.ending()
 
 	rl.endShaderMode()
 	
@@ -1881,6 +2254,73 @@ local function api_vertex(vm: *e3d.EVM): boolean
 
 	rlgl.vertex3f(v.x, v.y, v.z)
 	
+	if vm.gpu.triangle_mode then
+		if vm.gpu.triangle_vert_index == 0 then
+			vm.gpu.triangle_vert_pos = v
+		elseif vm.gpu.triangle_vert_index == 2 then
+			-- send copy of first vertex to allow textured tris
+			rlgl.color4ub(
+				vm.gpu.triangle_vert_color.r,
+				vm.gpu.triangle_vert_color.g,
+				vm.gpu.triangle_vert_color.b,
+				vm.gpu.triangle_vert_color.a
+			)
+			rlgl.texCoord2f(
+				vm.gpu.triangle_vert_uv.x,
+				vm.gpu.triangle_vert_uv.y
+			)
+			rlgl.vertex3f(
+				vm.gpu.triangle_vert_pos.x,
+				vm.gpu.triangle_vert_pos.y,
+				vm.gpu.triangle_vert_pos.z
+			)
+			
+			vm.gpu.triangle_vert_index = 0
+			return true
+		end
+
+		vm.gpu.triangle_vert_index = vm.gpu.triangle_vert_index + 1
+	end
+	
+	return true
+end
+
+local function api_vertex2d(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void vertex2d(vec2 v);
+
+	local v: rl.vector2 = vm:get_argv2(0)
+
+	rlgl.vertex2f(v.x, v.y)
+	
+	if vm.gpu.triangle_mode then
+		if vm.gpu.triangle_vert_index == 0 then
+			vm.gpu.triangle_vert_pos.x = v.x
+			vm.gpu.triangle_vert_pos.y = v.y
+		elseif vm.gpu.triangle_vert_index == 2 then
+			-- send copy of first vertex to allow textured tris
+			rlgl.color4ub(
+				vm.gpu.triangle_vert_color.r,
+				vm.gpu.triangle_vert_color.g,
+				vm.gpu.triangle_vert_color.b,
+				vm.gpu.triangle_vert_color.a
+			)
+			rlgl.texCoord2f(
+				vm.gpu.triangle_vert_uv.x,
+				vm.gpu.triangle_vert_uv.y
+			)
+			rlgl.vertex2f(
+				vm.gpu.triangle_vert_pos.x,
+				vm.gpu.triangle_vert_pos.y
+			)
+			
+			vm.gpu.triangle_vert_index = 0
+			return true
+		end
+
+		vm.gpu.triangle_vert_index = vm.gpu.triangle_vert_index + 1
+	end
+	
 	return true
 end
 
@@ -1889,8 +2329,12 @@ local function api_texcoord(vm: *e3d.EVM): boolean
 	-- void texcoord(vec2 uv);
 
 	local v: rl.vector2 = vm:get_argv2(0)
-
+	
 	rlgl.texCoord2f(v.x, v.y)
+
+	if vm.gpu.triangle_mode and (vm.gpu.triangle_vert_index == 0) then
+		vm.gpu.triangle_vert_uv = v
+	end
 	
 	return true
 end
@@ -1904,8 +2348,12 @@ local function api_color(vm: *e3d.EVM): boolean
 	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
 	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
 	local a: cuchar = (@cuchar)(col & 0xFF)
-
+	
 	rlgl.color4ub(r, g, b, a)
+
+	if vm.gpu.triangle_mode and (vm.gpu.triangle_vert_index == 0) then
+		vm.gpu.triangle_vert_color = {r, g, b, a}
+	end
 	
 	return true
 end
@@ -1994,10 +2442,8 @@ function e3d.new_vm(): *e3d.EVM
 	}
 
 	local constructor_ids: []e3d.Identifier = {
-		{name="v2",     type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}},
-		{name="v2zero", type_info={e3d.EVMType.VEC2}},
-		{name="v3",     type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}},
-		{name="v3zero", type_info={e3d.EVMType.VEC3}}
+		{name="vec2zero", type_info={e3d.EVMType.VEC2}},
+		{name="vec3zero", type_info={e3d.EVMType.VEC3}}
 	}
 	
 	local api_ids: []e3d.Identifier = {
@@ -2008,6 +2454,8 @@ function e3d.new_vm(): *e3d.EVM
 		{name="print_vec2",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_print_vec2},
 		{name="print_vec3",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},                           func=api_print_vec3},
 		
+		{name="btn",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}}, func=api_btn},
+		{name="btnu", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}}, func=api_btnu},
 		{name="btnd", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}}, func=api_btnd},
 		
 		{name="imin",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_imin},
@@ -2025,26 +2473,72 @@ function e3d.new_vm(): *e3d.EVM
 		{name="sin", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_sin},
 		{name="cos", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_cos},
 		
-		{name="v2len",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_v2len},
-		{name="v2lensq",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_v2lensq},
-		{name="v2norm",   type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_v2norm},
-		{name="v2dot",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_v2dot},
-		{name="v2cross",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_v2cross},
-		{name="v2dist",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_v2dist},
-		{name="v2distsq", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_v2distsq},
+		{name="time", type_info={e3d.EVMType.FLOAT}, func=api_time},
 		
-		{name="v3len",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_v3len},
-		{name="v3lensq",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_v3lensq},
-		{name="v3norm",   type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_v3norm},
-		{name="v3dot",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_v3dot},
-		{name="v3cross",  type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_v3cross},
-		{name="v3dist",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_v3dist},
-		{name="v3distsq", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_v3distsq},
+		{name="vec2len",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2len},
+		{name="vec2lensq",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2lensq},
+		{name="vec2norm",   type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2norm},
+		{name="vec2dot",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2dot},
+		{name="vec2cross",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2cross},
+		{name="vec2dist",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2dist},
+		{name="vec2distsq", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2distsq},
+		
+		{name="vec3len",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3len},
+		{name="vec3lensq",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3lensq},
+		{name="vec3norm",   type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3norm},
+		{name="vec3dot",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3dot},
+		{name="vec3cross",  type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3cross},
+		{name="vec3dist",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3dist},
+		{name="vec3distsq", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3distsq},
+		
+		{name="camera",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_camera},
+		{name="campos",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_campos},
+		{name="camtarget",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_camtarget},
+		{name="camup",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_camup},
+		{name="camfov",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_camfov},
+		{name="camproj",    type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_camproj},
+		{name="camright",   type_info={e3d.EVMType.VEC3},                                        func=api_camright},
+		{name="camforward", type_info={e3d.EVMType.VEC3},                                        func=api_camforward},
+		
+		{name="bgcolor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_bgcolor},
+		{name="texturemode", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_texturemode},
+		{name="cullmode",    type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_cullmode},
+		{name="wiremode",    type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_wiremode},
+
+		{
+			name="sprite2d",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=api_sprite2d
+		},
+		{
+			name="ssprite2d",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=api_ssprite2d
+		},
 
 		{name="meshbegin",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},  func=api_meshbegin},
 		{name="meshend",    type_info={e3d.EVMType.VOID},                                       func=api_meshend},
 		{name="texture",    type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_texture},
 		{name="vertex",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}}, func=api_vertex},
+		{name="vertex2d",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}}, func=api_vertex2d},
 		{name="texcoord",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}}, func=api_texcoord},
 		{name="color",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},  func=api_color},
 		{name="pushmatrix", type_info={e3d.EVMType.VOID},                                       func=api_pushmatrix},
@@ -2087,6 +2581,7 @@ function e3d.new_vm(): *e3d.EVM
 	local v2x: *e3d.Identifier = new(@e3d.Identifier)
 	local v2y: *e3d.Identifier = new(@e3d.Identifier)
 
+	sid.name = "vec2"
 	v2x.name = "x"
 	v2x.index = 0
 	v2x.type_info = {e3d.EVMType.FLOAT}
@@ -2106,6 +2601,7 @@ function e3d.new_vm(): *e3d.EVM
 	local v3y: *e3d.Identifier = new(@e3d.Identifier)
 	local v3z: *e3d.Identifier = new(@e3d.Identifier)
 
+	sid.name = "vec3"
 	v3x.name = "x"
 	v3x.index = 0
 	v3x.type_info = {e3d.EVMType.FLOAT}
@@ -2123,7 +2619,8 @@ function e3d.new_vm(): *e3d.EVM
 	sid:_add_member(v3z)
 	sid.is_complete = true
 	vm.struct_vec3 = sid
-	
-	vm:reset()
+
+	vm.gpu:init(&vm.tmem)
+	vm:reset(false)
 	return vm
 end

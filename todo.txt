@@ -7,4 +7,20 @@ COMPILER:
 - implement C-style for loop
 - implement break and continue
 - implement strings
+- implement struct/function forward declarations
+- implement arrays + array initializers
+- implement built-in constants (true, false, null, etc)
+- implement compound assignment operators
 - implement varargs?
+- implement unsigned int comparison operators?
+
+VM:
+- implement memory allocator for vm heap
+- implement sound/music api
+- implement physics api
+- implement actor+model+animation api
+- revise memory map
+
+HOST:
+- implement ui (terminal?, editors?. etc.)
+- implement cartridge format and saving/loading
