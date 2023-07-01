@@ -48,10 +48,10 @@ void update(float deltatime) {
 	float delta_angle = 0.0;
 
 	if (btn(2)) {
-		delta_angle = 45.0;
+		delta_angle = delta_angle + 45.0;
 	}
 	if (btn(3)) {
-		delta_angle = -45.0;
+		delta_angle = delta_angle - 45.0;
 	}
 
 	rotation_angle = fwrap(rotation_angle + delta_angle * deltatime, 0.0, 360.0);

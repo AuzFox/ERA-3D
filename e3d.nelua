@@ -414,7 +414,8 @@ e3d.EVM = @record {
 	
 	-- general vars
 	gpu: e3d.GPU,
-	error: string
+	error: string,
+	init_time: float64
 }
 
 global e3d.btnmap: [e3d.ControllerButtons.COUNT]cint
