@@ -388,6 +388,7 @@ e3d.EVM = @record {
 	-- compiler vars
 	src: string,
 	src_index: uinteger,
+	prev_src_index: uinteger,
 	token: uinteger,
 	token_val: uinteger,
 	token_valf: float32,

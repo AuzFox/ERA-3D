@@ -59,31 +59,21 @@ void setcell(int* grid, int x, int y, int val) {
 }
 
 void cleargrids() {
-	int x;
-	int y = 0;
-
-	while (y < GRID_H) {
-		x = 0;
-		while (x < GRID_W) {
+	for (int y = 0; y < GRID_H; y = y + 1) {
+		for (int x = 0; x < GRID_W; x = x + 1) {
 			setcell(curgrid, x, y, WHITE);
 			setcell(nextgrid, x, y, WHITE);
-
-			x = x + 1;
 		}
-		y = y + 1;
 	}
 }
 
 int getneighbours(int* grid, int x, int y) {
 	vec2 offset;
 	int total = 0;
-	int i = 0;
 
-	while (i < 8) {
+	for (int i = 0; i < 8; i = i + 1) {
 		offset = *(offsets + i);
 		total = total + (getcell(grid, x + (int)offset.x, y + (int)offset.y) == BLACK);
-
-		i = i + 1;
 	}
 
 	return total;
@@ -190,14 +180,11 @@ void update(float deltatime) {
 		}
 
 		// advance simulation
-		int x;
-		int y = 0;
 		int cell;
 		int neighbours;
 	
-		while (y < GRID_H) {
-			x = 0;
-			while (x < GRID_W) {
+		for (int y = 0; y < GRID_H; y = y + 1) {
+			for (int x = 0; x < GRID_W; x = x + 1) {
 				cell = getcell(curgrid, x, y);
 				neighbours = getneighbours(curgrid, x, y);
 	
@@ -213,10 +200,7 @@ void update(float deltatime) {
 				}
 	
 				setcell(nextgrid, x, y, cell);
-				
-				x = x + 1;
 			}
-			y = y + 1;
 		}
 	
 		// swap grids

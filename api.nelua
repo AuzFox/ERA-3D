@@ -1369,6 +1369,7 @@ function e3d.EVM:_register_builtins(): void
 		{name="else",   token=e3d.Token.ELSE},
 		{name="return", token=e3d.Token.RETURN},
 		{name="sizeof", token=e3d.Token.SIZEOF},
+		{name="for",    token=e3d.Token.FOR},
 		{name="while",  token=e3d.Token.WHILE}
 	}
 

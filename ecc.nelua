@@ -152,6 +152,7 @@ local function _getc(vm: *e3d.EVM): byte
 end
 
 local function _next(vm: *e3d.EVM): void
+	vm.prev_src_index = vm.src_index
 	vm.prev_token = vm.token
 
 	while _getc(vm) ~= 0 do
@@ -1901,11 +1902,11 @@ end
 local function _statement(vm: *e3d.EVM): void
 	local a: uinteger
 	local b: uinteger
-	local structref: *e3d.Struct
-
+	
 	if vm.token >= e3d.Token.VOID and vm.token <= e3d.Token.STRUCT_ID then
 		-- local variable declaration
 		local var_type: uinteger = e3d.EVMType.INT
+		local structref: *e3d.Struct
 
 		if vm.token == e3d.Token.VOID then
 			_match(vm, e3d.Token.VOID)
@@ -2100,23 +2101,249 @@ local function _statement(vm: *e3d.EVM): void
 		]]
 
 		_match(vm, e3d.Token.FOR)
-		_match(vm, '('_u8)
 		
-		-- init expression
-		if vm.token >= e3d.Token.VOID and vm.token <= e3d.Token.STRUCT_ID then
-			-- loop variable declaration
-			_match(vm, ';'_u8)
-		elseif vm.token == ';'_u8 then
-			-- empty init
-			_match(vm, ';'_u8)
-		else
-			-- init expression
-			_expression(vm, e3d.Token.ASSIGN)
-			_match(vm, ';'_u8)
+		vm:_push_scope()
+		
+		vm:_bytecode_emitop(e3d.Opcode.NEW_L)
+		local new_l_index: uinteger = vm.bytecode_len
+		vm:_bytecode_emit16(0)
+		
+		_match(vm, '('_u8)
+
+		-- init
+		while vm.token ~= ';'_u8 do
+			if vm.token >= e3d.Token.VOID and vm.token <= e3d.Token.STRUCT_ID then
+				-- init variable declaration
+				local var_type: uinteger = e3d.EVMType.INT
+				local structref: *e3d.Struct
+
+				if vm.token == e3d.Token.VOID then
+					_match(vm, e3d.Token.VOID)
+					var_type = e3d.EVMType.VOID
+				elseif vm.token == e3d.Token.INT then
+					_match(vm, e3d.Token.INT)
+					var_type = e3d.EVMType.INT
+				elseif vm.token == e3d.Token.FLOAT then
+					_match(vm, e3d.Token.FLOAT)
+					var_type = e3d.EVMType.FLOAT
+				elseif vm.token == e3d.Token.VEC2 then
+					structref = vm.struct_vec2
+					_match(vm, e3d.Token.VEC2)
+					var_type = e3d.EVMType.VEC2
+				elseif vm.token == e3d.Token.VEC3 then
+					structref = vm.struct_vec3
+					_match(vm, e3d.Token.VEC3)
+					var_type = e3d.EVMType.VEC3
+				elseif vm.token == e3d.Token.STRUCT_ID then
+					structref = vm.current_id.type_info.structref
+					_match(vm, e3d.Token.STRUCT_ID)
+					var_type = e3d.EVMType.STRUCT
+				end
+
+				while vm.token == e3d.Token.MUL do
+					_match(vm, e3d.Token.MUL)
+					var_type = var_type + e3d.EVMType.POINTER
+				end
+
+				if var_type == e3d.EVMType.VOID then
+					vm.error = string.format("ERROR: line %d: cannot declare variable of type 'void'\n", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+				if vm.token ~= e3d.Token.ID then
+					vm.error = string.format("ERROR: line %d: unexpected token %d (%c)\n", vm.line, vm.token, vm.token)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+				if vm.has_id then
+					vm.error = string.format("ERROR: line %d: duplicate declaration of symbol '%s'\n", vm.line, vm.current_id.name)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+
+				if structref and not structref.is_complete then
+					vm.error = string.format("ERROR: line %d: cannot declare variable of incomplete type\n", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+
+				_match(vm, e3d.Token.ID)
+
+				local size: uint8 = 1
+				vm.current_id.class = e3d.Class.LOCAL
+				vm.current_id.type_info = {var_type, structref}
+				vm.current_id.index = vm.local_index
+				vm:_add_scoped_symbol(vm.current_id.name, vm.current_id)
+
+				switch var_type do
+					case e3d.EVMType.VEC2 then
+						vm.local_index = vm.local_index + 2
+						size = 2
+					case e3d.EVMType.VEC3 then
+						vm.local_index = vm.local_index + 3
+						size = 3
+					case e3d.EVMType.STRUCT then
+						vm.local_index = vm.local_index + structref.size
+						size = structref.size
+					else
+						vm.local_index = vm.local_index + 1
+				end
+
+				vm:_inc_scope_locals_size(size)
+
+				if vm.token == e3d.Token.ASSIGN then
+					local id: *e3d.Identifier = vm.current_id
+
+					_match(vm, e3d.Token.ASSIGN)
+
+					_expression(vm, e3d.Token.ASSIGN)
+
+					if vm.expr_type.type_id == e3d.EVMType.VOID then
+						vm.error = string.format("ERROR: line %d: cannot assign expression of type `void` to symbol of type `%d`\n", vm.line, var_type)
+						vm.compile_err = true
+						coroutine.yield()
+					elseif var_type ~= vm.expr_type.type_id then
+						-- can we convert types?
+						local can_convert: boolean = false
+						
+						if var_type == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
+							can_convert = true
+							vm:_bytecode_emitop(e3d.Opcode.FTOI)
+						elseif var_type == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
+							can_convert = true
+						elseif var_type == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
+							vm:_bytecode_emitop(e3d.Opcode.ITOF)
+						elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
+							can_convert = true
+						elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
+							can_convert = true
+						end
+
+						if not can_convert then
+							vm.error = string.format("ERROR: line %d: cannot assign `%d` to symbol of type `%d`\n", vm.line, vm.expr_type.type_id, var_type)
+							vm.compile_err = true
+							coroutine.yield()
+						end
+
+						vm:_bytecode_emitop(e3d.Opcode.SET_L)
+						vm:_bytecode_emit16(id.index)
+					else
+						if var_type == e3d.EVMType.VEC2 or var_type == e3d.EVMType.VEC3 then
+							vm:_bytecode_emitop(e3d.Opcode.SET_LX)
+							vm:_bytecode_emit16(id.index)
+							vm:_bytecode_emit16(size)
+						elseif var_type == e3d.EVMType.STRUCT then
+							if structref ~= vm.expr_type.structref then
+								vm.error = string.format("ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n", vm.line, vm.expr_type.structref.name, structref.name)
+								vm.compile_err = true
+								coroutine.yield()
+							end
+							
+							vm:_bytecode_emitop(e3d.Opcode.SET_LX)
+							vm:_bytecode_emit16(id.index)
+							vm:_bytecode_emit16(id.type_info.structref.size)
+						else
+							vm:_bytecode_emitop(e3d.Opcode.SET_L)
+							vm:_bytecode_emit16(id.index)
+						end
+					end
+				end
+			else
+				_expression(vm, e3d.Token.ASSIGN)
+			end
+
+			if vm.token == ','_u8 then
+				_match(vm, ','_u8)
+			end
 		end
 
+		_match(vm, ';'_u8)
+		
+		-- cond
+		a = vm.bytecode_len
+		
+		local has_condition: boolean = false
+		if vm.token ~= ';'_u8 then
+			has_condition = true
+			_expression(vm, e3d.Token.ASSIGN)
+		end
+		
+		if has_condition then
+			vm:_bytecode_emitop(e3d.Opcode.JUMP_Z)
+			
+			b = vm.bytecode_len
+			vm:_bytecode_emit16(0)
+		end
+		
+		_match(vm, ';'_u8)
+		
+		-- save our spot
+		-- we're skipping over the step expressions for now,
+		-- but we'll be back!
+		local step_prev_token: uinteger = vm.prev_token
+		local step_index: uinteger = vm.prev_src_index
+		
+		while vm.token ~= ')'_u8 and vm.token ~= 0 do
+			_next(vm)
+		end
+		
+		_match(vm, ')'_u8)
+		
+		-- loop body
+		_statement(vm)
+		
+		-- save our spot again
+		-- we'll return to the step expressions now,
+		-- but we'll be back! ...again!
+		local end_prev_token: uinteger = vm.prev_token
+		local end_index: uinteger = vm.prev_src_index
+		
+		vm.prev_token = step_prev_token
+		vm.src_index = step_index
+		
+		-- ok, we're back
+		-- we need to generate the step expressions now
+		_next(vm)
+		while vm.token ~= ')'_u8 do
+			_expression(vm, e3d.Token.ASSIGN)
+			
+			if vm.token == ','_u8 then
+				_match(vm, ','_u8)
+			end
+		end
 
 		_match(vm, ')'_u8)
+
+		-- time to wrap up the loop with a jump
+		vm:_bytecode_emitop(e3d.Opcode.JUMP)
+		vm:_bytecode_emit16(a)
+		
+		if has_condition then
+			vm.bytecode[b] = ((vm.bytecode_len) >> 8)
+			vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
+		end
+
+		-- and now we can jump back to the end of the loop body
+		vm.prev_token = end_prev_token
+		vm.src_index = end_index
+
+		_next(vm)
+
+		-- cleanup any loop init variables allocated
+		local size: uinteger = vm:_get_scope_locals_size()
+		if size > 0 then
+			-- patch new_l size
+			vm.bytecode[new_l_index] = ((size) >> 8)
+			vm.bytecode[new_l_index + 1] = ((size) & 0xFF)
+			
+			-- cleanup
+			vm:_bytecode_emitop(e3d.Opcode.DEL_L)
+			vm:_bytecode_emit16(size)
+			
+			vm.local_index = vm.local_index - size
+		end
+		
+		vm:_pop_scope()
 	elseif vm.token == e3d.Token.WHILE then
 		--[[
 			ERA-C:         | BYTECODE:
@@ -2694,6 +2921,7 @@ local function _program(vm: *e3d.EVM): void
 
 	vm.line = 1
 	vm.src_index = 1 -- 1-based string indexing
+	vm.prev_src_index = 1
 	vm:_push_scope() -- global scope
 	
 	_next(vm)

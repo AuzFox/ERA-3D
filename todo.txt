@@ -4,7 +4,6 @@ COMPILER:
 - improve end-of function return generation (return zero value if no explicit return is used)
 - implement all operators: functionality and type checking
 - implement function/struct forward declarations
-- implement C-style for loop
 - implement break and continue
 - implement strings
 - implement struct/function forward declarations
