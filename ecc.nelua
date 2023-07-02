@@ -695,9 +695,9 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				e3d.Opcode.PUSH_VEC3_ZERO
 			}
 
-			if id.name == "vec2zero" then
+			if id.name == "vec2Zero" then
 				constructor_index = 0
-			elseif id.name == "vec3zero" then
+			elseif id.name == "vec3Zero" then
 				constructor_index = 1
 			end
 
@@ -3025,9 +3025,9 @@ local function _global_declaration(vm: *e3d.EVM): void
 				hook_index = e3d.Hook.INIT
 			elseif vm.current_id.name == "update" then
 				hook_index = e3d.Hook.UPDATE
-			elseif vm.current_id.name == "draw2d" then
+			elseif vm.current_id.name == "draw2D" then
 				hook_index = e3d.Hook.DRAW2D
-			elseif vm.current_id.name == "draw3d" then
+			elseif vm.current_id.name == "draw3D" then
 				hook_index = e3d.Hook.DRAW3D
 			end
 

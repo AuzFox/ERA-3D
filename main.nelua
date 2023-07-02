@@ -93,6 +93,7 @@ local function run(): void
 	while not rl.windowShouldClose() do
 		update()
 
+		-- update render settings
 		if running_vm and vm.gpu.update_tex then
 			vm.gpu.update_tex = false
 

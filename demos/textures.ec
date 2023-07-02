@@ -35,112 +35,112 @@ void init() {
 	frames = 0;
 	rotation_angle = 90.0;
 	cam_radius = 2.5;
-	cam_pos = vec3zero();
+	cam_pos = vec3Zero();
 
-	cullmode(2);
+	setCullMode(2);
 }
 
 void update(float deltatime) {
-	left_offset = fwrap(left_offset + 0.05, 0.0, 100.0);
+	left_offset = wrapf(left_offset + 0.05, 0.0, 100.0);
 	left_scale = sin(left_offset);
-	right_scroll = fwrap(right_scroll + 0.0125, 0.0, 1.0);
+	right_scroll = wrapf(right_scroll + 0.0125, 0.0, 1.0);
 
 	float delta_angle = 0.0;
 
-	if (btn(2)) {
+	if (buttonHeld(2)) {
 		delta_angle = delta_angle + 45.0;
 	}
-	if (btn(3)) {
+	if (buttonHeld(3)) {
 		delta_angle = delta_angle - 45.0;
 	}
 
-	rotation_angle = fwrap(rotation_angle + delta_angle * deltatime, 0.0, 360.0);
+	rotation_angle = wrapf(rotation_angle + delta_angle * deltatime, 0.0, 360.0);
 
 	float asrad = rad(rotation_angle);
 	cam_pos.x = cos(asrad) * cam_radius;
 	cam_pos.z = sin(asrad) * cam_radius;
 
-	campos(cam_pos);
+	setCamPos(cam_pos);
 }
 
-void draw3d() {
-	pushmatrix();
+void draw3D() {
+	pushMatrix();
 		// front
 		texture(BRICK, 0, 64, 64);
-		meshbegin(QUADS);
-			color(RED);
-			texcoord((vec2){0.0, 0.0});
+		beginMesh(QUADS);
+			vertColor(RED);
+			vertUV((vec2){0.0, 0.0});
 			vertex((vec3){-0.5, 0.5, 0.5});
 
-			color(GREEN);
-			texcoord((vec2){0.0, 1.0});
+			vertColor(GREEN);
+			vertUV((vec2){0.0, 1.0});
 			vertex((vec3){-0.5, -0.5, 0.5});
 
-			color(BLUE);
-			texcoord((vec2){1.0, 1.0});
+			vertColor(BLUE);
+			vertUV((vec2){1.0, 1.0});
 			vertex((vec3){0.5, -0.5, 0.5});
 
-			color(WHITE);
-			texcoord((vec2){1.0, 0.0});
+			vertColor(WHITE);
+			vertUV((vec2){1.0, 0.0});
 			vertex((vec3){0.5, 0.5, 0.5});
-		meshend();
+		endMesh();
 
 		// left
 		vec2 midpoint = (vec2){0.5, 0.5};
 		texture(WOOD, 0, 64, 64);
-		meshbegin(QUADS);
-			color(WHITE);
-			texcoord(midpoint - (vec2){left_scale, left_scale});
+		beginMesh(QUADS);
+			vertColor(WHITE);
+			vertUV(midpoint - (vec2){left_scale, left_scale});
 			vertex((vec3){-0.5, 0.5, -0.5});
 
-			texcoord(midpoint + (vec2){-left_scale, left_scale});
+			vertUV(midpoint + (vec2){-left_scale, left_scale});
 			vertex((vec3){-0.5, -0.5, -0.5});
 
-			texcoord(midpoint + (vec2){left_scale, left_scale});
+			vertUV(midpoint + (vec2){left_scale, left_scale});
 			vertex((vec3){-0.5, -0.5, 0.5});
 
-			texcoord(midpoint + (vec2){left_scale, -left_scale});
+			vertUV(midpoint + (vec2){left_scale, -left_scale});
 			vertex((vec3){-0.5, 0.5, 0.5});
-		meshend();
+		endMesh();
 
 		// right
 		vec2 scrollv = (vec2){right_scroll, right_scroll};
 		texture(TILE, 0, 64, 64);
-		meshbegin(QUADS);
-			color(WHITE);
-			texcoord((vec2){0.0, 0.0} + scrollv);
+		beginMesh(QUADS);
+			vertColor(WHITE);
+			vertUV((vec2){0.0, 0.0} + scrollv);
 			vertex((vec3){0.5, 0.5, 0.5});
 
-			color(BLUE);
-			texcoord((vec2){0.0, 1.0} + scrollv);
+			vertColor(BLUE);
+			vertUV((vec2){0.0, 1.0} + scrollv);
 			vertex((vec3){0.5, -0.5, 0.5});
 
-			color(BLUE);
-			texcoord((vec2){1.0, 1.0} + scrollv);
+			vertColor(BLUE);
+			vertUV((vec2){1.0, 1.0} + scrollv);
 			vertex((vec3){0.5, -0.5, -0.5});
 
-			color(WHITE);
-			texcoord((vec2){1.0, 0.0} + scrollv);
+			vertColor(WHITE);
+			vertUV((vec2){1.0, 0.0} + scrollv);
 			vertex((vec3){0.5, 0.5, -0.5});
-		meshend();
+		endMesh();
 
 		// back
 		texture(0, 0, 64, 64);
-		meshbegin(QUADS);
-			color(WHITE);
-			texcoord((vec2){0.0, 0.0});
+		beginMesh(QUADS);
+			vertColor(WHITE);
+			vertUV((vec2){0.0, 0.0});
 			vertex((vec3){0.5, 0.5, -0.5});
 
-			texcoord((vec2){0.0, 1.0});
+			vertUV((vec2){0.0, 1.0});
 			vertex((vec3){0.5, -0.5, -0.5});
 
-			texcoord((vec2){1.0, 1.0});
+			vertUV((vec2){1.0, 1.0});
 			vertex((vec3){-0.5, -0.5, -0.5});
 
-			texcoord((vec2){1.0, 0.0});
+			vertUV((vec2){1.0, 0.0});
 			vertex((vec3){-0.5, 0.5, -0.5});
-		meshend();
-	popmatrix();
+		endMesh();
+	popMatrix();
 
 	frames = frames + 1;
 }

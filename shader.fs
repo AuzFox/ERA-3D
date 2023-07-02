@@ -16,6 +16,11 @@ uniform int texY;
 uniform int texW;
 uniform int texH;
 
+uniform int fogMode;
+uniform float fogStart;
+uniform float fogEnd;
+uniform vec4 fogColor;
+
 void main()
 {
 	// wrap/clamp coords into range
@@ -37,5 +42,23 @@ void main()
 	vec2 mappedCoord = mix(tMin, tMax, wrappedCoord) / tSize;
 	
 	// sample color from texture
-    finalColor = texture(texture0, mappedCoord) * fragColor;
+    vec4 rawColor = texture(texture0, mappedCoord) * fragColor;
+
+	// calculate fog
+	float dist = (gl_FragCoord.z / gl_FragCoord.w);
+	float fogFactor;
+	if (fogStart == fogEnd) {
+		fogFactor = 1.0;
+	}
+	else {
+		fogFactor = fogEnd - fogStart;
+	}
+	fogFactor = clamp((fogEnd - dist) / fogFactor, 0.0f, 1.0f);
+
+	if (fogMode == 1) {
+		finalColor = mix(fogColor, rawColor, fogFactor);
+	}
+	else {
+		finalColor = rawColor;
+	}
 }

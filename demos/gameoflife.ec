@@ -32,48 +32,48 @@ enum {
 	WHITE          = 0xFFFFFFFF
 };
 
-int* curgrid;
-int* nextgrid;
+int* current_grid;
+int* next_grid;
 vec2* offsets;
 
 int running;
 int frames;
-int waitframes;
+int wait_frames;
 
-int cursorx;
-int cursory;
-float cursoranim;
+int cursor_x;
+int cursor_y;
+float cursor_anim;
 
-int getcell(int* grid, int x, int y) {
-	x = iwrap(x, 0, GRID_W - 1);
-	y = iwrap(y, 0, GRID_H - 1);
+int getCell(int* grid, int x, int y) {
+	x = wrapi(x, 0, GRID_W - 1);
+	y = wrapi(y, 0, GRID_H - 1);
 	
 	return *(grid + (TMEM_W * y + x));
 }
 
-void setcell(int* grid, int x, int y, int val) {
-	x = iwrap(x, 0, GRID_W - 1);
-	y = iwrap(y, 0, GRID_H - 1);
+void setCell(int* grid, int x, int y, int val) {
+	x = wrapi(x, 0, GRID_W - 1);
+	y = wrapi(y, 0, GRID_H - 1);
 	
 	*(grid + (TMEM_W * y + x)) = val;
 }
 
-void cleargrids() {
+void clearGrids() {
 	for (int y = 0; y < GRID_H; y = y + 1) {
 		for (int x = 0; x < GRID_W; x = x + 1) {
-			setcell(curgrid, x, y, WHITE);
-			setcell(nextgrid, x, y, WHITE);
+			setCell(current_grid, x, y, WHITE);
+			setCell(next_grid, x, y, WHITE);
 		}
 	}
 }
 
-int getneighbours(int* grid, int x, int y) {
+int getNeighbours(int* grid, int x, int y) {
 	vec2 offset;
 	int total = 0;
 
 	for (int i = 0; i < 8; i = i + 1) {
 		offset = *(offsets + i);
-		total = total + (getcell(grid, x + (int)offset.x, y + (int)offset.y) == BLACK);
+		total = total + (getCell(grid, x + (int)offset.x, y + (int)offset.y) == BLACK);
 	}
 
 	return total;
@@ -81,10 +81,10 @@ int getneighbours(int* grid, int x, int y) {
 
 void init() {
 	// start first grid at (0, 0) in TMEM
-	curgrid = (int*)TMEM_START;
+	current_grid = (int*)TMEM_START;
 
 	// start second grid at (0, GRID_H) in TMEM
-	nextgrid = (int*)TMEM_START + (GRID_H * TMEM_W);
+	next_grid = (int*)TMEM_START + (GRID_H * TMEM_W);
 
 	// store offsets table in the heap
 	offsets = (int*)0x000000;
@@ -99,31 +99,31 @@ void init() {
 	*(offsets + 6) = (vec2){ 0,  1};
 	*(offsets + 7) = (vec2){ 1,  1};
 
-	cleargrids();
+	clearGrids();
 	
 	running = 0;
 	frames = 0;
-	waitframes = 2;
+	wait_frames = 2;
 
-	cursorx = GRID_W / 2;
-	cursory = GRID_H / 2;
+	cursor_x = GRID_W / 2;
+	cursor_y = GRID_H / 2;
 
-	cursoranim = 0.0;
+	cursor_anim = 0.0;
 }
 
-void update(float deltatime) {
-	cursoranim = cursoranim + 0.2;
+void update(float delta_time) {
+	cursor_anim = cursor_anim + 0.2;
 	
-	if (btnd(BTN_L1)) {
-		waitframes = imid(1, waitframes - 1, 30);
+	if (buttonDown(BTN_L1)) {
+		wait_frames = midi(1, wait_frames - 1, 30);
 		frames = 0;
 	}
-	else if (btnd(BTN_R1)) {
-		waitframes = imid(1, waitframes + 1, 30);
+	else if (buttonDown(BTN_R1)) {
+		wait_frames = midi(1, wait_frames + 1, 30);
 		frames = 0;
 	}
 	
-	if (btnd(BTN_START)) {
+	if (buttonDown(BTN_START)) {
 		running = !running;
 		frames = 0;
 	}
@@ -132,33 +132,33 @@ void update(float deltatime) {
 		int dx = 0;
 		int dy = 0;
 		
-		if (btnd(BTN_UP)) {
+		if (buttonDown(BTN_UP)) {
 			dy = dy - 1;
 		}
-		if (btnd(BTN_DOWN)) {
+		if (buttonDown(BTN_DOWN)) {
 			dy = dy + 1;
 		}
-		if (btnd(BTN_LEFT)) {
+		if (buttonDown(BTN_LEFT)) {
 			dx = dx - 1;
 		}
-		if (btnd(BTN_RIGHT)) {
+		if (buttonDown(BTN_RIGHT)) {
 			dx = dx + 1;
 		}
 
-		cursorx = iwrap(cursorx + dx, 0, GRID_W - 1);
-		cursory = iwrap(cursory + dy, 0, GRID_H - 1);
+		cursor_x = wrapi(cursor_x + dx, 0, GRID_W - 1);
+		cursor_y = wrapi(cursor_y + dy, 0, GRID_H - 1);
 
-		if (btnd(BTN_SELECT)) {
-			cleargrids();
+		if (buttonDown(BTN_SELECT)) {
+			clearGrids();
 		}
-		else if (btnd(BTN_CROSS)) {
-			setcell(curgrid, cursorx, cursory, BLACK);
+		else if (buttonDown(BTN_CROSS)) {
+			setCell(current_grid, cursor_x, cursor_y, BLACK);
 		}
-		else if (btnd(BTN_CIRCLE)) {
-			setcell(curgrid, cursorx, cursory, WHITE);
+		else if (buttonDown(BTN_CIRCLE)) {
+			setCell(current_grid, cursor_x, cursor_y, WHITE);
 		}
-		else if (btnd(BTN_SQUARE)) {
-			int cell = getcell(curgrid, cursorx, cursory);
+		else if (buttonDown(BTN_SQUARE)) {
+			int cell = getCell(current_grid, cursor_x, cursor_y);
 
 			if (cell == BLACK) {
 				cell = WHITE;
@@ -167,12 +167,12 @@ void update(float deltatime) {
 				cell = BLACK;
 			}
 			
-			setcell(curgrid, cursorx, cursory, cell);
+			setCell(current_grid, cursor_x, cursor_y, cell);
 		}
 	}
 	else {
 		frames = frames + 1;
-		if (frames >= waitframes) {
+		if (frames >= wait_frames) {
 			frames = 0;
 		}
 		else {
@@ -185,8 +185,8 @@ void update(float deltatime) {
 	
 		for (int y = 0; y < GRID_H; y = y + 1) {
 			for (int x = 0; x < GRID_W; x = x + 1) {
-				cell = getcell(curgrid, x, y);
-				neighbours = getneighbours(curgrid, x, y);
+				cell = getCell(current_grid, x, y);
+				neighbours = getNeighbours(current_grid, x, y);
 	
 				if (cell == BLACK) {
 					if (neighbours < 2 || neighbours > 3) {
@@ -199,21 +199,21 @@ void update(float deltatime) {
 					}
 				}
 	
-				setcell(nextgrid, x, y, cell);
+				setCell(next_grid, x, y, cell);
 			}
 		}
 	
 		// swap grids
-		int* temp = curgrid;
-		curgrid = nextgrid;
-		nextgrid = temp;
+		int* temp = current_grid;
+		current_grid = next_grid;
+		next_grid = temp;
 	}
 }
 
-void draw2d() {
+void draw2D() {
 	// get y texturesheet coordinate of the current grid
 	int srcy = 0;
-	if (curgrid != TMEM_START) {
+	if (current_grid != TMEM_START) {
 		srcy = GRID_H;
 	}
 	
@@ -222,7 +222,7 @@ void draw2d() {
 	// the grid is drawn in the centered of the screen at 2x scale
 	int gridx = (320 / 2) - GRID_W; // x screen coordinate of the grid
 	int gridy = (240 / 2) - GRID_H; // y screen coordinate of the grid
-	ssprite2d(0, srcy, GRID_W, GRID_H, gridx, gridy, GRID_W * 2, GRID_H * 2);
+	spriteEx2D(0, srcy, GRID_W, GRID_H, gridx, gridy, GRID_W * 2, GRID_H * 2);
 	
 	// draw the cursor
 	//
@@ -233,26 +233,26 @@ void draw2d() {
 	
 	if (!running) {
 		vec2 cursorpos = (vec2){
-			(float)(gridx + cursorx * 2),
-			(float)(gridy + cursory * 2),
+			(float)(gridx + cursor_x * 2),
+			(float)(gridy + cursor_y * 2),
 		};
 		
 		texture(1023, 0, 1, 1);
-		meshbegin(QUADS);
+		beginMesh(QUADS);
 			// ping-pong between 25% and 100% transparency, no tinting
-			color(WHITE_NO_ALPHA | (int)(((1.0 + sin(cursoranim)) * 0.375 + 0.25) * 255.0));
+			vertColor(WHITE_NO_ALPHA | (int)(((1.0 + sin(cursor_anim)) * 0.375 + 0.25) * 255.0));
 			
-			texcoord((vec2){0.0, 0.0});
-			vertex2d(cursorpos);
+			vertUV((vec2){0.0, 0.0});
+			vertex2D(cursorpos);
 
-			texcoord((vec2){0.0, 1.0});
-			vertex2d(cursorpos + (vec2){0.0, 2.0});
+			vertUV((vec2){0.0, 1.0});
+			vertex2D(cursorpos + (vec2){0.0, 2.0});
 
-			texcoord((vec2){1.0, 1.0});
-			vertex2d(cursorpos + (vec2){2.0, 2.0});
+			vertUV((vec2){1.0, 1.0});
+			vertex2D(cursorpos + (vec2){2.0, 2.0});
 
-			texcoord((vec2){1.0, 0.0});
-			vertex2d(cursorpos + (vec2){2.0, 0.0});
-		meshend();
+			vertUV((vec2){1.0, 0.0});
+			vertex2D(cursorpos + (vec2){2.0, 0.0});
+		endMesh();
 	}
 }

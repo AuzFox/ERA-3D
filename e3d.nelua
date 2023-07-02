@@ -301,13 +301,18 @@ global e3d.GPU = @record {
 	gfx_shader: rl.shader,
 	gfx_rendertex: rl.renderTexture,
 	
+	-- shader uniform locations
 	tex_mode_loc: cint,
 	tex_x_loc: cint,
 	tex_y_loc: cint,
 	tex_w_loc: cint,
 	tex_h_loc: cint,
+	fog_mode_loc: cint,
+	fog_start_loc: cint,
+	fog_end_loc: cint,
+	fog_color_loc: cint,
+
 	update_tex: boolean,
-	
 	triangle_mode: boolean,
 	triangle_vert_index: integer,
 	triangle_vert_color: rl.color,
@@ -323,6 +328,10 @@ global e3d.GPU = @record {
 	tex_y: cint,
 	tex_w: cint,
 	tex_h: cint,
+	fog_mode: cint,
+	fog_start: float32,
+	fog_end: float32,
+	fog_color: rl.vector4,
 	bgcolor: rl.color
 }
 
@@ -538,13 +547,22 @@ function e3d.GPU:reset(): void
 	end
 
 	self.current_camera = 0
-	self.tex_mode = 0
 	self.cullmode = 0
 	self.wiremode = false
 	self.bgcolor = {0x00, 0x00, 0x00, 0xFF}
 	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
-
+	
+	self.tex_mode = 0
 	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
+	
+	self.fog_mode = 0
+	self.fog_start = 700.0
+	self.fog_end = 1000.0
+	self.fog_color = {1.0, 1.0, 1.0, 1.0}
+	rl.setShaderValue(self.gfx_shader, self.fog_mode_loc, &self.fog_mode, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &self.fog_start, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &self.fog_end, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &self.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
 
 	self:texture(0, 0, 64, 64)
 end
@@ -575,6 +593,10 @@ function e3d.GPU:init(tmem: *rl.color): void
 	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
 	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
 	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
+	self.fog_mode_loc = rl.getShaderLocation(self.gfx_shader, "fogMode")
+	self.fog_start_loc = rl.getShaderLocation(self.gfx_shader, "fogStart")
+	self.fog_end_loc = rl.getShaderLocation(self.gfx_shader, "fogEnd")
+	self.fog_color_loc = rl.getShaderLocation(self.gfx_shader, "fogColor")
 
 	self:reset()
 end
