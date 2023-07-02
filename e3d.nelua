@@ -99,6 +99,8 @@ global e3d.Token = @enum {
 	ELSE,
 	IF,
 	RETURN,
+	BREAK,
+	CONTINUE,
 	SIZEOF,
 	FOR,
 	WHILE,
@@ -349,6 +351,16 @@ global e3d.TypeInfo = @record {
 	structref: *e3d.Struct -- only used when base_type is e3d.EVMType.STRUCT
 }
 
+global e3d.LoopInfo = @record {
+	loop_start: uinteger,
+	loop_step: uinteger,
+	loop_end: uinteger,
+	break_count: uinteger,
+	step_count: uinteger,
+	del_l_count: uinteger,
+	has_step: boolean
+}
+
 e3d.Identifier = @record {
 	name: string,
 	token: uinteger,
@@ -393,6 +405,7 @@ e3d.EVM = @record {
 	token_val: uinteger,
 	token_valf: float32,
 	prev_token: uinteger,
+	prev_scope_size: uint16,
 	line: uinteger,
 	expr_type: e3d.TypeInfo,
 	local_index: uint16,
@@ -412,6 +425,10 @@ e3d.EVM = @record {
 	struct_ids: hashmap(string, *e3d.Identifier),
 	sym_tables: sequence(*hashmap(string, *e3d.Identifier)),
 	scope_sizes: sequence(uinteger),
+	loop_info_stack: sequence(e3d.LoopInfo),
+	loop_break_stack: sequence(uint16),
+	loop_step_stack: sequence(uint16),
+	loop_del_l_stack: sequence(uint16),
 	
 	-- general vars
 	gpu: e3d.GPU,

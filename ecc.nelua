@@ -38,7 +38,7 @@ end
 
 function e3d.EVM:_pop_scope(): void
 	self.sym_tables:pop()
-	self.scope_sizes :pop()
+	self.scope_sizes:pop()
 end
 
 function e3d.EVM:_add_scoped_symbol(name: string, id: *e3d.Identifier): void
@@ -53,6 +53,104 @@ function e3d.EVM:_inc_scope_locals_size(size: uinteger): void
 	local total: uinteger = self:_get_scope_locals_size()
 	total = total + size
 	self.scope_sizes[#self.scope_sizes] = total
+end
+
+function e3d.EVM:_push_loop(start: uint16): void
+	self.loop_info_stack:push((@e3d.LoopInfo){loop_start = start})
+end
+
+function e3d.EVM:_pop_loop(): void
+	local info: e3d.LoopInfo = self.loop_info_stack:pop()
+
+	-- patch break jumps
+	while info.break_count > 0 do
+		local index: uint16 = self.loop_break_stack:pop()
+
+		self.bytecode[index] = (info.loop_end >> 8)
+		self.bytecode[index + 1] = (info.loop_end & 0xFF)
+
+		info.break_count = info.break_count - 1
+	end
+
+	-- patch step jumps
+	while info.step_count > 0 do
+		local index: uint16 = self.loop_step_stack:pop()
+
+		self.bytecode[index] = (info.loop_step >> 8)
+		self.bytecode[index + 1] = (info.loop_step & 0xFF)
+
+		info.step_count = info.step_count - 1
+	end
+
+	local size: uint16 = self.prev_scope_size
+	while info.del_l_count > 0 do
+		local index: uint16 = self.loop_del_l_stack:pop()
+		
+		if size > 0 then
+			self.bytecode[index] = (size >> 8)
+			self.bytecode[index + 1] = (size & 0xFF)
+		end
+
+		info.del_l_count = info.del_l_count - 1
+	end
+end
+
+function e3d.EVM:_get_current_loop_info(): e3d.LoopInfo
+	return self.loop_info_stack[#self.loop_info_stack]
+end
+
+function e3d.EVM:_loop_has_step(): boolean
+	return self.loop_info_stack[#self.loop_info_stack].has_step
+end
+
+function e3d.EVM:_get_loop_start(): uint16
+	return self.loop_info_stack[#self.loop_info_stack].loop_start
+end
+
+function e3d.EVM:_get_loop_step(): uint16
+	return self.loop_info_stack[#self.loop_info_stack].loop_step
+end
+
+function e3d.EVM:_get_loop_end(): uint16
+	return self.loop_info_stack[#self.loop_info_stack].loop_end
+end
+
+function e3d.EVM:_set_loop_has_step(): void
+	self.loop_info_stack[#self.loop_info_stack].has_step = true
+end
+
+function e3d.EVM:_set_loop_step(index: uint16): void
+	local info: e3d.LoopInfo = self.loop_info_stack:pop()
+	info.loop_step = index
+	self.loop_info_stack:push(info)
+end
+
+function e3d.EVM:_set_loop_end(index: uint16): void
+	self.loop_info_stack[#self.loop_info_stack].loop_end = index
+end
+
+function e3d.EVM:_add_break(index: uint16): void
+	self.loop_break_stack:push(index)
+
+	local info: e3d.LoopInfo = self.loop_info_stack:pop()
+	info.break_count = info.break_count + 1
+	self.loop_info_stack:push(info)
+end
+
+function e3d.EVM:_add_jump_to_step(index: uint16): void
+	self.loop_step_stack:push(index)
+
+	local info: e3d.LoopInfo = self.loop_info_stack:pop()
+	info.step_count = info.step_count + 1
+	self.loop_info_stack:push(info)
+end
+
+function e3d.EVM:_add_del_l(index: uint16): void
+	self.loop_del_l_stack:push(index)
+
+	local info: e3d.LoopInfo = self.loop_info_stack:pop()
+	info.del_l_count = info.del_l_count + 1
+	self.loop_info_stack:push(info)
 end
 
 function e3d.EVM:_lookup_id(name: string): boolean
@@ -80,6 +178,7 @@ function e3d.EVM:_reset_compiler(): void
 	self.token_val = 0
 	self.token_valf = 0
 	self.prev_token = 0
+	self.prev_scope_size = 0
 	self.expr_type = {}
 	self.local_index = 0
 	self.mlcomment_level = 0
@@ -93,6 +192,10 @@ function e3d.EVM:_reset_compiler(): void
 	self.struct_ids:clear()
 	self.sym_tables:clear()
 	self.scope_sizes:clear()
+	self.loop_info_stack:clear()
+	self.loop_break_stack:clear()
+	self.loop_step_stack:clear()
+	self.loop_del_l_stack:clear()
 end
 
 function e3d.EVM:_bytecode_emitop(val: uint8): void
@@ -2261,6 +2364,8 @@ local function _statement(vm: *e3d.EVM): void
 		
 		-- cond
 		a = vm.bytecode_len
+
+		vm:_push_loop(vm.bytecode_len)
 		
 		local has_condition: boolean = false
 		if vm.token ~= ';'_u8 then
@@ -2275,6 +2380,8 @@ local function _statement(vm: *e3d.EVM): void
 			vm:_bytecode_emit16(0)
 		end
 		
+		local step_line: uinteger = vm.line
+
 		_match(vm, ';'_u8)
 		
 		-- save our spot
@@ -2283,6 +2390,9 @@ local function _statement(vm: *e3d.EVM): void
 		local step_prev_token: uinteger = vm.prev_token
 		local step_index: uinteger = vm.prev_src_index
 		
+		if vm.token ~= ')'_u8 then
+			vm:_set_loop_has_step()
+		end
 		while vm.token ~= ')'_u8 and vm.token ~= 0 do
 			_next(vm)
 		end
@@ -2290,6 +2400,7 @@ local function _statement(vm: *e3d.EVM): void
 		_match(vm, ')'_u8)
 		
 		-- loop body
+
 		_statement(vm)
 		
 		-- save our spot again
@@ -2297,13 +2408,20 @@ local function _statement(vm: *e3d.EVM): void
 		-- but we'll be back! ...again!
 		local end_prev_token: uinteger = vm.prev_token
 		local end_index: uinteger = vm.prev_src_index
-		
+		local end_line: uinteger = vm.line
+
 		vm.prev_token = step_prev_token
 		vm.src_index = step_index
+		vm.line = step_line
 		
 		-- ok, we're back
 		-- we need to generate the step expressions now
+		local has_step: boolean
+
 		_next(vm)
+		if vm.token ~= ')'_u8 then
+			vm:_set_loop_step(vm.bytecode_len)
+		end
 		while vm.token ~= ')'_u8 do
 			_expression(vm, e3d.Token.ASSIGN)
 			
@@ -2317,17 +2435,23 @@ local function _statement(vm: *e3d.EVM): void
 		-- time to wrap up the loop with a jump
 		vm:_bytecode_emitop(e3d.Opcode.JUMP)
 		vm:_bytecode_emit16(a)
+
+		vm:_set_loop_end(vm.bytecode_len)
 		
 		if has_condition then
 			vm.bytecode[b] = ((vm.bytecode_len) >> 8)
 			vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
 		end
 
+		vm:_pop_loop()
+
 		-- and now we can jump back to the end of the loop body
 		vm.prev_token = end_prev_token
 		vm.src_index = end_index
-
+		
 		_next(vm)
+
+		vm.line = end_line
 
 		-- cleanup any loop init variables allocated
 		local size: uinteger = vm:_get_scope_locals_size()
@@ -2361,6 +2485,8 @@ local function _statement(vm: *e3d.EVM): void
 
 		a = vm.bytecode_len
 
+		vm:_push_loop(vm.bytecode_len)
+
 		_match(vm, '('_u8)
 		_expression(vm, e3d.Token.ASSIGN)
 		_match(vm, ')'_u8)
@@ -2375,8 +2501,12 @@ local function _statement(vm: *e3d.EVM): void
 		vm:_bytecode_emitop(e3d.Opcode.JUMP)
 		vm:_bytecode_emit16(a)
 
+		vm:_set_loop_end(vm.bytecode_len)
+
 		vm.bytecode[b] = ((vm.bytecode_len) >> 8)
 		vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
+
+		vm:_pop_loop()
 	elseif vm.token == e3d.Token.RETURN then
 		_match(vm, e3d.Token.RETURN)
 
@@ -2416,6 +2546,47 @@ local function _statement(vm: *e3d.EVM): void
 		_match(vm, ';'_u8)
 
 		vm:_bytecode_emitop(e3d.Opcode.RETURN)
+	elseif vm.token == e3d.Token.BREAK then
+		_match(vm, e3d.Token.BREAK)
+
+		if #vm.loop_info_stack == 0 then
+			vm.error = string.format("ERROR: line %d: break statement is not in a loop\n", vm.line)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+
+		vm:_bytecode_emitop(e3d.Opcode.DEL_L)
+		vm:_add_del_l(vm.bytecode_len)
+		vm:_bytecode_emit16(0)
+		
+		vm:_bytecode_emitop(e3d.Opcode.JUMP)
+		vm:_add_break(vm.bytecode_len)
+		vm:_bytecode_emit16(0)
+		
+		_match(vm, ';'_u8)
+	elseif vm.token == e3d.Token.CONTINUE then
+		_match(vm, e3d.Token.CONTINUE)
+
+		if #vm.loop_info_stack == 0 then
+			vm.error = string.format("ERROR: line %d: continue statement is not in a loop\n", vm.line)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+
+		vm:_bytecode_emitop(e3d.Opcode.DEL_L)
+		vm:_add_del_l(vm.bytecode_len)
+		vm:_bytecode_emit16(0)
+		
+		vm:_bytecode_emitop(e3d.Opcode.JUMP)
+
+		if vm:_loop_has_step() then
+			vm:_add_jump_to_step(vm.bytecode_len)
+			vm:_bytecode_emit16(0)
+		else
+			vm:_bytecode_emit16(vm:_get_loop_start())
+		end
+
+		_match(vm, ';'_u8)
 	elseif vm.token == '{'_u8 then
 		_match(vm, '{'_u8)
 
@@ -2433,6 +2604,8 @@ local function _statement(vm: *e3d.EVM): void
 
 		-- cleanup any local variables allocated
 		local size: uinteger = vm:_get_scope_locals_size()
+		vm.prev_scope_size = size
+		
 		if size > 0 then
 			-- patch new_l size
 			vm.bytecode[new_l_index] = ((size) >> 8)
