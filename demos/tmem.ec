@@ -18,11 +18,11 @@ int* tmem;
 void setTMEMPixel(int x, int y, int col) {
 	x = midi(0, x, 1023);
 	y = midi(0, y, 1023);
-	*(tmem + (y * 1024 + x)) = col;
+	tmem[y * 1024 + x] = col;
 }
 
 void init() {
-	tmem = TMEM_ADDR; // get pointer to the start of TMEM
+	tmem = (int*)TMEM_ADDR; // get pointer to the start of TMEM
 }
 
 void update(float delta_time) {

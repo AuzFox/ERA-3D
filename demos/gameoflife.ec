@@ -20,21 +20,22 @@ enum {
 	BTN_SELECT,
 	BTN_START,
 
-	TMEM_START = 0x800000, // TMEM start address
-	TMEM_W = 1024,         // each row in TMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
-	GRID_W = 64,
-	GRID_H = 64,
-
 	// color constants
 	BLACK          = 0x000000FF,
 	RED            = 0xFF0000FF,
 	WHITE_NO_ALPHA = 0xFFFFFF00, // used as a base for non-tinted transparency
-	WHITE          = 0xFFFFFFFF
+	WHITE          = 0xFFFFFFFF,
+
+	TMEM_START = 0x800000, // TMEM start address
+	TMEM_W = 1024,         // each row in TMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
+	GRID_W = 64,
+	GRID_H = 64,
+	OFFSETS_SIZE = 8
 };
 
 int* current_grid;
 int* next_grid;
-vec2* offsets;
+vec2 offsets[OFFSETS_SIZE];
 
 int running;
 int frames;
@@ -48,14 +49,14 @@ int getCell(int* grid, int x, int y) {
 	x = wrapi(x, 0, GRID_W - 1);
 	y = wrapi(y, 0, GRID_H - 1);
 	
-	return *(grid + (TMEM_W * y + x));
+	return grid[TMEM_W * y + x];
 }
 
 void setCell(int* grid, int x, int y, int val) {
 	x = wrapi(x, 0, GRID_W - 1);
 	y = wrapi(y, 0, GRID_H - 1);
 	
-	*(grid + (TMEM_W * y + x)) = val;
+	grid[TMEM_W * y + x] = val;
 }
 
 void clearGrids() {
@@ -72,7 +73,7 @@ int getNeighbours(int* grid, int x, int y) {
 	int total = 0;
 
 	for (int i = 0; i < 8; i = i + 1) {
-		offset = *(offsets + i);
+		offset = offsets[i];
 		total = total + (getCell(grid, x + (int)offset.x, y + (int)offset.y) == BLACK);
 	}
 
@@ -86,18 +87,15 @@ void init() {
 	// start second grid at (0, GRID_H) in TMEM
 	next_grid = (int*)TMEM_START + (GRID_H * TMEM_W);
 
-	// store offsets table in the heap
-	offsets = (int*)0x000000;
-
 	// fill offsets table
-	*(offsets    ) = (vec2){-1, -1};
-	*(offsets + 1) = (vec2){ 0, -1};
-	*(offsets + 2) = (vec2){ 1, -1};
-	*(offsets + 3) = (vec2){-1,  0};
-	*(offsets + 4) = (vec2){ 1,  0};
-	*(offsets + 5) = (vec2){-1,  1};
-	*(offsets + 6) = (vec2){ 0,  1};
-	*(offsets + 7) = (vec2){ 1,  1};
+	offsets[0] = (vec2){-1, -1};
+	offsets[1] = (vec2){ 0, -1};
+	offsets[2] = (vec2){ 1, -1};
+	offsets[3] = (vec2){-1,  0};
+	offsets[4] = (vec2){ 1,  0};
+	offsets[5] = (vec2){-1,  1};
+	offsets[6] = (vec2){ 0,  1};
+	offsets[7] = (vec2){ 1,  1};
 
 	clearGrids();
 	

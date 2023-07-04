@@ -216,6 +216,15 @@ function e3d.EVM:reset(reset_gpu: boolean): void
 	math.randomseed()
 end
 
+function e3d.EVM:_copy(): void
+	self.opstack[self.osp] = self.opstack[self.osp - 1]
+	self.osp = self.osp + 1
+end
+
+function e3d.EVM:_discard(n: uint16): void
+	self.osp = self.osp - n
+end
+
 -- get one word from the vm RAM, does not do bounds or alignment checking!
 function e3d.EVM:_get_ramw(addr: uint32): uint32
 	if addr < e3d.TMEM_START_ADDR then
@@ -504,20 +513,22 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("PUSH_VEC2_ZERO\n")
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				io.printf("PUSH_VEC3_ZERO\n")
-			case e3d.Opcode.BIN_NOT then
-				io.printf("BIN_NOT\n")
-			case e3d.Opcode.BIN_OR then
-				io.printf("BIN_OR\n")
-			case e3d.Opcode.BIN_XOR then
-				io.printf("BIN_XOR\n")
-			case e3d.Opcode.BIN_AND then
-				io.printf("BIN_AND\n")
-			case e3d.Opcode.BIN_LSHIFT then
-				io.printf("BIN_LSHIFT\n")
-			case e3d.Opcode.BIN_RSHIFT then
-				io.printf("BIN_RSHIFT\n")
-			case e3d.Opcode.BIN_ARSHIFT then
-				io.printf("BIN_ARSHIFT\n")
+			case e3d.Opcode.DISCARD then
+				io.printf("DISCARD %d\n", self:_bytecode_next16())
+			case e3d.Opcode.NOT then
+				io.printf("NOT\n")
+			case e3d.Opcode.OR then
+				io.printf("OR\n")
+			case e3d.Opcode.XOR then
+				io.printf("XOR\n")
+			case e3d.Opcode.AND then
+				io.printf("AND\n")
+			case e3d.Opcode.LSHIFT then
+				io.printf("LSHIFT\n")
+			case e3d.Opcode.RSHIFT then
+				io.printf("RSHIFT\n")
+			case e3d.Opcode.ARSHIFT then
+				io.printf("ARSHIFT\n")
 			case e3d.Opcode.NEG then
 				io.printf("NEG\n")
 			case e3d.Opcode.NEGF then
@@ -560,12 +571,8 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("MODU\n")
 			case e3d.Opcode.MODF then
 				io.printf("MODF\n")
-			case e3d.Opcode.LOGIC_NOT then
-				io.printf("LOGIC_NOT\n")
-			case e3d.Opcode.LOGIC_OR then
-				io.printf("LOGIC_OR\n")
-			case e3d.Opcode.LOGIC_AND then
-				io.printf("LOGIC_AND\n")
+			case e3d.Opcode.LNOT then
+				io.printf("LNOT\n")
 			case e3d.Opcode.EQ then
 				io.printf("EQ\n")
 			case e3d.Opcode.EQF then
@@ -614,6 +621,12 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("JUMP 0x%04X\n", self:_bytecode_next16())
 			case e3d.Opcode.JUMP_Z then
 				io.printf("JUMP_Z 0x%04X\n", self:_bytecode_next16())
+			case e3d.Opcode.JUMP_ZD then
+				io.printf("JUMP_ZD 0x%04X\n", self:_bytecode_next16())
+			case e3d.Opcode.JUMP_NZ then
+				io.printf("JUMP_NZ 0x%04X\n", self:_bytecode_next16())
+			case e3d.Opcode.JUMP_NZD then
+				io.printf("JUMP_NZD 0x%04X\n", self:_bytecode_next16())
 			case e3d.Opcode.CALL then
 				index = self:_bytecode_next16()
 				local argc: uint16 = self:_bytecode_next16()
@@ -665,6 +678,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:_set_globals(index, n)
 			case e3d.Opcode.NEW_L then
 				self.lsp = self.lsp + self:_bytecode_next16()
+
+				if self.lsp > e3d.LOCALS_SIZE then
+					self.error = string.format("RUNTIME ERROR: local variable stack limit exceeded by %d word(s)\n", self.lsp - e3d.LOCALS_SIZE)
+					return false
+				end
 			case e3d.Opcode.DEL_L then
 				self.lsp = self.lsp - self:_bytecode_next16()
 			case e3d.Opcode.GET_L then
@@ -702,10 +720,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local v: uint32
 
 				if ptr > e3d.RAM_MAX_ADDR then
-					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
 					return false
 				end
 				
@@ -716,10 +734,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self:popi()
 
 				if ptr > e3d.RAM_MAX_ADDR then
-					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
 					return false
 				end
 
@@ -728,7 +746,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					local addr: uint32 = start + i * 4
 
 					if addr > e3d.RAM_MAX_ADDR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", addr)
+						self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
 						return false
 					end
 					
@@ -740,15 +758,15 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self:popi()
 
 				if ptr > e3d.RAM_MAX_ADDR then
-					self.error = string.format("ERROR: invalid word write address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("ERROR: misaligned word write address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: misaligned word write address 0x%08X\n", ptr)
 					return false
 				end
 				
 				if not self:_set_ramw((@uint32)(ptr + (@int32)(index) * 4), v) then
-					self.error = string.format("ERROR: cannot write word to ROM address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", ptr)
 					return false
 				end
 			case e3d.Opcode.SET_MX then
@@ -761,10 +779,10 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self.opstack[(self.osp - 1) - size].i
 
 				if ptr > e3d.RAM_MAX_ADDR then
-					self.error = string.format("ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
 					return false
 				end
 
@@ -775,7 +793,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					local struct_word_index: uint32 = struct_start + i
 
 					if mem_addr > e3d.RAM_MAX_ADDR then
-						self.error = string.format("ERROR: invalid word read address 0x%08X\n", mem_addr)
+						self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", mem_addr)
 						return false
 					end
 					
@@ -806,29 +824,31 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushv2({0,0})
 			case e3d.Opcode.PUSH_VEC3_ZERO then
 				self:pushv3({0,0,0})
-			case e3d.Opcode.BIN_NOT then
+			case e3d.Opcode.DISCARD then
+				self:_discard(self:_bytecode_next16())
+			case e3d.Opcode.NOT then
 				self:pushu(~self:popu())
-			case e3d.Opcode.BIN_OR then
+			case e3d.Opcode.OR then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
 				self:pushu(a | b)
-			case e3d.Opcode.BIN_XOR then
+			case e3d.Opcode.XOR then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
 				self:pushu(a ~ b)
-			case e3d.Opcode.BIN_AND then
+			case e3d.Opcode.AND then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
 				self:pushu(a & b)
-			case e3d.Opcode.BIN_LSHIFT then
+			case e3d.Opcode.LSHIFT then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
 				self:pushu(a << b)
-			case e3d.Opcode.BIN_RSHIFT then
+			case e3d.Opcode.RSHIFT then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
 				self:pushu(a >> b)
-			case e3d.Opcode.BIN_ARSHIFT then
+			case e3d.Opcode.ARSHIFT then
 				local b: int32 = self:popi()
 				local a: int32 = self:popi()
 				self:pushi(a >>> b)
@@ -1081,17 +1101,9 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				local b: float32 = self:popf()
 				local a: float32 = self:popf()
 				self:pushf(math.fmod(a, b))
-			case e3d.Opcode.LOGIC_NOT then
+			case e3d.Opcode.LNOT then
 				local v: uint32 = self:popu()
 				self:pushu(v == 0 and 1 or 0)
-			case e3d.Opcode.LOGIC_OR then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a ~= 0 or b ~= 0) and 1 or 0)
-			case e3d.Opcode.LOGIC_AND then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a ~= 0 and b ~= 0) and 1 or 0)
 			case e3d.Opcode.EQ then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
@@ -1286,6 +1298,35 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				if v == 0 then
 					self.cf.pc = index
 				end
+			case e3d.Opcode.JUMP_ZD then
+				-- jump if zero but only discard value if branch is not taken
+				-- used by && operator
+				index = self:_bytecode_next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+
+				if v == 0 then
+					self.cf.pc = index
+				else
+					self.osp = self.osp - 1
+				end
+			case e3d.Opcode.JUMP_NZ then
+				index = self:_bytecode_next16()
+				local v: uint32 = self:popu()
+
+				if v ~= 0 then
+					self.cf.pc = index
+				end
+			case e3d.Opcode.JUMP_NZD then
+				-- jump if not zero but only discard value if branch is not taken
+				-- used by || operator
+				index = self:_bytecode_next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+
+				if v ~= 0 then
+					self.cf.pc = index
+				else
+					self.osp = self.osp - 1
+				end
 			case e3d.Opcode.CALL then
 				index = self:_bytecode_next16()
 				local argc: uint16 = self:_bytecode_next16()
@@ -1298,7 +1339,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					self:_push_callframe(0)
 					self.cf.pc = addr
 				else
-					self.error = string.format("ERROR: invalid call address 0x%08X\n", addr)
+					self.error = string.format("RUNTIME ERROR: invalid call address 0x%08X\n", addr)
 					return false
 				end
 			case e3d.Opcode.RETURN then
@@ -1325,12 +1366,12 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					end
 					self:_pop_callframe()
 				else
-					self.error = string.format("ERROR: attempt to call unregistered API function at index %d\n", index)
+					self.error = string.format("RUNTIME ERROR: attempt to call unregistered API function at index %d\n", index)
 					return false
 				end
 			else
 				-- invalid opcode
-				self.error = string.format("ERROR: attempt to execute invalid opcode %d\n", op)
+				self.error = string.format("RUNTIME ERROR: attempt to execute invalid opcode %d\n", op)
 				return false
 		end
 

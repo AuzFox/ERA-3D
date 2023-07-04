@@ -1,14 +1,13 @@
 COMPILER:
-- better error messages
-- remove multi-variable declarations
-- improve end-of function return generation (return zero value if no explicit return is used)
+- improve end-of-function return generation (return zero value if no explicit return is used)
 - implement all operators: functionality and type checking
 - implement function/struct forward declarations
 - implement strings
 - implement struct/function forward declarations
-- implement arrays + array initializers
+- implement array initializers
 - implement built-in constants (true, false, null, etc)
 - implement compound assignment operators
+- implement function pointers
 - implement varargs?
 - implement unsigned int comparison operators?
 

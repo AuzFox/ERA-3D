@@ -161,13 +161,14 @@ global e3d.Opcode = @enum {
 	PUSH_FLOAT,
 	PUSH_VEC2_ZERO,
 	PUSH_VEC3_ZERO,
-	BIN_NOT,
-	BIN_OR,
-	BIN_XOR,
-	BIN_AND,
-	BIN_LSHIFT,
-	BIN_RSHIFT,
-	BIN_ARSHIFT,
+	DISCARD,
+	NOT,
+	OR,
+	XOR,
+	AND,
+	LSHIFT,
+	RSHIFT,
+	ARSHIFT,
 	NEG,
 	NEGF,
 	NEGV,
@@ -189,9 +190,7 @@ global e3d.Opcode = @enum {
 	MOD,
 	MODU,
 	MODF,
-	LOGIC_NOT,
-	LOGIC_OR,
-	LOGIC_AND,
+	LNOT,
 	EQ,
 	EQF,
 	EQV,
@@ -216,6 +215,9 @@ global e3d.Opcode = @enum {
 	GEV,
 	JUMP,
 	JUMP_Z,
+	JUMP_ZD,
+	JUMP_NZ,
+	JUMP_NZD,
 	CALL,
 	CALL_PTR,
 	RETURN,
@@ -237,7 +239,7 @@ global e3d.Class = @enum {
 }
 
 global e3d.EVMType = @enum {
-	VOID = 0, -- only used for function declarations
+	VOID = 0,
 	INT,
 	FLOAT,
 	VEC2,
@@ -245,7 +247,7 @@ global e3d.EVMType = @enum {
 	STRUCT,
 	STRING,
 	FUNC_POINTER,
-	POINTER = 16
+	POINTER = 16 -- repeatedly added to type to indicate pointer levels
 }
 
 global e3d.MulVMode = @enum {
@@ -376,6 +378,7 @@ e3d.Identifier = @record {
 	class: uinteger,
 	index: uinteger,
 	type_info: e3d.TypeInfo,
+	is_array: boolean,
 	const_val: uint32, -- only used for constants (enum values)
 	func: e3d.APIFunction, -- only used when registering api functions
 	argdata: sequence(e3d.TypeInfo) -- only used to track function arguments
@@ -417,7 +420,7 @@ e3d.EVM = @record {
 	prev_scope_size: uint16,
 	line: uinteger,
 	expr_type: e3d.TypeInfo,
-	local_index: uint16,
+	local_index: uinteger,
 	mlcomment_level: uinteger,
 	prev_opcode: uint8,
 	has_id: boolean,
@@ -446,6 +449,75 @@ e3d.EVM = @record {
 }
 
 global e3d.btnmap: [e3d.ControllerButtons.COUNT]cint
+
+global e3d._type_names: []string = {
+	"void",
+	"int",
+	"float",
+	"vec2",
+	"vec3",
+	"struct",
+	"string",
+	"function",
+	"unmapped type (8)",
+	"unmapped type (9)",
+	"unmapped type (10)",
+	"unmapped type (11)",
+	"unmapped type (12)",
+	"unmapped type (13)",
+	"unmapped type (14)",
+	"unmapped type (15)"
+}
+
+global e3d._token_names: []string = {
+	"int literal",
+	"float literal",
+	"string",
+	"void",
+	"int",
+	"float",
+	"vec2",
+	"vec3",
+	"struct identifier",
+	"struct",
+	"function",
+	"num",
+	"identifier",
+	"else",
+	"if",
+	"return",
+	"break",
+	"continue",
+	"sizeof",
+	"for",
+	"while",
+	"!",
+	"~",
+	"=",
+	"?",
+	"||",
+	"&&",
+	"|",
+	"^",
+	"&",
+	"==",
+	"!=",
+	"<",
+	">",
+	"<=",
+	">=",
+	"<<",
+	">>",
+	">>>",
+	"+",
+	"-",
+	"*",
+	"/",
+	"%",
+	"->",
+	".",
+	"["
+}
 
 ---------------------------------------
 --                                   --
@@ -478,21 +550,50 @@ function e3d.set_btn_keycode(btn: integer, keycode: cint): void
 	e3d.btnmap[btn] = keycode
 end
 
+function e3d.get_type_name(info: e3d.TypeInfo): string
+	local sb: stringbuilder
+	local full_type: uinteger = info.type_id
+	local base_type: uinteger = info.type_id & (e3d.EVMType.POINTER - 1)
+
+	if base_type < e3d.EVMType.VEC3 then
+		sb:write(e3d._type_names[base_type])
+	else
+		sb:write(info.structref.name)
+	end
+
+	while full_type >= e3d.EVMType.POINTER do
+		sb:writebyte('*'_u8)
+		full_type = full_type - e3d.EVMType.POINTER
+	end
+
+	return sb:__tostring()
+end
+
+function e3d.get_token_string(token: uinteger): string
+	if token == 0 then
+		return "EOF"
+	elseif token < e3d.Token.INT_LITERAL then
+		return string.format("%c", token)
+	else
+		return e3d._token_names[token - e3d.Token.INT_LITERAL]
+	end
+end
+
+function e3d.size_of_type(info: e3d.TypeInfo): uint16
+	-- returns size in words
+	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRUCT) then
+		return info.structref.size
+	end
+	
+	return 1
+end
+
 function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 	-- returns size in words
 	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
 	
-	if type_pointed_to < e3d.EVMType.POINTER then
-		switch type_pointed_to do
-			case e3d.EVMType.INT, e3d.EVMType.FLOAT then
-				return 1
-			case e3d.EVMType.VEC2 then
-				return 2
-			case e3d.EVMType.VEC3 then
-				return 3
-			case e3d.EVMType.STRUCT then
-				return info.structref.size
-		end
+	if (type_pointed_to >= e3d.EVMType.VEC2) and (type_pointed_to <= e3d.EVMType.STRUCT) then
+		return info.structref.size
 	end
 	
 	return 1
