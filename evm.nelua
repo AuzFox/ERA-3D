@@ -501,8 +501,12 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("ADDROF_A %d\n", index)
 			case e3d.Opcode.PUSH_ZERO then
 				io.printf("PUSH_ZERO\n")
+			case e3d.Opcode.PUSH_ZEROF then
+				io.printf("PUSH_ZEROF\n")
 			case e3d.Opcode.PUSH_ONE then
 				io.printf("PUSH_ONE\n")
+			case e3d.Opcode.PUSH_ONEF then
+				io.printf("PUSH_ONEF\n")
 			case e3d.Opcode.PUSH_CHAR then
 				io.printf("PUSH_CHAR %d\n", self:_bytecode_next8())
 			case e3d.Opcode.PUSH_INT then
@@ -639,6 +643,8 @@ function e3d.EVM:_dump_bytecode(): void
 				io.printf("FTOI\n")
 			case e3d.Opcode.ITOF then
 				io.printf("ITOF\n")
+			case e3d.Opcode.ITOB then
+				io.printf("ITOB\n")
 			case e3d.Opcode.API then
 				index = self:_bytecode_next16()
 				local argc: uint16 = self:_bytecode_next16()
@@ -812,8 +818,12 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushu(self:_address_of_arg(index))
 			case e3d.Opcode.PUSH_ZERO then
 				self:pushu(0)
+			case e3d.Opcode.PUSH_ZEROF then
+				self:pushf(0.0)
 			case e3d.Opcode.PUSH_ONE then
 				self:pushu(1)
+			case e3d.Opcode.PUSH_ONEF then
+				self:pushf(1.0)
 			case e3d.Opcode.PUSH_CHAR then
 				self:pushu((@uint32)(self:_bytecode_next8()))
 			case e3d.Opcode.PUSH_INT then
@@ -1306,26 +1316,28 @@ function e3d.EVM:run(cycles: uinteger): boolean
 
 				if v == 0 then
 					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 0
 				else
 					self.osp = self.osp - 1
 				end
-			case e3d.Opcode.JUMP_NZ then
-				index = self:_bytecode_next16()
-				local v: uint32 = self:popu()
-
-				if v ~= 0 then
+				case e3d.Opcode.JUMP_NZ then
+					index = self:_bytecode_next16()
+					local v: uint32 = self:popu()
+					
+					if v ~= 0 then
 					self.cf.pc = index
 				end
-			case e3d.Opcode.JUMP_NZD then
-				-- jump if not zero but only discard value if branch is not taken
-				-- used by || operator
-				index = self:_bytecode_next16()
-				local v: uint32 = self.opstack[self.osp - 1].u
-
-				if v ~= 0 then
-					self.cf.pc = index
-				else
-					self.osp = self.osp - 1
+				case e3d.Opcode.JUMP_NZD then
+					-- jump if not zero but only discard value if branch is not taken
+					-- used by || operator
+					index = self:_bytecode_next16()
+					local v: uint32 = self.opstack[self.osp - 1].u
+					
+					if v ~= 0 then
+						self.cf.pc = index
+						self.opstack[self.osp - 1].u = 1
+					else
+						self.osp = self.osp - 1
 				end
 			case e3d.Opcode.CALL then
 				index = self:_bytecode_next16()
@@ -1353,6 +1365,8 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushi((@int32)(self:popf()))
 			case e3d.Opcode.ITOF then
 				self:pushf((@float32)(self:popi()))
+			case e3d.Opcode.ITOB then
+				self:pushu(self:popu() ~= 0 and 1 or 0)
 			case e3d.Opcode.API then
 				index = self:_bytecode_next16()
 				local argc: uint16 = self:_bytecode_next16()

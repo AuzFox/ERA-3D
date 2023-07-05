@@ -48,25 +48,25 @@ end
 
 local function draw(): void
 	if running_vm then
-		rl.beginTextureMode(vm.gpu.gfx_rendertex)
-			vm.gpu:enable_render_state()
-			
-			rl.clearBackground(vm.gpu.bgcolor)
-			
-			rl.beginMode3D(vm.gpu.cameras[vm.gpu.current_camera])
+		
+		vm.gpu:enable_render_state()
+		
+		rl.beginMode3D(vm.gpu.cameras[0]) -- configure default camera
 			if not vm:call_hook(e3d.Hook.DRAW3D, 0) then
 				running_vm = false
 				io.printf(vm.error)
 			end
-			rl.endMode3D()
-			
-			if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D, 0)) then
-				running_vm = false
-				io.printf(vm.error)
-			end
 
-			vm.gpu:disable_render_state()
-		rl.endTextureMode()
+			-- TODO: pop all extra matrices!
+			-- vm.gpu:reset_matrix_stack()
+		rl.endMode3D()
+		
+		if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D, 0)) then
+			running_vm = false
+			io.printf(vm.error)
+		end
+		
+		vm.gpu:disable_render_state()
 		
 		rl.beginDrawing()
 			rl.clearBackground(rl.BLACK)
@@ -80,6 +80,7 @@ local function draw(): void
 	else
 		rl.beginDrawing()
 			rl.clearBackground(rl.RAYWHITE)
+			rl.drawFPS(0,0)
 			
 			rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
 			rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)

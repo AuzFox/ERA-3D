@@ -43,7 +43,6 @@ void init() {
 	cam_pos = vec3Zero();
 
 	// configure render settings
-	setBGColor(BLACK);  // clear color (RGBA32, alpha ignored)
 	setCullMode(2);     // 0 = cull backfaces, 1 = cull frontfaces, 2 = disable culling
 	setFogMode(0);      // 1 = enable, 0 = disable
 	setFogStart(2.0);   // 0.0 to 1000.0
@@ -56,16 +55,16 @@ void update(float delta_time) {
 	right_scroll = wrapf(right_scroll + 0.25 * delta_time, 0.0, 1.0);
 
 	// toggle fog
-	if (buttonDown(BTN_CROSS)) {
+	if (pressed(BTN_CROSS, 0)) {
 		setFogMode(!getFogMode());
 	}
 
 	// rotate camera around cube
 	float delta_angle = 0.0;
-	if (buttonHeld(BTN_LEFT)) {
+	if (held(BTN_LEFT, 0)) {
 		delta_angle = delta_angle + 45.0;
 	}
-	if (buttonHeld(BTN_RIGHT)) {
+	if (held(BTN_RIGHT, 0)) {
 		delta_angle = delta_angle - 45.0;
 	}
 
@@ -75,11 +74,11 @@ void update(float delta_time) {
 	cam_pos.x = cos(asrad) * cam_radius;
 	cam_pos.z = sin(asrad) * cam_radius;
 
-	setCamPos(cam_pos);
+	setCamPos(0, cam_pos);
 }
 
 void draw3D() {
-	// OpenGL 1.1 style graphics API
+	clear(WHITE);
 
 	pushMatrix();
 		// front

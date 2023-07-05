@@ -677,8 +677,15 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 	elseif vm.token == e3d.Token.FLOAT_LITERAL then
 		_match(vm, e3d.Token.FLOAT_LITERAL)
 
-		vm:_bytecode_emitop(e3d.Opcode.PUSH_FLOAT)
-		vm:_bytecode_emitf(vm.token_valf)
+		if vm.token_valf == 0.0 then
+			vm:_bytecode_emitop(e3d.Opcode.PUSH_ZEROF)
+		elseif vm.token_valf == 1.0 then
+			vm:_bytecode_emitop(e3d.Opcode.PUSH_ONEF)
+		else
+			vm:_bytecode_emitop(e3d.Opcode.PUSH_FLOAT)
+			vm:_bytecode_emitf(vm.token_valf)
+		end
+		
 		vm.expr_type = {e3d.EVMType.FLOAT}
 	elseif vm.token == '"'_u8 then
 		-- TODO: complete this
@@ -1276,7 +1283,6 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 		if vm.token == e3d.Token.INT_LITERAL then
 			if vm.token_val == 0 then
 				vm:_bytecode_emitop(e3d.Opcode.PUSH_ZERO)
-				vm:_bytecode_emitop(e3d.Opcode.NEG)
 			elseif vm.token_val == 1 then
 				vm:_bytecode_emitop(e3d.Opcode.PUSH_ONE)
 				vm:_bytecode_emitop(e3d.Opcode.NEG)
@@ -1288,12 +1294,20 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				vm:_bytecode_emitop(e3d.Opcode.PUSH_INT)
 				vm:_bytecode_emit32(-(@int32)(vm.token_val))
 			end
-
+			
 			_match(vm, e3d.Token.INT_LITERAL)
 			vm.expr_type = {e3d.EVMType.INT}
 		elseif vm.token == e3d.Token.FLOAT_LITERAL then
-			vm:_bytecode_emitop(e3d.Opcode.PUSH_FLOAT)
-			vm:_bytecode_emitf(-vm.token_valf)
+			if vm.token_valf == 0.0 then
+				vm:_bytecode_emitop(e3d.Opcode.PUSH_ZEROF)
+				vm:_bytecode_emitop(e3d.Opcode.NEGF)
+			elseif vm.token_valf == 1.0 then
+				vm:_bytecode_emitop(e3d.Opcode.PUSH_ONEF)
+				vm:_bytecode_emitop(e3d.Opcode.NEGF)
+			else
+				vm:_bytecode_emitop(e3d.Opcode.PUSH_FLOAT)
+				vm:_bytecode_emitf(-vm.token_valf)
+			end
 
 			_match(vm, e3d.Token.FLOAT_LITERAL)
 			vm.expr_type = {e3d.EVMType.FLOAT}
@@ -1516,6 +1530,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				<expr1>
 				JUMP_NZD b
 				<expr2>
+				ITOB
 				b:
 			]]
 
@@ -1536,7 +1551,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 			addr = vm.bytecode_len
 			
 			vm:_bytecode_emit16(0)
-
+			
 			_expression(vm, e3d.Token.LAND)
 			
 			if vm.expr_type.type_id ~= e3d.EVMType.INT then
@@ -1549,6 +1564,8 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				coroutine.yield()
 			end
 
+			vm:_bytecode_emitop(e3d.Opcode.ITOB)
+			
 			-- patch JUMP_NZD address
 			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)
 			vm.bytecode[addr + 1] = ((vm.bytecode_len) & 0xFF)
@@ -1561,6 +1578,7 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				<expr1>
 				JUMP_ZD b
 				<expr2>
+				ITOB
 				b:
 			]]
 
@@ -1593,6 +1611,8 @@ local function _expression(vm: *e3d.EVM, level: integer): void
 				vm.compile_err = true
 				coroutine.yield()
 			end
+
+			vm:_bytecode_emitop(e3d.Opcode.ITOB)
 
 			-- patch JUMP_ZD address
 			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)

@@ -112,16 +112,16 @@ void init() {
 void update(float delta_time) {
 	cursor_anim = cursor_anim + 0.2;
 	
-	if (buttonDown(BTN_L1)) {
+	if (pressed(BTN_L1, 0)) {
 		wait_frames = midi(1, wait_frames - 1, 30);
 		frames = 0;
 	}
-	else if (buttonDown(BTN_R1)) {
+	else if (pressed(BTN_R1, 0)) {
 		wait_frames = midi(1, wait_frames + 1, 30);
 		frames = 0;
 	}
 	
-	if (buttonDown(BTN_START)) {
+	if (pressed(BTN_START, 0)) {
 		running = !running;
 		frames = 0;
 	}
@@ -130,32 +130,32 @@ void update(float delta_time) {
 		int dx = 0;
 		int dy = 0;
 		
-		if (buttonDown(BTN_UP)) {
+		if (pressed(BTN_UP, 0)) {
 			dy = dy - 1;
 		}
-		if (buttonDown(BTN_DOWN)) {
+		if (pressed(BTN_DOWN, 0)) {
 			dy = dy + 1;
 		}
-		if (buttonDown(BTN_LEFT)) {
+		if (pressed(BTN_LEFT, 0)) {
 			dx = dx - 1;
 		}
-		if (buttonDown(BTN_RIGHT)) {
+		if (pressed(BTN_RIGHT, 0)) {
 			dx = dx + 1;
 		}
 
 		cursor_x = wrapi(cursor_x + dx, 0, GRID_W - 1);
 		cursor_y = wrapi(cursor_y + dy, 0, GRID_H - 1);
 
-		if (buttonDown(BTN_SELECT)) {
+		if (pressed(BTN_SELECT, 0)) {
 			clearGrids();
 		}
-		else if (buttonDown(BTN_CROSS)) {
+		else if (pressed(BTN_CROSS, 0)) {
 			setCell(current_grid, cursor_x, cursor_y, BLACK);
 		}
-		else if (buttonDown(BTN_CIRCLE)) {
+		else if (pressed(BTN_CIRCLE, 0)) {
 			setCell(current_grid, cursor_x, cursor_y, WHITE);
 		}
-		else if (buttonDown(BTN_SQUARE)) {
+		else if (pressed(BTN_SQUARE, 0)) {
 			int cell = getCell(current_grid, cursor_x, cursor_y);
 
 			if (cell == BLACK) {

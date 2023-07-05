@@ -26,7 +26,7 @@ void init() {
 }
 
 void update(float delta_time) {
-	if (buttonDown(5)) {
+	if (pressed(5, 0)) {
 		setTMEMPixel(0, 0, RED);
 		setTMEMPixel(0, 2, GREEN);
 		setTMEMPixel(0, 4, BLUE);

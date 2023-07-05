@@ -54,7 +54,7 @@ global e3d.OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE <comptime> = 256
 global e3d.API_FUNCS_SIZE <comptime> = 65536
-global e3d.CAMERAS_COUNT  <comptime> = 8
+global e3d.CAMERAS_COUNT  <comptime> = 4
 
 global e3d.TMEM_START_ADDR <comptime> = 0x800000
 global e3d.GLOBALS_START_ADDR <comptime> = 0xC00000
@@ -62,6 +62,8 @@ global e3d.LOCALS_START_ADDR <comptime> = 0xC40000
 global e3d.ARGS_START_ADDR <comptime> = 0xC80000
 global e3d.ROM_START_ADDR <comptime> = 0xCC0000
 global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
+
+global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
 
 -- emulate a PS1-like controller
 global e3d.ControllerButtons = @enum {
@@ -155,7 +157,9 @@ global e3d.Opcode = @enum {
 	ADDROF_L,
 	ADDROF_A,
 	PUSH_ZERO,
+	PUSH_ZEROF,
 	PUSH_ONE,
+	PUSH_ONEF,
 	PUSH_CHAR,
 	PUSH_INT,
 	PUSH_FLOAT,
@@ -223,6 +227,7 @@ global e3d.Opcode = @enum {
 	RETURN,
 	FTOI,
 	ITOF,
+	ITOB, -- int to bool, used by || and && operators
 	API
 }
 
@@ -322,9 +327,8 @@ global e3d.GPU = @record {
 	triangle_vert_pos: rl.vector3,
 	
 	-- graphics state
-	current_camera: uinteger,
-	cullmode: uinteger,
-	wiremode: boolean,
+	cull_mode: uinteger,
+	wire_mode: boolean,
 	tex_mode: cint,
 	tex_x: cint,
 	tex_y: cint,
@@ -334,7 +338,8 @@ global e3d.GPU = @record {
 	fog_start: float32,
 	fog_end: float32,
 	fog_color: rl.vector4,
-	bgcolor: rl.color
+	viewport_w: cint,
+	viewport_h: cint
 }
 
 global e3d.EVMValue = @union {
@@ -448,7 +453,7 @@ e3d.EVM = @record {
 	init_time: float64
 }
 
-global e3d.btnmap: [e3d.ControllerButtons.COUNT]cint
+global e3d.btnmap: [e3d.ControllerButtons.COUNT * e3d.INPUT_PLAYERS_COUNT]cint
 
 global e3d._type_names: []string = {
 	"void",
@@ -612,7 +617,9 @@ function e3d.GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 end
 
 function e3d.GPU:enable_render_state(): void
-	switch self.cullmode do
+	rl.beginTextureMode(self.gfx_rendertex)
+
+	switch self.cull_mode do
 		case 0 then
 			rlgl.enableBackfaceCulling()
 			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
@@ -623,23 +630,31 @@ function e3d.GPU:enable_render_state(): void
 			rlgl.disableBackfaceCulling()
 	end
 
-	if self.wiremode then
+	if self.wire_mode then
 		rlgl.enableWireMode()
 	else
 		rlgl.disableWireMode()
 	end
+
+	rlgl.enableScissorTest()
+	rlgl.scissor(0, 0, e3d.VSCREEN_W, e3d.VSCREEN_H)
 end
 
 function e3d.GPU:disable_render_state(): void
 	rlgl.enableBackfaceCulling()
 	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
 	rlgl.disableWireMode()
+	rlgl.disableScissorTest()
+
+	-- TODO: pop all extra matrices!
+
+	rl.endTextureMode()
 end
 
 function e3d.GPU:reset(): void
 	for i = 0, < #self.cameras do
 		self.cameras[i] = {
-			position={0,0,0},
+			position={0,0,1},
 			target={0,0,0},
 			up={0,1,0},
 			fovy=45,
@@ -647,10 +662,8 @@ function e3d.GPU:reset(): void
 		}
 	end
 
-	self.current_camera = 0
-	self.cullmode = 0
-	self.wiremode = false
-	self.bgcolor = {0x00, 0x00, 0x00, 0xFF}
+	self.cull_mode = 0
+	self.wire_mode = false
 	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
 	
 	self.tex_mode = 0
@@ -664,8 +677,11 @@ function e3d.GPU:reset(): void
 	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &self.fog_start, rl.shaderUniformDataType.UNIFORM_FLOAT)
 	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &self.fog_end, rl.shaderUniformDataType.UNIFORM_FLOAT)
 	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &self.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
-
+	
 	self:texture(0, 0, 64, 64)
+
+	self.viewport_w = e3d.VSCREEN_W
+	self.viewport_h = e3d.VSCREEN_H
 end
 
 function e3d.GPU:init(tmem: *rl.color): void
