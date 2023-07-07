@@ -20,7 +20,7 @@ local function update(): void
 		end
 		
 		vm:pushf(rl.getFrameTime())
-		vm:_push_args(1)
+		vm:push_args(1)
 		if not vm:call_hook(e3d.Hook.UPDATE, 1) then
 			running_vm = false
 			io.printf(vm.error)
@@ -34,9 +34,9 @@ local function update(): void
 			end
 		elseif rl.isKeyPressed(rl.keyboardKey.B) then
 			print("-- BYTECODE --")
-			vm:_dump_bytecode()
+			vm:dump_bytecode()
 		elseif rl.isKeyPressed(rl.keyboardKey.R) then
-			vm:reset(true)
+			vm:reset_vm(true)
 			if vm:call_hook(e3d.Hook.INIT, 0) then
 				running_vm = true
 			else

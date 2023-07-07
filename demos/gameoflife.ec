@@ -217,7 +217,7 @@ void draw2D() {
 	
 	// draw the current grid
 	//
-	// the grid is drawn in the centered of the screen at 2x scale
+	// the grid is drawn in the center of the screen at 2x scale
 	int gridx = (320 / 2) - GRID_W; // x screen coordinate of the grid
 	int gridy = (240 / 2) - GRID_H; // y screen coordinate of the grid
 	spriteEx2D(0, srcy, GRID_W, GRID_H, gridx, gridy, GRID_W * 2, GRID_H * 2);

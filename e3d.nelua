@@ -19,9 +19,13 @@ global e3d = @record{}
 --                         --
 -----------------------------
 
---[[ RAM logical memory map
+--[[ VM RAM logical memory map
+	TODO: revise to allow for audio and model data(?)
+
+	note: 1 vm word = 4 bytes
+
 	heap:    8 MiB
-	tmem:    4 MiB  (1024*1024 pixels (32bpp))
+	tmem:    4 MiB  (1024*1024 pixels (32BPP))
 	globals: 256KiB (65536 words)
 	locals:  256KiB (65536 words)
 	args:    256KiB (65536 words)
@@ -36,6 +40,7 @@ global e3d = @record{}
 	0xCC0000 - 0xCCFFFF: rom
 ]]
 
+-- screen dimentions (vscreen is console's virtual resolution)
 global e3d.VSCREEN_W <comptime> = 320
 global e3d.VSCREEN_H <comptime> = 240
 global e3d.SCREEN_W <comptime> = (e3d.VSCREEN_W * 3)
@@ -44,8 +49,9 @@ global e3d.SCREEN_H <comptime> = (e3d.VSCREEN_H * 3)
 global e3d.TMEM_WIDTH <comptime> = 1024
 global e3d.TMEM_HEIGHT <comptime> = 1024
 
+-- memory size and address constants
 global e3d.HEAP_SIZE      <comptime> = (1024*1024*8) -- 8MiB
-global e3d.TMEM_SIZE      <comptime> = (e3d.TMEM_WIDTH*e3d.TMEM_HEIGHT) -- ?MiB (2048*2048 pixels (32bpp))
+global e3d.TMEM_SIZE      <comptime> = (e3d.TMEM_WIDTH*e3d.TMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
 global e3d.GLOBALS_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE    <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE      <comptime> = 65536 -- 256KiB (65536 words)
@@ -55,6 +61,7 @@ global e3d.BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE <comptime> = 256
 global e3d.API_FUNCS_SIZE <comptime> = 65536
 global e3d.CAMERAS_COUNT  <comptime> = 4
+global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
 
 global e3d.TMEM_START_ADDR <comptime> = 0x800000
 global e3d.GLOBALS_START_ADDR <comptime> = 0xC00000
@@ -62,8 +69,6 @@ global e3d.LOCALS_START_ADDR <comptime> = 0xC40000
 global e3d.ARGS_START_ADDR <comptime> = 0xC80000
 global e3d.ROM_START_ADDR <comptime> = 0xCC0000
 global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
-
-global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
 
 -- emulate a PS1-like controller
 global e3d.ControllerButtons = @enum {
@@ -84,16 +89,18 @@ global e3d.ControllerButtons = @enum {
 	COUNT -- not an actual button; used to count the number of buttons
 }
 
+-- tokens used by the compiler (ecc.nelua)
 global e3d.Token = @enum {
 	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
 	FLOAT_LITERAL,
-	STRING,  -- string literal
+	STRING_LITERAL,
 	VOID,
 	INT,
 	FLOAT,
 	VEC2,
 	VEC3,
 	STRUCT_ID, -- struct type id
+	STRING,
 	STRUCT,
 	FUNCTION,
 	ENUM,
@@ -134,6 +141,7 @@ global e3d.Token = @enum {
 	BRAK
 }
 
+-- opcodes used by the vm (evm.nelua) and emitted by the compiler (ecc.nelua)
 global e3d.Opcode = @enum {
 	GET_G = 0,
 	GET_GX,
@@ -153,6 +161,8 @@ global e3d.Opcode = @enum {
 	GET_MX,
 	SET_M,
 	SET_MX,
+	GET_S,
+	SET_S,
 	ADDROF_G,
 	ADDROF_L,
 	ADDROF_A,
@@ -165,6 +175,7 @@ global e3d.Opcode = @enum {
 	PUSH_FLOAT,
 	PUSH_VEC2_ZERO,
 	PUSH_VEC3_ZERO,
+	PUSH_STRING,
 	DISCARD,
 	NOT,
 	OR,
@@ -198,9 +209,11 @@ global e3d.Opcode = @enum {
 	EQ,
 	EQF,
 	EQV,
+	EQS,
 	NE,
 	NEF,
 	NEV,
+	NES,
 	LTI,
 	LTU,
 	LTF,
@@ -231,6 +244,7 @@ global e3d.Opcode = @enum {
 	API
 }
 
+-- 
 global e3d.Class = @enum {
 	KEYWORD = 0,
 	API,
@@ -238,6 +252,7 @@ global e3d.Class = @enum {
 	STRUCT,
 	FUNCTION,
 	MEMORY, -- only used when writing values into memory using pointers
+	STRING, -- only used when writing characters to a string using indexing
 	GLOBAL,
 	ARG,
 	LOCAL
@@ -252,9 +267,10 @@ global e3d.EVMType = @enum {
 	STRUCT,
 	STRING,
 	FUNC_POINTER,
-	POINTER = 16 -- repeatedly added to type to indicate pointer levels
+	POINTER = 16 -- repeatedly added to type id value to indicate pointer levels
 }
 
+-- vm multiplication opcode has several modes for multiplying different types
 global e3d.MulVMode = @enum {
 	INT_V2 = 0,
 	INT_V3,
@@ -268,6 +284,7 @@ global e3d.MulVMode = @enum {
 	V3_V3
 }
 
+-- vm division opcode has several modes for dividing different types
 global e3d.DivVMode = @enum {
 	V2_INT = 0,
 	V2_FLOAT,
@@ -277,17 +294,12 @@ global e3d.DivVMode = @enum {
 	V3_V3
 }
 
+-- vm script hook function ids
 global e3d.Hook = @enum {
 	INIT = 0,
 	UPDATE,
 	DRAW2D,
 	DRAW3D
-}
-
-global e3d.StatusCode = @enum {
-	OK = 0,
-	ERR_MISALIGNED_PTR,
-	ERR_OOB_PTR
 }
 
 -------------------------
@@ -302,6 +314,7 @@ global e3d.Identifier <forwarddecl> = @record {}
 
 global e3d.APIFunction: type = @function(vm: *e3d.EVM): boolean
 
+-- holds graphics information for the vm
 global e3d.GPU = @record {
 	cameras: [e3d.CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
@@ -319,7 +332,12 @@ global e3d.GPU = @record {
 	fog_end_loc: cint,
 	fog_color_loc: cint,
 
-	update_tex: boolean,
+	update_tex: boolean, -- set when TMEM is updated. when set, TMEM is uploaded to the real GPU
+
+	-- "triangle mode" data
+	--
+	-- RLGL currently doesn't allow primitives created using RL_TRIANGLES to use UV coordinates for textures.
+	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
 	triangle_mode: boolean,
 	triangle_vert_index: integer,
 	triangle_vert_color: rl.color,
@@ -342,18 +360,27 @@ global e3d.GPU = @record {
 	viewport_h: cint
 }
 
+-- union used internally by the vm to store values of different types
 global e3d.EVMValue = @union {
-	i: int32, -- int
-	u: uint32, -- pointer, string, func_ptr
+	i: int32,
+	u: uint32,
 	f: float32
 }
 
+-- record used to represet an ERA-C string struct
+global e3d.EVMString = @record {
+	len: uint32, -- string length
+	data: uint32 -- string data virtual address
+}
+
+-- record that tracks data used by the vm when calling functions
 global e3d.CallFrame = @record {
 	pc: uinteger,
 	lbp: uinteger,
 	argc: uint16
 }
 
+-- ERA-C struct metadata record used in the compiler
 global e3d.Struct = @record {
 	is_complete: boolean,
 	size: uinteger,
@@ -362,6 +389,7 @@ global e3d.Struct = @record {
 	members: sequence(*e3d.Identifier)
 }
 
+-- 
 global e3d.TypeInfo = @record {
 	type_id: uinteger,
 	structref: *e3d.Struct -- only used when base_type is e3d.EVMType.STRUCT
@@ -407,7 +435,7 @@ e3d.EVM = @record {
 	globals_len: uinteger,
 	lsp: uinteger,
 	asp: uinteger,
-	ap: uinteger,   -- ap for current function
+	ap: uinteger, -- ap for current function
 	osp: uinteger,
 	csp: uinteger,
 	hook_addresses: [4]uint16,
@@ -421,6 +449,7 @@ e3d.EVM = @record {
 	token: uinteger,
 	token_val: uinteger,
 	token_valf: float32,
+	string_len: uinteger,
 	prev_token: uinteger,
 	prev_scope_size: uint16,
 	line: uinteger,
@@ -436,8 +465,10 @@ e3d.EVM = @record {
 	current_func_id: *e3d.Identifier,
 	struct_vec2: *e3d.Struct,
 	struct_vec3: *e3d.Struct,
+	struct_string: *e3d.Struct,
 	sb: stringbuilder,
 	keywords: hashmap(string, *e3d.Identifier),
+	constants: hashmap(string, *e3d.Identifier),
 	api_ids: hashmap(string, *e3d.Identifier),
 	struct_ids: hashmap(string, *e3d.Identifier),
 	sym_tables: sequence(*hashmap(string, *e3d.Identifier)),
@@ -477,16 +508,17 @@ global e3d._type_names: []string = {
 global e3d._token_names: []string = {
 	"int literal",
 	"float literal",
-	"string",
+	"string literal",
 	"void",
 	"int",
 	"float",
 	"vec2",
 	"vec3",
 	"struct identifier",
+	"string",
 	"struct",
 	"function",
-	"num",
+	"enum",
 	"identifier",
 	"else",
 	"if",
@@ -586,7 +618,7 @@ end
 
 function e3d.size_of_type(info: e3d.TypeInfo): uint16
 	-- returns size in words
-	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRUCT) then
+	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRING) then
 		return info.structref.size
 	end
 	
@@ -597,7 +629,7 @@ function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 	-- returns size in words
 	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
 	
-	if (type_pointed_to >= e3d.EVMType.VEC2) and (type_pointed_to <= e3d.EVMType.STRUCT) then
+	if (type_pointed_to >= e3d.EVMType.VEC2) and (type_pointed_to <= e3d.EVMType.STRING) then
 		return info.structref.size
 	end
 	
@@ -654,7 +686,7 @@ end
 function e3d.GPU:reset(): void
 	for i = 0, < #self.cameras do
 		self.cameras[i] = {
-			position={0,0,1},
+			position={0,0,4},
 			target={0,0,0},
 			up={0,1,0},
 			fovy=45,

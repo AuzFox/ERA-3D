@@ -8,11 +8,18 @@ function e3d.EVM:get_argu(i: uint16): uint32 <forwarddecl> end
 function e3d.EVM:get_argf(i: uint16): float32 <forwarddecl> end
 function e3d.EVM:get_argv2(i: uint16): rl.vector2 <forwarddecl> end
 function e3d.EVM:get_argv3(i: uint16): rl.vector3 <forwarddecl> end
+function e3d.EVM:get_argstr(i: uint16): e3d.EVMString <forwarddecl> end
 function e3d.EVM:pushi(val: int32): void <forwarddecl> end
 function e3d.EVM:pushu(val: uint32): void <forwarddecl> end
 function e3d.EVM:pushf(val: float32): void <forwarddecl> end
 function e3d.EVM:pushv2(val: rl.vector2): void <forwarddecl> end
 function e3d.EVM:pushv3(val: rl.vector3): void <forwarddecl> end
+function e3d.EVM:pushstr(val: e3d.EVMString): void <forwarddecl> end
+
+function e3d.EVM:get_ram8(addr: uint32): uint8 <forwarddecl> end
+function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean <forwarddecl> end
+function e3d.EVM:get_ram32(addr: uint32): uint32 <forwarddecl> end
+function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
 
 --[[
 	API FUNCTIONS TO IMPLEMENT:
@@ -36,15 +43,15 @@ function e3d.EVM:pushv3(val: rl.vector3): void <forwarddecl> end
 	void ambient(???);
 	
 	// memory
-	char* alloc(int size);
-	char* realloc(char* ptr, int size);
-	void free(char* ptr);
-	void memset(char* ptr, int nbytes, char value);
-	void memcpy(char* a, char* b, int nbytes);
-	int strlen(char* str);
-	char* strdup(char* str);
-	char* strcat(char* a, char* b);
-	char* strfmt(char* fmt, ...);
+	void* alloc(int size);
+	void* alloc(int size);
+	void* realloc(void* ptr, int size);
+	void free(void* ptr);
+	void memset(void* ptr, int nbytes, int value);
+	void memcpy(void* a, void* b, int nbytes);
+	string strdup(string str);
+	string strcat(string a, string b);
+	string strfmt(string fmt, ...);
 	
 	// i/o
 	// ...
@@ -55,6 +62,40 @@ function e3d.EVM:pushv3(val: rl.vector3): void <forwarddecl> end
 local function api_halt(vm: *e3d.EVM): boolean
 	vm.error = "- PROGRAM HALTED -\n"
 	return false
+end
+
+local function api_printc(vm: *e3d.EVM): boolean
+	local v: uint32 = vm:get_argu(0)
+	io.printf("%c\n", (cchar)(v & 0xFF))
+	return true
+end
+
+local function api_prints(vm: *e3d.EVM): boolean
+	local s: e3d.EVMString = vm:get_argstr(0)
+
+	local addr: uint32 = s.data
+
+	for i = 0, < s.len do
+		local c: uint8
+
+		if addr > e3d.RAM_MAX_ADDR then
+			io.write("\n")
+			io.flush()
+			vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+			return false
+		end
+	
+		c = vm:get_ram8(addr)
+
+		io.writef("%c", c)
+		
+		addr = addr + 1
+	end
+	
+	io.write("\n")
+	io.flush()
+
+	return true
 end
 
 local function api_printi(vm: *e3d.EVM): boolean
@@ -1119,23 +1160,23 @@ local function api_getCamForward(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getTexMode(vm: *e3d.EVM): boolean
+local function api_getTextureMode(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int getTexMode();
+	-- int getTextureMode();
 
 	vm:pushi((@int32)(vm.gpu.tex_mode))
 
 	return true
 end
 
-local function api_setTexMode(vm: *e3d.EVM): boolean
+local function api_setTextureMode(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setTexMode(int mode);
+	-- void setTextureMode(int mode);
 
 	local mode: uint32 = vm:get_argu(0)
 
-	if mode > 1 then
-		mode = 1
+	if mode > 2 then
+		mode = 2
 	end
 
 	vm.gpu.tex_mode = (@cint)(mode)
@@ -1657,7 +1698,7 @@ end
 local function api_scale(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void scale(vec3 sca);
-
+	
 	local v: rl.vector3 = vm:get_argv3(0)
 	
 	rlgl.scalef(v.x, v.y, v.z)
@@ -1665,13 +1706,92 @@ local function api_scale(vm: *e3d.EVM): boolean
 	return true
 end
 
-function e3d.EVM:_register_builtins(): void
+local function api_peek8(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int peek8(int addr);
+
+	local addr: uint32 = vm:get_argu(0)
+
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+		return false
+	end
+
+	vm:pushu(vm:get_ram8(addr))
+
+	return true
+end
+
+local function api_poke8(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void poke8(int addr, int val);
+
+	local addr: uint32 = vm:get_argu(0)
+	local val: uint8 = (@uint8)(vm:get_argu(1) & 0xFF)
+
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid byte write address 0x%08X\n", addr)
+		return false
+	end
+
+	if not vm:set_ram8(addr, val) then
+		vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
+		return false
+	end
+
+	return true
+end
+
+local function api_peek32(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int peek32(int addr);
+
+	local addr: uint32 = vm:get_argu(0)
+
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
+		return false
+	elseif (addr & 0b11) ~= 0 then
+		vm.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", addr)
+		return false
+	end
+
+	vm:pushu(vm:get_ram32(addr))
+
+	return true
+end
+
+local function api_poke32(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void poke32(int addr, int val);
+
+	local addr: uint32 = vm:get_argu(0)
+	local val: uint32 = vm:get_argu(1)
+
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", addr)
+		return false
+	elseif (addr & 0b11) ~= 0 then
+		vm.error = string.format("RUNTIME ERROR: misaligned word write address 0x%08X\n", addr)
+		return false
+	end
+
+	if not vm:set_ram32(addr, val) then
+		vm.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", addr)
+		return false
+	end
+
+	return true
+end
+
+function e3d.EVM:register_builtins(): void
 	local keyword_ids: []e3d.Identifier = {
 		{name="void",     token=e3d.Token.VOID},
 		{name="int",      token=e3d.Token.INT},
 		{name="float",    token=e3d.Token.FLOAT},
 		{name="vec2",     token=e3d.Token.VEC2},
 		{name="vec3",     token=e3d.Token.VEC3},
+		{name="string",   token=e3d.Token.STRING},
 		{name="enum",     token=e3d.Token.ENUM},
 		{name="struct",   token=e3d.Token.STRUCT},
 		{name="if",       token=e3d.Token.IF},
@@ -1682,6 +1802,12 @@ function e3d.EVM:_register_builtins(): void
 		{name="sizeof",   token=e3d.Token.SIZEOF},
 		{name="for",      token=e3d.Token.FOR},
 		{name="while",    token=e3d.Token.WHILE}
+	}
+
+	local constant_ids: []e3d.Identifier = {
+		{name="true",  type_info={e3d.EVMType.INT}, const_val=1},
+		{name="false", type_info={e3d.EVMType.INT}, const_val=0},
+		{name="null",  type_info={e3d.EVMType.INT}, const_val=0} -- TODO: change value to actual null address
 	}
 
 	local constructor_ids: []e3d.Identifier = {
@@ -1695,6 +1821,15 @@ function e3d.EVM:_register_builtins(): void
 		$id = keyword_ids[i]
 		id.class = e3d.Class.KEYWORD
 		self.keywords[id.name] = id
+	end
+
+	self.constants:reserve(#constant_ids)
+	for i = 0, < #constant_ids do
+		local id: *e3d.Identifier = new(@e3d.Identifier)
+		$id = constant_ids[i]
+		id.token = e3d.Token.ID
+		id.class = e3d.Class.CONSTANT
+		self.constants[id.name] = id
 	end
 
 	-- vector construction functions are special cases,
@@ -1721,8 +1856,8 @@ function e3d.EVM:_register_builtins(): void
 	v2y.index = 1
 	v2y.type_info = {e3d.EVMType.FLOAT}
 
-	sid:_add_member(v2x)
-	sid:_add_member(v2y)
+	sid:add_member(v2x)
+	sid:add_member(v2y)
 	sid.is_complete = true
 	self.struct_vec2 = sid
 
@@ -1745,17 +1880,38 @@ function e3d.EVM:_register_builtins(): void
 	v3z.index = 2
 	v3z.type_info = {e3d.EVMType.FLOAT}
 
-	sid:_add_member(v3x)
-	sid:_add_member(v3y)
-	sid:_add_member(v3z)
+	sid:add_member(v3x)
+	sid:add_member(v3y)
+	sid:add_member(v3z)
 	sid.is_complete = true
 	self.struct_vec3 = sid
+
+	-- define string struct
+	sid = new(@e3d.Struct)
+	local string_len: *e3d.Identifier = new(@e3d.Identifier)
+	local string_data: *e3d.Identifier = new(@e3d.Identifier)
+
+	sid.name = "string"
+	string_len.name = "len"
+	string_len.index = 0
+	string_len.type_info = {e3d.EVMType.INT}
+
+	string_data.name = "data"
+	string_data.index = 1
+	string_data.type_info = {e3d.EVMType.VOID + e3d.EVMType.POINTER}
+
+	sid:add_member(string_len)
+	sid:add_member(string_data)
+	sid.is_complete = true
+	self.struct_string = sid
 end
 
-function e3d.EVM:_register_api(): void
+function e3d.EVM:register_api(): void
 	local api_ids: []e3d.Identifier = {
 		{name="halt", type_info={e3d.EVMType.VOID}, func=api_halt},
 		
+		{name="printc",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},                            func=api_printc},
+		{name="prints",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.STRING}},                         func=api_prints},
 		{name="printi",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_printi},
 		{name="printf",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}},                          func=api_printf},
 		{name="printv2", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_printv2},
@@ -2007,34 +2163,34 @@ function e3d.EVM:_register_api(): void
 			},
 			func=api_texture
 		},
-		{name="getTexMode",  type_info={e3d.EVMType.INT},                                         func=api_getTexMode},
-		{name="setTexMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setTexMode},
-		{name="getCullMode", type_info={e3d.EVMType.INT},                                         func=api_getCullMode},
-		{name="setCullMode", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setCullMode},
-		{name="getWireMode", type_info={e3d.EVMType.INT},                                         func=api_getWireMode},
-		{name="setWireMode", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setWireMode},
-		{name="getFogMode",  type_info={e3d.EVMType.INT},                                         func=api_getFogMode},
-		{name="setFogMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogMode},
-		{name="getFogStart", type_info={e3d.EVMType.FLOAT},                                       func=api_getFogStart},
-		{name="setFogStart", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogStart},
-		{name="getFogEnd",   type_info={e3d.EVMType.FLOAT},                                       func=api_getFogEnd},
-		{name="setFogEnd",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogEnd},
-		{name="getFogColor", type_info={e3d.EVMType.INT},                                         func=api_getFogColor},
-		{name="setFogColor", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogColor},
-		{name="matrixMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_matrixMode},
-		{name="clear",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_clear},
-		{name="pushMatrix",  type_info={e3d.EVMType.VOID},                                        func=api_pushMatrix},
-		{name="popMatrix",   type_info={e3d.EVMType.VOID},                                        func=api_popMatrix},
-		{name="identity",    type_info={e3d.EVMType.VOID},                                        func=api_identity},
-		{name="translate",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_translate},
-		{name="rotate",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_rotate},
-		{name="scale",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_scale},
-		{name="vertex",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_vertex},
-		{name="vertex2D",    type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertex2D},
-		{name="vertUV",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertUV},
-		{name="vertColor",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_vertColor},
-		{name="beginMesh",   type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_beginMesh},
-		{name="endMesh",     type_info={e3d.EVMType.VOID},                                        func=api_endMesh},
+		{name="getTextureMode",  type_info={e3d.EVMType.INT},                                         func=api_getTextureMode},
+		{name="setTextureMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setTextureMode},
+		{name="getCullMode",     type_info={e3d.EVMType.INT},                                         func=api_getCullMode},
+		{name="setCullMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setCullMode},
+		{name="getWireMode",     type_info={e3d.EVMType.INT},                                         func=api_getWireMode},
+		{name="setWireMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setWireMode},
+		{name="getFogMode",      type_info={e3d.EVMType.INT},                                         func=api_getFogMode},
+		{name="setFogMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogMode},
+		{name="getFogStart",     type_info={e3d.EVMType.FLOAT},                                       func=api_getFogStart},
+		{name="setFogStart",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogStart},
+		{name="getFogEnd",       type_info={e3d.EVMType.FLOAT},                                       func=api_getFogEnd},
+		{name="setFogEnd",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogEnd},
+		{name="getFogColor",     type_info={e3d.EVMType.INT},                                         func=api_getFogColor},
+		{name="setFogColor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogColor},
+		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_matrixMode},
+		{name="clear",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_clear},
+		{name="pushMatrix",      type_info={e3d.EVMType.VOID},                                        func=api_pushMatrix},
+		{name="popMatrix",       type_info={e3d.EVMType.VOID},                                        func=api_popMatrix},
+		{name="identity",        type_info={e3d.EVMType.VOID},                                        func=api_identity},
+		{name="translate",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_translate},
+		{name="rotate",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_rotate},
+		{name="scale",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_scale},
+		{name="vertex",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_vertex},
+		{name="vertex2D",        type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertex2D},
+		{name="vertUV",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertUV},
+		{name="vertColor",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_vertColor},
+		{name="beginMesh",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_beginMesh},
+		{name="endMesh",         type_info={e3d.EVMType.VOID},                                        func=api_endMesh},
 		{
 			name="sprite2D",
 			type_info={e3d.EVMType.VOID},
@@ -2062,7 +2218,38 @@ function e3d.EVM:_register_api(): void
 				{type_id=e3d.EVMType.INT}
 			},
 			func=api_spriteEx2D
-		}
+		},
+
+		{
+			name="peek8",
+			type_info={e3d.EVMType.INT},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_peek8
+		},
+		{
+			name="poke8",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=api_poke8
+		},
+		{
+			name="peek32",
+			type_info={e3d.EVMType.INT},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_peek32
+		},
+		{
+			name="poke32",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=api_poke32
+		},
 	}
 
 	self.api_ids:reserve(#api_ids + 2)

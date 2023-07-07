@@ -18,6 +18,9 @@ vec2 positions[SUBVIEW_COUNT];
 vec2 velocities[SUBVIEW_COUNT];
 int colors[SUBVIEW_COUNT];
 
+// rotations for each cube face from identity position
+vec3 face_rotations[6];
+
 // draw a quad, used by draw_cube()
 void draw_cube_face() {
     vertUV((vec2){0.0, 0.0});
@@ -32,15 +35,6 @@ void draw_cube_face() {
 
 // draw a rotating cube
 void draw_cube() {
-    vec3 rotation_values[6]; // rotations for each face from identity position
-
-    rotation_values[0] = (vec3){  0.0,   0.0, 0.0}; // front
-    rotation_values[1] = (vec3){  0.0,  90.0, 0.0}; // left
-    rotation_values[2] = (vec3){  0.0, -90.0, 0.0}; // right
-    rotation_values[3] = (vec3){  0.0, 180.0, 0.0}; // back
-    rotation_values[4] = (vec3){-90.0,   0.0, 0.0}; // top
-    rotation_values[5] = (vec3){ 90.0,   0.0, 0.0}; // bottom
-
     texture(64, 0, 64, 64);
 
     pushMatrix();
@@ -52,7 +46,7 @@ void draw_cube() {
             // draw faces
             for (int i = 0; i < 6; i = i + 1) {
                 pushMatrix();
-                    rotate(rotation_values[i]);
+                    rotate(face_rotations[i]);
                     draw_cube_face();
                 popMatrix();
             }
@@ -69,6 +63,17 @@ void init () {
 
     setCamPos(0, (vec3){0.0, 0.0, 2.5}); // position main camera to look at it's cube
 
+    face_rotations[0] = (vec3){  0.0,   0.0, 0.0}; // front
+    face_rotations[1] = (vec3){  0.0,  90.0, 0.0}; // left
+    face_rotations[2] = (vec3){  0.0, -90.0, 0.0}; // right
+    face_rotations[3] = (vec3){  0.0, 180.0, 0.0}; // back
+    face_rotations[4] = (vec3){-90.0,   0.0, 0.0}; // top
+    face_rotations[5] = (vec3){ 90.0,   0.0, 0.0}; // bottom
+
+    colors[0] = 0xFF0000FF;
+    colors[1] = 0x00FF00FF;
+    colors[2] = 0x0000FFFF;
+
     // init sub-view data
     //
     // start each sub-view in the middle of the screen
@@ -84,8 +89,6 @@ void init () {
             randf(-64.0, 64.0),
             randf(-64.0, 64.0)
         };
-
-        colors[i] = randiEx() | 0xFF;
 
         setCamPos(i + 1, (vec3){0, 0, 2.5}); // i + 1 to skip camera 0
     }

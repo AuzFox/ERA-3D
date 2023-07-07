@@ -78,7 +78,7 @@ void update(float delta_time) {
 }
 
 void draw3D() {
-	clear(WHITE);
+	clear(BLACK);
 
 	pushMatrix();
 		// front
