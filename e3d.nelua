@@ -113,6 +113,7 @@ global e3d.Token = @enum {
 	SIZEOF,
 	FOR,
 	WHILE,
+	VARARGS,
 	LNOT,
 	NOT,
 	ASSIGN,
@@ -238,6 +239,7 @@ global e3d.Opcode = @enum {
 	CALL,
 	CALL_PTR,
 	RETURN,
+	VARGP,
 	FTOI,
 	ITOF,
 	ITOB, -- int to bool, used by || and && operators
@@ -377,7 +379,10 @@ global e3d.EVMString = @record {
 global e3d.CallFrame = @record {
 	pc: uinteger,
 	lbp: uinteger,
-	argc: uint16
+	argc: uint16,
+	vargc: uint16, -- remaining vararg word count for function
+	vargp: uint16, -- vararg pointer
+	vargf: boolean, -- vararg flag, true if the function for this frame is a varargs function
 }
 
 -- ERA-C struct metadata record used in the compiler
@@ -410,8 +415,10 @@ e3d.Identifier = @record {
 	token: uinteger,
 	class: uinteger,
 	index: uinteger,
+	varargs_index: uinteger, -- only used for varargs functions
 	type_info: e3d.TypeInfo,
 	is_array: boolean,
+	is_varargs: boolean, -- only used for functions
 	const_val: uint32, -- only used for constants (enum values)
 	func: e3d.APIFunction, -- only used when registering api functions
 	argdata: sequence(e3d.TypeInfo) -- only used to track function arguments
@@ -528,6 +535,7 @@ global e3d._token_names: []string = {
 	"sizeof",
 	"for",
 	"while",
+	"...",
 	"!",
 	"~",
 	"=",

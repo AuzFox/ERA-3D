@@ -129,6 +129,73 @@ end
 
 -- API FUNCTIONS:
 
+local function api_vargc(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int vargc();
+
+	if vm.csp < 1 then
+		-- shouldn't happen, but just in case
+		vm.error = string.format("RUNTIME ERROR (DEBUG): cannot call vargc() with empty callstack\n")
+		return false
+	end
+
+	-- examine the callframe from the function we called from
+	local frame: *e3d.CallFrame = &vm.callstack[vm.csp - 1]
+
+	if not frame.vargf then
+		vm.error = string.format("RUNTIME ERROR: cannot call vargc() from non-vararg function\n")
+		return false
+	end
+
+	vm:pushu(frame.vargc * 4) -- return number of vararg bytes to allow use of sizeof()
+
+	return true
+end
+
+local function api_vargv(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void* vargv(int offset);
+
+	local offset: uint32 = vm:get_argu(0) / 4 -- offset is given in bytes to allow easy use of sizeof()
+
+	if vm.csp < 1 then
+		-- shouldn't happen, but just in case
+		vm.error = string.format("RUNTIME ERROR (DEBUG): cannot call vargv() with empty callstack\n")
+		return false
+	end
+
+	-- examine the callframe from the function we called from
+	local frame: *e3d.CallFrame = &vm.callstack[vm.csp - 1]
+
+	if not frame.vargf then
+		vm.error = string.format("RUNTIME ERROR: cannot call vargv() from non-vararg function\n")
+		return false
+	end
+
+	if frame.vargc == 0 then
+		vm.error = string.format("RUNTIME ERROR: vargv() called after end of varargs\n")
+		return false
+	end
+
+	if offset > frame.vargc then
+		vm.error = string.format("RUNTIME ERROR: vararg count exceeded by %d word(s)\n", offset - frame.vargc)
+		return false
+	end
+
+	frame.vargc = frame.vargc - offset
+	
+	-- get ap of the function we called from
+	local ap: uinteger = (vm.asp - vm.cf.argc) - frame.argc
+	
+	-- return adress vargp currently points to
+	vm:pushu(e3d.ARGS_START_ADDR + ((ap + frame.vargp) * 4))
+
+	-- offset vararg pointer
+	frame.vargp = frame.vargp + offset
+
+	return true
+end
+
 local function api_pressed(vm: *e3d.EVM): boolean
 	local b: uint32 = vm:get_argu(0)
 	local p: uint32 = vm:get_argu(1)
@@ -1916,6 +1983,9 @@ function e3d.EVM:register_api(): void
 		{name="printf",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}},                          func=api_printf},
 		{name="printv2", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_printv2},
 		{name="printv3", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},                           func=api_printv3},
+
+		{name="vargc", type_info={e3d.EVMType.INT},                                                             func=api_vargc},
+		{name="vargv", type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, argdata={{type_id=e3d.EVMType.INT}}, func=api_vargv},
 		
 		{
 			name="pressed",

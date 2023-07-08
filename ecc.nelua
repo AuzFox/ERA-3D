@@ -580,7 +580,20 @@ local function next(vm: *e3d.EVM): void
 			vm.token = e3d.Token.COND
 			return
 		elseif vm.token == '.'_u8 then
-			vm.token = e3d.Token.DOT
+			if getchar(vm) == '.'_u8 then
+				vm.src_index = vm.src_index + 1
+				if getchar(vm) == '.'_u8 then
+					vm.src_index = vm.src_index + 1
+					vm.token = e3d.Token.VARARGS
+				else
+					vm.error = string.format("COMPILE ERROR: line %d: invalid token '..'\n", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+			else
+				vm.token = e3d.Token.DOT
+			end
+			
 			return
 		elseif (vm.token == ';'_u8 or vm.token == '{'_u8 or vm.token == '}'_u8 or vm.token == '('_u8 or vm.token == ')'_u8 or vm.token == ']'_u8 or vm.token == ','_u8 or vm.token == ':'_u8) then
 			return
@@ -839,7 +852,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			local argc: isize = 0
 			local size: uint16 = 0
 
-			if target_argc == 0 then
+			if not id.is_varargs and target_argc == 0 then
 				if vm.token ~= ')'_u8 then
 					vm.error = string.format("COMPILE ERROR: line %d: too many arguments in call to function `%s`. expected 0\n", vm.line, id.name)
 					vm.compile_err = true
@@ -847,12 +860,22 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				end
 			else
 				while vm.token ~= ')'_u8 do
-					if argc + 1 > target_argc then
-						vm.error = string.format("COMPILE ERROR: line %d: too many arguments in call to function `%s`. expected %d\n", vm.line, id.name, target_argc)
-						vm.compile_err = true
-						coroutine.yield()
+					-- only check arg count if:
+					-- function is not varargs
+					-- or
+
+					if id.is_varargs then
+						if argc < target_argc then
+							target_info = id.argdata[argc + 1]
+						end
 					else
-						target_info = id.argdata[argc + 1]
+						if argc + 1 > target_argc then
+							vm.error = string.format("COMPILE ERROR: line %d: too many arguments in call to function `%s`. expected %d\n", vm.line, id.name, target_argc)
+							vm.compile_err = true
+							coroutine.yield()
+						else
+							target_info = id.argdata[argc + 1]
+						end
 					end
 					
 					expression(vm, e3d.Token.ASSIGN)
@@ -861,41 +884,49 @@ local function expression(vm: *e3d.EVM, level: integer): void
 						vm.error = string.format("COMPILE ERROR: line %d: cannot pass expression of type `void` as a function argument\n", vm.line)
 						vm.compile_err = true
 						coroutine.yield()
-					elseif target_info.type_id ~= vm.expr_type.type_id then
-						-- can we convert types?
-						local can_convert: boolean = false
-						
-						if target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
-							can_convert = true
-							vm:emitop(e3d.Opcode.FTOI)
-						elseif target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
-							can_convert = true
-						elseif target_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
-							can_convert = true
-							vm:emitop(e3d.Opcode.ITOF)
-						elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
-							can_convert = true
-						elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
-							can_convert = true
-						end
-						
-						if not can_convert then
-							vm.error = string.format(
-								"COMPILE ERROR: line %d: invalid type for argument %d in call to function `%s`. expected `%s`, got `%s`\n",
-								vm.line,
-								argc + 1,
-								id.name,
-								e3d.get_type_name(target_info),
-								e3d.get_type_name(vm.expr_type)
-							)
-							vm.compile_err = true
-							coroutine.yield()
-						end
-					elseif target_info.type_id == e3d.EVMType.STRUCT then
-						if target_info.structref ~= vm.expr_type.structref then
-							vm.error = string.format("COMPILE ERROR: line %d: invalid type for argument %d in call to function `%s`. expected `%s`, got `%s`\n", vm.line, argc + 1, id.name, target_info.structref.name, vm.expr_type.structref.name)
-							vm.compile_err = true
-							coroutine.yield()
+					end
+
+					-- only typecheck if:
+					-- the function is not varargs
+					-- or
+					-- the function is varargs, and there are still required arguments
+					if not id.is_varargs or (id.is_varargs and (argc < target_argc)) then
+						if target_info.type_id ~= vm.expr_type.type_id then
+							-- can we convert types?
+							local can_convert: boolean = false
+							
+							if target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
+								can_convert = true
+								vm:emitop(e3d.Opcode.FTOI)
+							elseif target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
+								can_convert = true
+							elseif target_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
+								can_convert = true
+								vm:emitop(e3d.Opcode.ITOF)
+							elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
+								can_convert = true
+							elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
+								can_convert = true
+							end
+							
+							if not can_convert then
+								vm.error = string.format(
+									"COMPILE ERROR: line %d: invalid type for argument %d in call to function `%s`. expected `%s`, got `%s`\n",
+									vm.line,
+									argc + 1,
+									id.name,
+									e3d.get_type_name(target_info),
+									e3d.get_type_name(vm.expr_type)
+								)
+								vm.compile_err = true
+								coroutine.yield()
+							end
+						elseif target_info.type_id == e3d.EVMType.STRUCT then
+							if target_info.structref ~= vm.expr_type.structref then
+								vm.error = string.format("COMPILE ERROR: line %d: invalid type for argument %d in call to function `%s`. expected `%s`, got `%s`\n", vm.line, argc + 1, id.name, target_info.structref.name, vm.expr_type.structref.name)
+								vm.compile_err = true
+								coroutine.yield()
+							end
 						end
 					end
 
@@ -910,9 +941,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				end
 
 				if argc < target_argc then
-					vm.error = string.format("COMPILE ERROR: line %d: too few arguments in call to function `%s`. expected %d, got %d\n", vm.line, id.name, target_argc, argc)
-					vm.compile_err = true
-					coroutine.yield()
+					if id.is_varargs then
+						vm.error = string.format("COMPILE ERROR: line %d: too few arguments in call to varargs function `%s`. expected at least %d, got %d\n", vm.line, id.name, target_argc, argc)
+						vm.compile_err = true
+						coroutine.yield()
+					else
+						vm.error = string.format("COMPILE ERROR: line %d: too few arguments in call to function `%s`. expected %d, got %d\n", vm.line, id.name, target_argc, argc)
+						vm.compile_err = true
+						coroutine.yield()
+					end
 				end
 			end
 			match(vm, ')'_u8)
@@ -3142,7 +3179,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 	while vm.token ~= ')'_u8 do
 		local structref: *e3d.Struct = nilptr
 		arg_type = e3d.EVMType.INT
-
+		
 		if vm.token == e3d.Token.VOID then
 			match(vm, e3d.Token.VOID)
 			arg_type = e3d.EVMType.VOID
@@ -3168,6 +3205,11 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 			structref = vm.struct_string
 			match(vm, e3d.Token.STRING)
 			arg_type = e3d.EVMType.STRING
+		elseif vm.token == e3d.Token.VARARGS then
+			match(vm, e3d.Token.VARARGS)
+			vm.current_func_id.is_varargs = true
+			vm.current_func_id.varargs_index = arg_index
+			break
 		else
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
@@ -3227,17 +3269,17 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 
 	if hook_index ~= -1 then
 		if hook_index == e3d.Hook.UPDATE then
-			if #vm.current_func_id.argdata ~= 1 then
+			if #vm.current_func_id.argdata ~= 1 or vm.current_func_id.is_varargs then
 				vm.error = string.format("COMPILE ERROR: line %d: invalid signature for hook function `update`, expected `void update(float)`\n", vm.line)
 				vm.compile_err = true
 				coroutine.yield()
-			elseif vm.current_func_id.argdata[1].type_id ~= e3d.EVMType.FLOAT then
+			elseif vm.current_func_id.argdata[1].type_id ~= e3d.EVMType.FLOAT or vm.current_func_id.is_varargs then
 				vm.error = string.format("COMPILE ERROR: line %d: invalid signature for hook function `update`, expected `void update(float)`\n", vm.line)
 				vm.compile_err = true
 				coroutine.yield()
 			end
 		else
-			if #vm.current_func_id.argdata ~= 0 then
+			if #vm.current_func_id.argdata ~= 0 or vm.current_func_id.is_varargs then
 				vm.error = string.format("COMPILE ERROR: line %d: invalid signature for hook function `%s`, expected `void $s()`\n", vm.line, vm.current_func_id.name, vm.current_func_id.name)
 				vm.compile_err = true
 				coroutine.yield()
@@ -3262,6 +3304,12 @@ local function function_declaration(vm: *e3d.EVM, hook_index: integer): void
 	function_parameters(vm, hook_index)
 	match(vm, ')'_u8)
 	match(vm, '{'_u8)
+
+	if vm.current_func_id.is_varargs then
+		-- establish starting point for vararg pointer and set vargs flag
+		vm:emitop(e3d.Opcode.VARGP)
+		vm:emit16(vm.current_func_id.varargs_index)
+	end
 	
 	vm:emitop(e3d.Opcode.NEW_L)
 	local new_l_index: uinteger = vm.bytecode_len

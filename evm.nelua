@@ -788,6 +788,9 @@ function e3d.EVM:dump_bytecode(): void
 				io.printf("CALL_PTR\n")
 			case e3d.Opcode.RETURN then
 				io.printf("RETURN\n")
+			case e3d.Opcode.VARGP then
+				index = self:next16()
+				io.printf("VARGP %d\n", index)
 			case e3d.Opcode.FTOI then
 				io.printf("FTOI\n")
 			case e3d.Opcode.ITOF then
@@ -1637,6 +1640,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				else
 					self:pop_callframe()
 				end
+			case e3d.Opcode.VARGP then
+				index = self:next16()
+				self.cf.vargp = self.ap + index
+				self.cf.vargc = self.cf.argc - index
+				self.cf.vargf = true
 			case e3d.Opcode.FTOI then
 				self:pushi((@int32)(self:popf()))
 			case e3d.Opcode.ITOF then

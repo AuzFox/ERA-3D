@@ -9,7 +9,6 @@ COMPILER:
 - implement array initializers
 - implement compound assignment operators
 - implement function pointers
-- implement varargs?
 - implement unsigned int comparison operators?
 - implement global variable initialization
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
@@ -19,7 +18,6 @@ VM:
 - implement debug opcodes
 - implement null pointers
 - implement vertex-lighting mode and api
-- implement memory peek/poke api
 - implement memory allocator and api for vm heap
 - implement memory card system and api
 - implement cartridge data loading api
