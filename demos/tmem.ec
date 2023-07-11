@@ -34,5 +34,6 @@ void update(float delta_time) {
 }
 
 void draw2D() {
+	clear(0x000000FF);
 	sprite2D(0, 0, 8, 8, 8, 8);
 }

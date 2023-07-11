@@ -70,6 +70,8 @@ global e3d.ARGS_START_ADDR <comptime> = 0xC80000
 global e3d.ROM_START_ADDR <comptime> = 0xCC0000
 global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
 
+global e3d.NULL <comptime> = 0xFFFFFFFF
+
 -- emulate a PS1-like controller
 global e3d.ControllerButtons = @enum {
 	UP = 0,
@@ -207,6 +209,7 @@ global e3d.Opcode = @enum {
 	MODU,
 	MODF,
 	LNOT,
+	LNOTP,
 	EQ,
 	EQF,
 	EQV,
@@ -234,8 +237,10 @@ global e3d.Opcode = @enum {
 	JUMP,
 	JUMP_Z,
 	JUMP_ZD,
-	JUMP_NZ,
 	JUMP_NZD,
+	JUMP_NULL,
+	JUMP_NULLD,
+	JUMP_NNULLD,
 	CALL,
 	CALL_PTR,
 	RETURN,
@@ -243,6 +248,7 @@ global e3d.Opcode = @enum {
 	FTOI,
 	ITOF,
 	ITOB, -- int to bool, used by || and && operators
+	PTOB, -- pointer to bool, used by || and && operators
 	API
 }
 
@@ -322,6 +328,7 @@ global e3d.GPU = @record {
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
 	gfx_rendertex: rl.renderTexture,
+	gfx_font_texture: rl.texture,
 	
 	-- shader uniform locations
 	tex_mode_loc: cint,
@@ -419,7 +426,8 @@ e3d.Identifier = @record {
 	type_info: e3d.TypeInfo,
 	is_array: boolean,
 	is_varargs: boolean, -- only used for functions
-	const_val: uint32, -- only used for constants (enum values)
+	const_val: uint32, -- only used for constants
+	const_valf: float32, -- only used for constants
 	func: e3d.APIFunction, -- only used when registering api functions
 	argdata: sequence(e3d.TypeInfo) -- only used to track function arguments
 }
@@ -742,6 +750,8 @@ function e3d.GPU:init(tmem: *rl.color): void
 	memory.copy(tmem, img.data, e3d.TMEM_SIZE * #rl.color)
 	self.gfx_texture = rl.loadTextureFromImage(img)
 	rl.unloadImage(img)
+
+	self.gfx_font_texture = rl.loadTexture("font.png")
 	
 	self.gfx_shader = rl.loadShader(nilptr, "shader.fs")
 	
@@ -760,6 +770,7 @@ end
 
 function e3d.GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
+	rl.unloadTexture(self.gfx_font_texture)
 	rl.unloadTexture(self.gfx_texture)
 	rl.unloadRenderTexture(self.gfx_rendertex)
 

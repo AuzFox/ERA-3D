@@ -1,9 +1,12 @@
-// hellotriangle.ec by Auz
-// this demo is a minimal example of how to render a 3D triangle onto the screen
+// hello.ec by Auz
+// this demo is a minimal example of how to render a rotating 3D triangle onto the screen
 
 // establish some constants for readability
 enum {
 
+    // constant for disabling backface culling
+    CULLING_DISABLED = 2,
+    
     // constant for disabling textures
     TEXTURES_DISABLED = 2,
 
@@ -13,27 +16,44 @@ enum {
     // convenient color constants.
     // colors use the RGBA32 format
     BLACK = 0x000000FF,
+    WHITE = 0xFFFFFFFF,
     RED   = 0xFF0000FF,
     GREEN = 0x00FF00FF,
     BLUE  = 0x0000FFFF,
+
+    // screen and font dimentions
+    SCREEN_WIDTH = 320,
+    SCREEN_HEIGHT = 240,
+    CHAR_WIDTH = 6,
+    CHAR_HEIGHT = 9,
 };
+
+// create a 3D vector that will store the rotation of the triangle
+vec3 rotation;
 
 // this function is called once when the game starts,
 // use it to set the initial state for your game
 void init() {
 
-    // disable texturing for this demo
+    // disable backface culling and texturing for this demo
     // 
     // when texturing is disabled,
     // all pixels on a surface are set to white instead of using a texture
+    setCullMode(CULLING_DISABLED);
     setTextureMode(TEXTURES_DISABLED);
+
+    // set the x, y, and z rotation angles to zero
+    rotation = vec3Zero();
 }
 
 // this function is called every frame,
 // use it to update game state before rendering
 void update(float delta_time) {
 
-    // ... update stuff here ...
+    // rotate the triangle along the y (vertical) axis at 45 degrees per second
+    // 
+    // wrapf() keeps the angle between 0.0 and 360.0
+    rotation.y = wrapf(rotation.y + 45.0 * delta_time, 0.0, 360.0);
 }
 
 // this function is called after update() every frame,
@@ -59,6 +79,9 @@ void draw3D() {
     // current matrix off of the stack so the next object can use the
     // unmodified original matrix again for its own transformations
     pushMatrix();
+
+        // apply rotation to the current matrix
+        rotate(rotation);
 
         // begin constructing our mesh
         //
@@ -101,4 +124,20 @@ void draw3D() {
     
     // pop the matrix off of the stack
     popMatrix();
+}
+
+// this function is called after draw3D() every frame,
+// use it to draw 2D objects to the screen
+void draw2D() {
+
+    // render some text in the center of the screen
+    // 
+    // the screen is 320x240 pixels
+    //
+    // each character is 6x9 pixels
+    string text = "HELLO ERA-3D!";
+
+    int x = (SCREEN_WIDTH / 2) - ((text.len * CHAR_WIDTH) / 2); // x screen position
+    int y = (SCREEN_HEIGHT / 2) - (CHAR_HEIGHT / 2);            // y screen position
+    print2D(x, y, WHITE, text);
 }

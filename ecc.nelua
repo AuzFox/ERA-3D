@@ -412,8 +412,7 @@ local function next(vm: *e3d.EVM): void
 				if len ~= 0 then
 					vm.token_val = e3d.ROM_START_ADDR + rom_start
 				else
-					-- TODO: set to null pointer (maybe different address?)
-					vm.token_val = 0
+					vm.token_val = e3d.NULL
 				end
 
 				vm.token = e3d.Token.STRING_LITERAL
@@ -971,19 +970,36 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			vm.expr_type = id.type_info
 		elseif id.class == e3d.Class.CONSTANT then
-			if id.const_val == 0 then
-				vm:emitop(e3d.Opcode.PUSH_ZERO)
-			elseif id.const_val == 1 then
-				vm:emitop(e3d.Opcode.PUSH_ONE)
-			elseif id.const_val < 256 then -- simple optimization, turn small enum values into chars
-				vm:emitop(e3d.Opcode.PUSH_CHAR)
-				vm:emit8((@uint8)(id.const_val & 0xFF))
-			else
-				vm:emitop(e3d.Opcode.PUSH_INT)
-				vm:emit32(id.const_val)
+			switch id.type_info.type_id do
+				case e3d.EVMType.INT then
+					if id.const_val == 0 then
+						vm:emitop(e3d.Opcode.PUSH_ZERO)
+					elseif id.const_val == 1 then
+						vm:emitop(e3d.Opcode.PUSH_ONE)
+					elseif id.const_val < 256 then -- simple optimization, turn small enum values into chars
+						vm:emitop(e3d.Opcode.PUSH_CHAR)
+						vm:emit8((@uint8)(id.const_val & 0xFF))
+					else
+						vm:emitop(e3d.Opcode.PUSH_INT)
+						vm:emit32(id.const_val)
+					end
+				case e3d.EVMType.FLOAT then
+					if id.const_valf == 0.0 then
+						vm:emitop(e3d.Opcode.PUSH_ZEROF)
+					elseif id.const_valf == 1.0 then
+						vm:emitop(e3d.Opcode.PUSH_ONEF)
+					else
+						vm:emitop(e3d.Opcode.PUSH_FLOAT)
+						vm:emitf(id.const_valf)
+					end
+				else
+					if id.type_info.type_id >= e3d.EVMType.POINTER then
+						vm:emitop(e3d.Opcode.PUSH_INT)
+						vm:emit32(id.const_val)
+					end
 			end
 			
-			vm.expr_type = {e3d.EVMType.INT}
+			vm.expr_type = id.type_info
 		else
 			-- variable
 			if (id.class >= e3d.Class.GLOBAL) and (id.class <= e3d.Class.LOCAL) then
@@ -1334,6 +1350,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		
 		if vm.expr_type.type_id == e3d.EVMType.INT then
 			vm:emitop(e3d.Opcode.LNOT)
+		elseif vm.expr_type.type_id >= e3d.EVMType.POINTER then
+			vm:emitop(e3d.Opcode.LNOTP)
 		else
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `!` on type `%s`\n",
@@ -1628,45 +1646,46 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				<expr1> || <expr2>
 
 				<expr1>
-				JUMP_NZD b
+				JUMP_NZD b or JUMP_NNULLD b
 				<expr2>
-				ITOB
+				ITOB or PTOB
 				b:
 			]]
 
 			match(vm, e3d.Token.LOR)
 
-			if vm.expr_type.type_id ~= e3d.EVMType.INT then
+			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+				-- short circuit evaluation
+				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_NZD or e3d.Opcode.JUMP_NNULLD)
+				
+				addr = vm.bytecode_len
+				
+				vm:emit16(0)
+			else
 				vm.error = string.format(
-					"COMPILE ERROR: line %d: invalid lvalue type for operator '||', expected `int`, got `%s`\n",
+					"COMPILE ERROR: line %d: invalid lvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
 					e3d.get_type_name(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
 			end
-			
-			vm:emitop(e3d.Opcode.JUMP_NZD) -- short circuit evaluation
-			
-			addr = vm.bytecode_len
-			
-			vm:emit16(0)
 			
 			expression(vm, e3d.Token.LAND)
 			
-			if vm.expr_type.type_id ~= e3d.EVMType.INT then
+			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
+			else
 				vm.error = string.format(
-					"COMPILE ERROR: line %d: invalid rvalue type for operator '||', expected `int`, got `%s`\n",
+					"COMPILE ERROR: line %d: invalid rvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
 					e3d.get_type_name(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
 			end
-
-			vm:emitop(e3d.Opcode.ITOB)
 			
-			-- patch JUMP_NZD address
+			-- patch JUMP_NZD/JUMP_NNULLD address
 			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)
 			vm.bytecode[addr + 1] = ((vm.bytecode_len) & 0xFF)
 			
@@ -1676,35 +1695,38 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				<expr1> && <expr2>
 
 				<expr1>
-				JUMP_ZD b
+				JUMP_ZD b or JUMP_NULLD b
 				<expr2>
-				ITOB
+				ITOB or PTOB
 				b:
 			]]
 
 			match(vm, e3d.Token.LAND)
 
-			if vm.expr_type.type_id ~= e3d.EVMType.INT then
+			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+				-- short circuit evaluation
+				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_ZD or e3d.Opcode.JUMP_NULLD)
+				
+				addr = vm.bytecode_len
+				
+				vm:emit16(0)
+			else
 				vm.error = string.format(
-					"COMPILE ERROR: line %d: invalid lvalue type for operator '&&', expected `int`, got `%s`\n",
+					"COMPILE ERROR: line %d: invalid lvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
 					e3d.get_type_name(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
 			end
-			
-			vm:emitop(e3d.Opcode.JUMP_ZD) -- short circuit evaluation
-			
-			addr = vm.bytecode_len
-			
-			vm:emit16(0)
 
 			expression(vm, e3d.Token.OR)
 			
-			if vm.expr_type.type_id ~= e3d.EVMType.INT then
+			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
+			else
 				vm.error = string.format(
-					"COMPILE ERROR: line %d: invalid rvalue type for operator '&&', expected `int`, got `%s`\n",
+					"COMPILE ERROR: line %d: invalid rvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
 					e3d.get_type_name(vm.expr_type)
 				)
@@ -1712,9 +1734,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				coroutine.yield()
 			end
 
-			vm:emitop(e3d.Opcode.ITOB)
-
-			-- patch JUMP_ZD address
+			-- patch JUMP_ZD/JUMP_NULLD address
 			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)
 			vm.bytecode[addr + 1] = ((vm.bytecode_len) & 0xFF)
 			
@@ -2565,16 +2585,31 @@ local function statement(vm: *e3d.EVM): void
 		
 		match(vm, e3d.Token.IF)
 		match(vm, '('_u8)
-		-- TODO: type check if, while, and for for ints or pointers
-		--       if pointer use JUMP_NULL
 		expression(vm, e3d.Token.ASSIGN)
+
+		if vm.expr_type.type_id == e3d.EVMType.VOID then
+			vm.error = string.format("COMPILE ERROR: line %d: cannot use expression of type `void` as if statement condition\n", vm.line)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+
+		if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+			vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+
+			b = vm.bytecode_len
+		
+			vm:emit16(0)
+		else
+			vm.error = string.format(
+				"COMPILE ERROR: line %d: invalid type for if statement condition. expected `int` or pointer, got `%s`\n",
+				vm.line,
+				e3d.get_type_name(vm.expr_type)
+			)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+
 		match(vm, ')'_u8)
-
-		vm:emitop(e3d.Opcode.JUMP_Z)
-
-		b = vm.bytecode_len -- store index for jump_z address
-
-		vm:emit16(0)
 
 		statement(vm)
 		if vm.token == e3d.Token.ELSE then
@@ -2837,14 +2872,30 @@ local function statement(vm: *e3d.EVM): void
 		local has_condition: boolean = false
 		if vm.token ~= ';'_u8 then
 			has_condition = true
+
 			expression(vm, e3d.Token.ASSIGN)
-		end
-		
-		if has_condition then
-			vm:emitop(e3d.Opcode.JUMP_Z)
+
+			if vm.expr_type.type_id == e3d.EVMType.VOID then
+				vm.error = string.format("COMPILE ERROR: line %d: cannot use expression of type `void` as loop condition\n", vm.line)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+	
+			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+	
+				b = vm.bytecode_len
 			
-			b = vm.bytecode_len
-			vm:emit16(0)
+				vm:emit16(0)
+			else
+				vm.error = string.format(
+					"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
+					vm.line,
+					e3d.get_type_name(vm.expr_type)
+				)
+				vm.compile_err = true
+				coroutine.yield()
+			end
 		end
 		
 		local step_line: uinteger = vm.line
@@ -2961,13 +3012,32 @@ local function statement(vm: *e3d.EVM): void
 		vm:push_loop(vm.bytecode_len)
 
 		match(vm, '('_u8)
+
 		expression(vm, e3d.Token.ASSIGN)
+
+		if vm.expr_type.type_id == e3d.EVMType.VOID then
+			vm.error = string.format("COMPILE ERROR: line %d: cannot use expression of type `void` as loop condition\n", vm.line)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+
+		if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
+			vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+
+			b = vm.bytecode_len
+		
+			vm:emit16(0)
+		else
+			vm.error = string.format(
+				"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
+				vm.line,
+				e3d.get_type_name(vm.expr_type)
+			)
+			vm.compile_err = true
+			coroutine.yield()
+		end
+		
 		match(vm, ')'_u8)
-
-		vm:emitop(e3d.Opcode.JUMP_Z)
-
-		b = vm.bytecode_len
-		vm:emit16(0)
 
 		statement(vm)
 
@@ -3280,7 +3350,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 			end
 		else
 			if #vm.current_func_id.argdata ~= 0 or vm.current_func_id.is_varargs then
-				vm.error = string.format("COMPILE ERROR: line %d: invalid signature for hook function `%s`, expected `void $s()`\n", vm.line, vm.current_func_id.name, vm.current_func_id.name)
+				vm.error = string.format("COMPILE ERROR: line %d: invalid signature for hook function `%s`, expected `void %s()`\n", vm.line, vm.current_func_id.name, vm.current_func_id.name)
 				vm.compile_err = true
 				coroutine.yield()
 			end

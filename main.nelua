@@ -19,9 +19,7 @@ local function update(): void
 			return
 		end
 		
-		vm:pushf(rl.getFrameTime())
-		vm:push_args(1)
-		if not vm:call_hook(e3d.Hook.UPDATE, 1) then
+		if not vm:call_hook(e3d.Hook.UPDATE) then
 			running_vm = false
 			io.printf(vm.error)
 		end
@@ -37,7 +35,7 @@ local function update(): void
 			vm:dump_bytecode()
 		elseif rl.isKeyPressed(rl.keyboardKey.R) then
 			vm:reset_vm(true)
-			if vm:call_hook(e3d.Hook.INIT, 0) then
+			if vm:call_hook(e3d.Hook.INIT) then
 				running_vm = true
 			else
 				io.printf(vm.error)
@@ -52,7 +50,7 @@ local function draw(): void
 		vm.gpu:enable_render_state()
 		
 		rl.beginMode3D(vm.gpu.cameras[0]) -- configure default camera
-			if not vm:call_hook(e3d.Hook.DRAW3D, 0) then
+			if not vm:call_hook(e3d.Hook.DRAW3D) then
 				running_vm = false
 				io.printf(vm.error)
 			end
@@ -61,7 +59,7 @@ local function draw(): void
 			-- vm.gpu:reset_matrix_stack()
 		rl.endMode3D()
 		
-		if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D, 0)) then
+		if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D)) then
 			running_vm = false
 			io.printf(vm.error)
 		end

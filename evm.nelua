@@ -722,6 +722,8 @@ function e3d.EVM:dump_bytecode(): void
 				io.printf("MODF\n")
 			case e3d.Opcode.LNOT then
 				io.printf("LNOT\n")
+			case e3d.Opcode.LNOTP then
+				io.printf("LNOTP\n")
 			case e3d.Opcode.EQ then
 				io.printf("EQ\n")
 			case e3d.Opcode.EQF then
@@ -776,10 +778,14 @@ function e3d.EVM:dump_bytecode(): void
 				io.printf("JUMP_Z 0x%04X\n", self:next16())
 			case e3d.Opcode.JUMP_ZD then
 				io.printf("JUMP_ZD 0x%04X\n", self:next16())
-			case e3d.Opcode.JUMP_NZ then
-				io.printf("JUMP_NZ 0x%04X\n", self:next16())
 			case e3d.Opcode.JUMP_NZD then
 				io.printf("JUMP_NZD 0x%04X\n", self:next16())
+			case e3d.Opcode.JUMP_NULL then
+				io.printf("JUMP_NULL 0x%04X\n", self:next16())
+			case e3d.Opcode.JUMP_NULLD then
+				io.printf("JUMP_NULLD 0x%04X\n", self:next16())
+			case e3d.Opcode.JUMP_NNULLD then
+				io.printf("JUMP_NNULLD 0x%04X\n", self:next16())
 			case e3d.Opcode.CALL then
 				index = self:next16()
 				local argc: uint16 = self:next16()
@@ -797,6 +803,8 @@ function e3d.EVM:dump_bytecode(): void
 				io.printf("ITOF\n")
 			case e3d.Opcode.ITOB then
 				io.printf("ITOB\n")
+			case e3d.Opcode.PTOB then
+				io.printf("PTOB\n")
 			case e3d.Opcode.API then
 				index = self:next16()
 				local argc: uint16 = self:next16()
@@ -1297,6 +1305,9 @@ function e3d.EVM:run(cycles: uinteger): boolean
 			case e3d.Opcode.LNOT then
 				local v: uint32 = self:popu()
 				self:pushu(v == 0 and 1 or 0)
+			case e3d.Opcode.LNOTP then
+				local v: uint32 = self:popu()
+				self:pushu(v > e3d.RAM_MAX_ADDR and 1 or 0)
 			case e3d.Opcode.EQ then
 				local b: uint32 = self:popu()
 				local a: uint32 = self:popu()
@@ -1599,28 +1610,63 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				else
 					self.osp = self.osp - 1
 				end
-				case e3d.Opcode.JUMP_NZ then
-					index = self:next16()
-					local v: uint32 = self:popu()
-					
-					if v ~= 0 then
+			case e3d.Opcode.JUMP_NZD then
+				-- jump if not zero but only discard value if branch is not taken
+				-- used by || operator
+				index = self:next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+				
+				if v ~= 0 then
+					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 1
+				else
+					self.osp = self.osp - 1
+				end
+			case e3d.Opcode.JUMP_NULL then
+				index = self:next16()
+				local v: uint32 = self:popu()
+
+				if v > e3d.RAM_MAX_ADDR then
 					self.cf.pc = index
 				end
-				case e3d.Opcode.JUMP_NZD then
-					-- jump if not zero but only discard value if branch is not taken
-					-- used by || operator
-					index = self:next16()
-					local v: uint32 = self.opstack[self.osp - 1].u
-					
-					if v ~= 0 then
-						self.cf.pc = index
-						self.opstack[self.osp - 1].u = 1
-					else
-						self.osp = self.osp - 1
+			case e3d.Opcode.JUMP_NULLD then
+				-- jump if null but only discard value if branch is not taken
+				-- used by && operator
+				index = self:next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+
+				if v > e3d.RAM_MAX_ADDR then
+					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 0
+				else
+					self.osp = self.osp - 1
+				end
+			case e3d.Opcode.JUMP_NNULLD then
+				-- jump if not null but only discard value if branch is not taken
+				-- used by || operator
+				index = self:next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+				
+				if v <= e3d.RAM_MAX_ADDR then
+					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 1
+				else
+					self.osp = self.osp - 1
 				end
 			case e3d.Opcode.CALL then
+				if self.csp >= e3d.CALLSTACK_SIZE then
+					self.error = "RUNTIME ERROR: callstack overflow\n"
+					return false
+				end
+
 				index = self:next16()
 				local argc: uint16 = self:next16()
+
+				if self.asp + argc >= e3d.ARGS_SIZE then
+					self.error = "RUNTIME ERROR: argstack overflow\n"
+					return false
+				end
+
 				self:push_args(argc)
 				self:push_callframe(argc)
 				self.cf.pc = index
@@ -1651,11 +1697,23 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self:pushf((@float32)(self:popi()))
 			case e3d.Opcode.ITOB then
 				self:pushu(self:popu() ~= 0 and 1 or 0)
+			case e3d.Opcode.PTOB then
+				self:pushu(self:popu() <= e3d.RAM_MAX_ADDR and 1 or 0)
 			case e3d.Opcode.API then
 				index = self:next16()
 				local argc: uint16 = self:next16()
 				local func: e3d.APIFunction = self.api_funcs[index]
 				if func ~= nilptr then
+					if self.csp >= e3d.CALLSTACK_SIZE then
+						self.error = "RUNTIME ERROR: callstack overflow\n"
+						return false
+					end
+
+					if self.asp + argc >= e3d.ARGS_SIZE then
+						self.error = "RUNTIME ERROR: argstack overflow\n"
+						return false
+					end
+
 					self:push_args(argc)
 					self:push_callframe(argc)
 					if not func(self) then
@@ -1684,10 +1742,18 @@ function e3d.EVM:run(cycles: uinteger): boolean
 	return true
 end
 
-function e3d.EVM:call_hook(hook: integer, argc: uint16): boolean
+function e3d.EVM:call_hook(hook: integer): boolean
 	if self.hook_flags[hook] then
 		self.current_hook = hook
 		self.cf.pc = self.hook_addresses[hook]
+
+		local argc: uint16 = 0
+		if self.current_hook == e3d.Hook.UPDATE then
+			self:pushf(rl.getFrameTime())
+			self:push_args(1)
+			argc = 1
+		end
+
 		self:push_callframe(argc)
 		local result: boolean = self:run(0)
 		self:pop_callframe()

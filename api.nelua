@@ -29,13 +29,12 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	// ... ?
 	
 	// basic graphics
-	void print2d(int x, int y, nchar* fmt, ...);
-	void print3d(vec3 pos, nchar* fmt, ...);
+	void print2d(int x, int y, string fmt, ...);
+	void print3d(vec3 pos, string fmt, ...);
 	
 	// advanced graphics
 	// ortho(), etc.?
 	void normal(vec3 norm);
-	void matrixmode(int mode);
 	
 	// lighting
 	void lightmode(int mode);
@@ -64,66 +63,306 @@ local function api_halt(vm: *e3d.EVM): boolean
 	return false
 end
 
-local function api_printc(vm: *e3d.EVM): boolean
-	local v: uint32 = vm:get_argu(0)
-	io.printf("%c\n", (cchar)(v & 0xFF))
+-- get_ram8() helper function for api_print2D()
+local function _get_ram8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+		return false
+	end
+
+	$c = vm:get_ram8(addr)
+
 	return true
 end
 
-local function api_prints(vm: *e3d.EVM): boolean
-	local s: e3d.EVMString = vm:get_argstr(0)
+-- get_ram32() helper function for api_print2D()
+local function _get_ram32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
+	if addr > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
+		return false
+	elseif (addr & 0b11) ~= 0 then
+		vm.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", addr)
+		return false
+	end
 
-	local addr: uint32 = s.data
+	$v = vm:get_ram32(addr)
 
-	for i = 0, < s.len do
+	return true
+end
+
+-- vargv() helper function.
+-- gets vargv() for the *api* function
+local function _vargv(vm: *e3d.EVM, offset: uint32): uint32
+	vm.cf.vargc = vm.cf.vargc - offset
+	
+	-- get adress vargp currently points to
+	local addr: uint32 = e3d.ARGS_START_ADDR + ((vm.ap + vm.cf.vargp) * 4)
+
+	-- offset vararg pointer
+	vm.cf.vargp = vm.cf.vargp + offset
+
+	return addr
+end
+
+local function _drawchar2D(vm: *e3d.EVM, c: uint8, x: *int32, y: int32, color: rl.color): void
+	local fx: float32 = (@float32)($x)
+	local fy: float32 = (@float32)(y)
+
+	if fx <= -6.0 or y <= -9.0 or color.a == 0 then
+		return
+	end
+
+	if c < ' '_u8 then
+		c = '?'_u8
+	end
+
+	local srcx: float32 = (@float32)((c %%% 32) * 6)
+	local srcy: float32 = (@float32)((c /// 32) * 9)
+
+	local src_rect: rl.rectangle = { srcx, srcy, 6.0, 9.0 };
+	local dest_rect: rl.rectangle = { fx, fy, 6.0, 9.0 };
+
+	rl.drawTexturePro(vm.gpu.gfx_font_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, color)
+
+	$x = $x + 6
+end
+
+local function api_print2D(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void print2D(int x, int y, int color, string fmt, ...);
+
+	local x: int32 = vm:get_argi(0)
+	local y: int32 = vm:get_argi(1)
+	local col: uint32 = vm:get_argu(2)
+	local fmt: e3d.EVMString = vm:get_argstr(3)
+
+	if y >= e3d.VSCREEN_H or x >= e3d.VSCREEN_W then
+		-- we're off screen, no need to render
+		return true
+	end
+
+	local cur_x: int32 = x
+	local start_addr: uint32 = fmt.data
+	local arg_addr: uint32
+	local addr: uint32
+	local arg_val0: e3d.EVMValue
+	local arg_val1: e3d.EVMValue
+	local arg_val2: e3d.EVMValue
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF),
+	}
+
+	-- setup varargs
+	vm.cf.vargp = vm.ap + 5
+	vm.cf.vargc = vm.cf.argc - 5
+	vm.cf.vargf = true
+
+	local i: uinteger = 0
+	while i < fmt.len do
 		local c: uint8
 
-		if addr > e3d.RAM_MAX_ADDR then
-			io.write("\n")
-			io.flush()
-			vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
-			return false
+		-- stop if we're going offscreen
+		if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+			return true
 		end
-	
-		c = vm:get_ram8(addr)
 
-		io.writef("%c", c)
+		addr = start_addr + i
+
+		if not _get_ram8(vm, addr, &c) then return false end
 		
-		addr = addr + 1
+		if c == '%'_u8 then
+			if not _get_ram8(vm, addr + 1, &c) then return false end
+
+			switch c do
+				case 'i'_u8, 'd'_u8 then
+					if vm.cf.vargc < 1 then
+						vm.error = string.format("RUNTIME ERROR: insufficient vararg bytes for format specifier `%%%c`\n", c)
+						return false
+					end
+
+					arg_addr = _vargv(vm, 1)
+					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+
+					vm.sb:clear()
+					vm.sb:writef("%d", arg_val0.i)
+
+					local s: string = vm.sb:view()
+
+					for j = 0, < #s do
+						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+							return true
+						end
+
+						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+					end
+
+					i = i + 1
+				case 'u'_u8 then
+					if vm.cf.vargc < 1 then
+						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%i`\n"
+						return false
+					end
+
+					arg_addr = _vargv(vm, 1)
+					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+
+					vm.sb:clear()
+					vm.sb:writef("%d", arg_val0.u)
+
+					local s: string = vm.sb:view()
+
+					for j = 0, < #s do
+						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+							return true
+						end
+
+						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+					end
+
+					i = i + 1
+				case 'x'_u8 then
+					if vm.cf.vargc < 1 then
+						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%x`\n"
+						return false
+					end
+
+					arg_addr = _vargv(vm, 1)
+					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+
+					vm.sb:clear()
+					vm.sb:writef("%08x", arg_val0.u)
+
+					local s: string = vm.sb:view()
+
+					for j = 0, < #s do
+						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+							return true
+						end
+
+						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+					end
+
+					i = i + 1
+				case 'X'_u8 then
+					if vm.cf.vargc < 1 then
+						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%X`\n"
+						return false
+					end
+
+					arg_addr = _vargv(vm, 1)
+					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+
+					vm.sb:clear()
+					vm.sb:writef("%08X", arg_val0.u)
+
+					local s: string = vm.sb:view()
+
+					for j = 0, < #s do
+						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+							return true
+						end
+
+						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+					end
+
+					i = i + 1
+				case 'f'_u8 then
+					if vm.cf.vargc < 1 then
+						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%f`\n"
+						return false
+					end
+
+					arg_addr = _vargv(vm, 1)
+					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+
+					vm.sb:clear()
+					vm.sb:writef("%.2f", arg_val0.f)
+
+					local s: string = vm.sb:view()
+
+					for j = 0, < #s do
+						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+							return true
+						end
+
+						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+					end
+
+					i = i + 1
+				case 'v'_u8 then
+					if not _get_ram8(vm, addr + 2, &c) then return false end
+
+					switch c do
+						case '2'_u8 then
+							if vm.cf.vargc < 2 then
+								vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%v2`\n"
+								return false
+							end
+		
+							arg_addr = _vargv(vm, 2)
+							if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+							if not _get_ram32(vm, arg_addr + 4, &arg_val1.u) then return false end
+		
+							vm.sb:clear()
+							vm.sb:writef("(%.2f, %.2f)", arg_val0.f, arg_val1.f)
+		
+							local s: string = vm.sb:view()
+		
+							for j = 0, < #s do
+								if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+									return true
+								end
+		
+								_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+							end
+
+							i = i + 2
+						case '3'_u8 then
+							if vm.cf.vargc < 3 then
+								vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%v3`\n"
+								return false
+							end
+		
+							arg_addr = _vargv(vm, 3)
+							if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+							if not _get_ram32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							if not _get_ram32(vm, arg_addr + 8, &arg_val2.u) then return false end
+		
+							vm.sb:clear()
+							vm.sb:writef("(%.2f, %.2f, %.2f)", arg_val0.f, arg_val1.f, arg_val2.f)
+		
+							local s: string = vm.sb:view()
+		
+							for j = 0, < #s do
+								if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+									return true
+								end
+		
+								_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+							end
+
+							i = i + 2
+						else
+							vm.error = string.format("RUNTIME ERROR: invalid format specifier `%%v%c`\n", c)
+							return false
+					end
+				else
+					vm.error = string.format("RUNTIME ERROR: invalid format specifier `%%%c`\n", c)
+					return false
+			end
+		elseif c == '\n'_u8 then
+			cur_x = x
+			y = y + 9
+		else
+			_drawchar2D(vm, c, &cur_x, y, ray_col)
+		end
+
+		i = i + 1
 	end
-	
-	io.write("\n")
-	io.flush()
 
-	return true
-end
-
-local function api_printi(vm: *e3d.EVM): boolean
-	local v: int32 = vm:get_argi(0)
-	local hex: int32 = vm:get_argi(1)
-	if hex ~= 0 then
-		io.printf("0x%08X\n", v)
-	else
-		io.printf("%d\n", v)
-	end
-	return true
-end
-
-local function api_printf(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
-	io.printf("%f\n", v)
-	return true
-end
-
-local function api_printv2(vm: *e3d.EVM): boolean
-	local v: rl.vector2 = vm:get_argv2(0)
-	io.printf("(%f, %f)\n", v.x, v.y)
-	return true
-end
-
-local function api_printv3(vm: *e3d.EVM): boolean
-	local v: rl.vector3 = vm:get_argv3(0)
-	io.printf("(%f, %f, %f)\n", v.x, v.y, v.z)
 	return true
 end
 
@@ -156,7 +395,7 @@ local function api_vargv(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void* vargv(int offset);
 
-	local offset: uint32 = vm:get_argu(0) / 4 -- offset is given in bytes to allow easy use of sizeof()
+	local offset: uint32 = vm:get_argu(0) /// 4 -- offset is given in bytes to allow easy use of sizeof()
 
 	if vm.csp < 1 then
 		-- shouldn't happen, but just in case
@@ -1872,9 +2111,9 @@ function e3d.EVM:register_builtins(): void
 	}
 
 	local constant_ids: []e3d.Identifier = {
-		{name="true",  type_info={e3d.EVMType.INT}, const_val=1},
-		{name="false", type_info={e3d.EVMType.INT}, const_val=0},
-		{name="null",  type_info={e3d.EVMType.INT}, const_val=0} -- TODO: change value to actual null address
+		{name="true",  type_info={e3d.EVMType.INT},                        const_val=1},
+		{name="false", type_info={e3d.EVMType.INT},                        const_val=0},
+		{name="null",  type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, const_val=e3d.NULL}
 	}
 
 	local constructor_ids: []e3d.Identifier = {
@@ -1976,13 +2215,6 @@ end
 function e3d.EVM:register_api(): void
 	local api_ids: []e3d.Identifier = {
 		{name="halt", type_info={e3d.EVMType.VOID}, func=api_halt},
-		
-		{name="printc",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},                            func=api_printc},
-		{name="prints",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.STRING}},                         func=api_prints},
-		{name="printi",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_printi},
-		{name="printf",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}},                          func=api_printf},
-		{name="printv2", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},                           func=api_printv2},
-		{name="printv3", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},                           func=api_printv3},
 
 		{name="vargc", type_info={e3d.EVMType.INT},                                                             func=api_vargc},
 		{name="vargv", type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, argdata={{type_id=e3d.EVMType.INT}}, func=api_vargv},
@@ -2261,6 +2493,19 @@ function e3d.EVM:register_api(): void
 		{name="vertColor",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_vertColor},
 		{name="beginMesh",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_beginMesh},
 		{name="endMesh",         type_info={e3d.EVMType.VOID},                                        func=api_endMesh},
+		{
+			name="print2D",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.STRING}
+			},
+			is_varargs=true,
+			varargs_index=4,
+			func=api_print2D
+		},
 		{
 			name="sprite2D",
 			type_info={e3d.EVMType.VOID},
