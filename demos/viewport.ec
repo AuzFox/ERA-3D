@@ -13,8 +13,9 @@ enum {
 
 // store data for the sub-views
 //
-// position, velocity, clear+fog color
+// position, rotation masks, velocity, clear+fog color
 vec2 positions[SUBVIEW_COUNT];
+vec3 rotation_masks[SUBVIEW_COUNT];
 vec2 velocities[SUBVIEW_COUNT];
 int colors[SUBVIEW_COUNT];
 
@@ -33,12 +34,12 @@ void draw_cube_face() {
     vertex((vec3){0.5, 0.5, 0.5});
 }
 
-// draw a rotating cube
-void draw_cube() {
+// draw a rotated cube
+void draw_cube(vec3 rotation) {
     texture(64, 0, 64, 64);
 
     pushMatrix();
-        rotate((vec3){wrapf(time() * -22.5, 0.0, 360.0), wrapf(time() * -45.0, 0.0, 360.0), 0.0});
+        rotate(rotation);
 		
 		beginMesh(2);
 			vertColor(0xFFFFFFFF);
@@ -73,6 +74,10 @@ void init () {
     colors[0] = 0xFF0000FF;
     colors[1] = 0x00FF00FF;
     colors[2] = 0x0000FFFF;
+
+    rotation_masks[0] = (vec3){1.0, 0.0, 0.0};
+    rotation_masks[1] = (vec3){0.0, 1.0, 0.0};
+    rotation_masks[2] = (vec3){0.0, 0.0, 1.0};
 
     // init sub-view data
     //
@@ -131,7 +136,10 @@ void draw3D() {
     setFogColor(0x000000FF);
     camera3D(0);
 
-    draw_cube();
+    float angle = wrapf(time() * -45.0, 0.0, 360.0);
+    vec3 rotation = (vec3){angle, angle, angle};
+
+    draw_cube(rotation);
 
     // draw sub-views
     for (int i = 0; i < SUBVIEW_COUNT; i = i + 1) {
@@ -144,6 +152,6 @@ void draw3D() {
         setFogColor(col);
         camera3D(i + 1);
 
-        draw_cube();
+        draw_cube(rotation * rotation_masks[i]);
     }
 }

@@ -29,7 +29,6 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	// ... ?
 	
 	// basic graphics
-	void print2d(int x, int y, string fmt, ...);
 	void print3d(vec3 pos, string fmt, ...);
 	
 	// advanced graphics
@@ -46,8 +45,6 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	void* alloc(int size);
 	void* realloc(void* ptr, int size);
 	void free(void* ptr);
-	void memset(void* ptr, int nbytes, int value);
-	void memcpy(void* a, void* b, int nbytes);
 	string strdup(string str);
 	string strcat(string a, string b);
 	string strfmt(string fmt, ...);
@@ -62,6 +59,8 @@ local function api_halt(vm: *e3d.EVM): boolean
 	vm.error = "- PROGRAM HALTED -\n"
 	return false
 end
+
+-- API FUNCTIONS:
 
 -- get_ram8() helper function for api_print2D()
 local function _get_ram8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
@@ -114,6 +113,10 @@ local function _drawchar2D(vm: *e3d.EVM, c: uint8, x: *int32, y: int32, color: r
 
 	if c < ' '_u8 then
 		c = '?'_u8
+	elseif c == ' '_u8 then
+		return
+	elseif c == '\t'_u8 then
+		$x = $x + 12 -- tabs = 2 spaces
 	end
 
 	local srcx: float32 = (@float32)((c %%% 32) * 6)
@@ -366,8 +369,6 @@ local function api_print2D(vm: *e3d.EVM): boolean
 	return true
 end
 
--- API FUNCTIONS:
-
 local function api_vargc(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int vargc();
@@ -552,19 +553,26 @@ end
 
 local function api_wrapi(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int wrapi(int v, int min, int max);
+	-- int wrapi(int x, int min, int max);
 
-	local v: int32 = vm:get_argi(0)
+	local x: int32 = vm:get_argi(0)
 	local min: int32 = vm:get_argi(1)
 	local max: int32 = vm:get_argi(2)
 	
-	local range_size: int32 = max - min + 1;
+	if min == max then
+        vm:pushi(min)
+		return true
+    elseif min > max then
+        min, max = max, min
+    end
 
-	if v < min then
-		v = v + range_size * ((min - v) /// range_size + 1)
-	end
+    -- TODO: code solution for when range is all negative
+    if max < 0 then
+        -- ???
+    end
 
-	vm:pushi(min + (v - min) % range_size)
+    local temp: float32 = max - min
+    vm:pushi(min + ((temp + ((x - min) %%% temp)) %%% temp))
 	
 	return true
 end
@@ -1482,7 +1490,8 @@ local function api_setTextureMode(vm: *e3d.EVM): boolean
 	local mode: uint32 = vm:get_argu(0)
 
 	if mode > 2 then
-		mode = 2
+		vm.error = string.format("RUNTIME ERROR: attempt to set invalid texture mode `%d`", mode)
+		return false
 	end
 
 	vm.gpu.tex_mode = (@cint)(mode)
@@ -1514,9 +1523,11 @@ local function api_setCullMode(vm: *e3d.EVM): boolean
 		case 1 then
 			rlgl.enableBackfaceCulling()
 			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
-		else
+		case 2 then
 			rlgl.disableBackfaceCulling()
-			mode = 2
+		else
+			vm.error = string.format("RUNTIME ERROR: attempt to set invalid cull mode `%d`", mode)
+			return false
 	end
 
 	vm.gpu.cull_mode = mode
@@ -1565,7 +1576,7 @@ local function api_setFogMode(vm: *e3d.EVM): boolean
 
 	local mode: uint32 = vm:get_argu(0)
 
-	if mode > 1 then
+	if mode ~= 0 then
 		mode = 1
 	end
 
@@ -1791,9 +1802,12 @@ local function api_beginMesh(vm: *e3d.EVM): boolean
 			vm.gpu.triangle_mode = true
 			vm.gpu.triangle_vert_index = 0
 			mode = rlgl.QUADS
-		else
+		case 2 then
 			vm.gpu.triangle_mode = false
 			mode = rlgl.QUADS
+		else
+			vm.error = string.format("RUNTIME ERROR: attempt to set invalid primitive mode `%d`", mode)
+			return false
 	end
 
 	rl.beginShaderMode(vm.gpu.gfx_shader)
@@ -1936,15 +1950,16 @@ local function api_matrixMode(vm: *e3d.EVM): boolean
 
 	local mode: uint32 = vm:get_argu(0)
 
-	if mode > 1 then
-		mode = 1
-	end
-
 	switch mode do
 		case 0 then
 			rlgl.matrixMode(rlgl.PROJECTION)
+			vm.gpu.matrix_mode = rlgl.PROJECTION
 		case 1 then
 			rlgl.matrixMode(rlgl.MODELVIEW)
+			vm.gpu.matrix_mode = rlgl.MODELVIEW
+		else
+			vm.error = string.format("RUNTIME ERROR: attempt to set invalid matrix mode `%d`", mode)
+			return false
 	end
 
 	return true
@@ -1954,6 +1969,22 @@ local function api_pushMatrix(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void pushMatrix();
 
+	if vm.gpu.matrix_mode == rlgl.PROJECTION then
+		if vm.gpu.proj_matrix_count >= 24 then
+			vm.error = "RUNTIME ERROR: projection matrix stack overflow\n"
+			return false
+		end
+
+		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count + 1
+	else
+		if vm.gpu.view_matrix_count >= 24 then
+			vm.error = "RUNTIME ERROR: view matrix stack overflow\n"
+			return false
+		end
+
+		vm.gpu.view_matrix_count = vm.gpu.view_matrix_count + 1
+	end
+	
 	rlgl.pushMatrix()
 	
 	return true
@@ -1962,6 +1993,22 @@ end
 local function api_popMatrix(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void popMatrix();
+
+	if vm.gpu.matrix_mode == rlgl.PROJECTION then
+		if vm.gpu.proj_matrix_count == 0 then
+			vm.error = "RUNTIME ERROR: projection matrix stack underflow\n"
+			return false
+		end
+
+		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count - 1
+	else
+		if vm.gpu.view_matrix_count == 0 then
+			vm.error = "RUNTIME ERROR: view matrix stack underflow\n"
+			return false
+		end
+
+		vm.gpu.view_matrix_count = vm.gpu.view_matrix_count - 1
+	end
 
 	rlgl.popMatrix()
 	
@@ -2088,6 +2135,100 @@ local function api_poke32(vm: *e3d.EVM): boolean
 	end
 
 	return true
+end
+
+local function api_memcpy(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void memcpy(void* src, void* dest, int nbytes);
+
+	local src: uint32 = vm:get_argu(0)
+	local dest: uint32 = vm:get_argu(1)
+	local nbytes: uint32 = vm:get_argu(2)
+
+	if src > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memcpy src address 0x%08X\n", src)
+		return false
+	end
+
+	if src + (nbytes - 1) > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memcpy src end address 0x%08X\n", src + (nbytes - 1))
+		return false
+	end
+
+	if dest > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memcpy dest address 0x%08X\n", dest)
+		return false
+	end
+
+	if dest + (nbytes - 1) > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memcpy dest end address 0x%08X\n", dest + (nbytes - 1))
+		return false
+	end
+
+	if src == dest then
+		return true
+	elseif src < dest then
+		-- copy from the end
+		src = src + (nbytes - 1)
+		dest = dest + (nbytes - 1)
+
+		for i = 0, < nbytes do
+			local byte: uint8 = vm:get_ram8(src)
+
+			if not vm:set_ram8(dest, byte) then
+				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+				return false
+			end
+
+			src = src - 1
+			dest = dest - 1
+		end
+	else
+		-- copy from the beginning
+		for i = 0, < nbytes do
+			local byte: uint8 = vm:get_ram8(src)
+
+			if not vm:set_ram8(dest, byte) then
+				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+				return false
+			end
+
+			src = src + 1
+			dest = dest + 1
+		end
+	end
+
+	return true
+end
+
+local function api_memset(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void memset(void* dest, int nbytes, int value);
+
+	local dest: uint32 = vm:get_argu(0)
+	local nbytes: uint32 = vm:get_argu(1)
+	local value: uint8 = vm:get_argu(2) & 0xFF
+
+	if dest > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memset dest address 0x%08X\n", dest)
+		return false
+	end
+
+	if dest + (nbytes - 1) > e3d.RAM_MAX_ADDR then
+		vm.error = string.format("RUNTIME ERROR: invalid memset dest end address 0x%08X\n", dest + (nbytes - 1))
+		return false
+	end
+
+	for i = 0, < nbytes do
+		if not vm:set_ram8(dest, value) then
+			vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+			return false
+		end
+
+		dest = dest + 1
+	end
+
+	return true;
 end
 
 function e3d.EVM:register_builtins(): void
@@ -2564,6 +2705,26 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT}
 			},
 			func=api_poke32
+		},
+		{
+			name="memcpy",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
+			},
+			func=api_memcpy
+		},
+		{
+			name="memset",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT},
+				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
+			},
+			func=api_memset
 		},
 	}
 

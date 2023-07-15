@@ -1,105 +1,50 @@
 require("arg")
 require("ecc")
 require("evm")
+require("state_boot")
+require("state_main")
+require("state_run")
 
 global vm: *e3d.EVM
-global running_vm: boolean
+global sm: StateMachine
 
 local function init(): void
 	vm = e3d.new_vm()
 	e3d.set_default_btnmap()
 
-	running_vm = false
-end
+	sm.states = {
+		{
+			state_boot_init,
+			state_boot_update,
+			state_boot_draw
+		},
+		{
+			state_main_init,
+			state_main_update,
+			state_main_draw
+		},
+		{
+			state_run_init,
+			state_run_update,
+			state_run_draw
+		}
+	}
 
-local function update(): void
-	if running_vm then
-		if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
-			running_vm = false
-			return
-		end
-		
-		if not vm:call_hook(e3d.Hook.UPDATE) then
-			running_vm = false
-			io.printf(vm.error)
-		end
-	else
-		if rl.isKeyPressed(rl.keyboardKey.C) then
-			if vm:compile_file(arg[1]) then
-				print("-- COMPILE SUCCESS --")
-			else
-				io.printf(vm.error)
-			end
-		elseif rl.isKeyPressed(rl.keyboardKey.B) then
-			print("-- BYTECODE --")
-			vm:dump_bytecode()
-		elseif rl.isKeyPressed(rl.keyboardKey.R) then
-			vm:reset_vm(true)
-			if vm:call_hook(e3d.Hook.INIT) then
-				running_vm = true
-			else
-				io.printf(vm.error)
-			end
-		end
-	end
-end
-
-local function draw(): void
-	if running_vm then
-		
-		vm.gpu:enable_render_state()
-		
-		rl.beginMode3D(vm.gpu.cameras[0]) -- configure default camera
-			if not vm:call_hook(e3d.Hook.DRAW3D) then
-				running_vm = false
-				io.printf(vm.error)
-			end
-
-			-- TODO: pop all extra matrices!
-			-- vm.gpu:reset_matrix_stack()
-		rl.endMode3D()
-		
-		if running_vm and (not vm:call_hook(e3d.Hook.DRAW2D)) then
-			running_vm = false
-			io.printf(vm.error)
-		end
-		
-		vm.gpu:disable_render_state()
-		
-		rl.beginDrawing()
-			rl.clearBackground(rl.BLACK)
-
-			local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.VSCREEN_W), -(@float32)(e3d.VSCREEN_H) };
-		    local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.SCREEN_W), (@float32)(e3d.SCREEN_H) };
-
-			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
-			rl.drawFPS(0,0)
-		rl.endDrawing()
-	else
-		rl.beginDrawing()
-			rl.clearBackground(rl.RAYWHITE)
-			rl.drawFPS(0,0)
-			
-			rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
-			rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
-			rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
-		rl.endDrawing()
-	end
-
+	sm:init(vm)
 end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		update()
+		sm:update_state(vm)
 
 		-- update render settings
-		if running_vm and vm.gpu.update_tex then
-			vm.gpu.update_tex = false
-
+		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
 			rl.updateTexture(vm.gpu.gfx_texture, &vm.tmem)
+			vm.gpu.update_tex = false
 		end
 
-		draw()
+		sm:draw_state(vm)
+		sm:set_queued_state()
 	end
 end
 

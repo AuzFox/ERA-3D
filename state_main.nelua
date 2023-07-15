@@ -1,0 +1,39 @@
+require("arg")
+require("statemachine")
+
+global function state_main_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function state_main_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    if rl.isKeyPressed(rl.keyboardKey.B) then
+        print("-- BYTECODE --")
+        vm:dump_bytecode()
+    elseif (rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)) and rl.isKeyPressed(rl.keyboardKey.R) then
+        if vm:compile_file(arg[1]) then
+            vm:reset_vm(true)
+            
+            if vm:call_hook(e3d.Hook.INIT) then
+                sm.queued_state = StateID.RUN -- switch to run state next frame
+            else
+                io.printf(vm.error)
+            end
+        else
+            io.printf(vm.error)
+        end
+    end
+
+    return StateID.MAIN
+end
+
+global function state_main_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    rl.beginDrawing()
+        rl.clearBackground(rl.RAYWHITE)
+        rl.drawFPS(0,0)
+        
+        rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
+        rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
+        rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
+    rl.endDrawing()
+
+    return StateID.MAIN
+end

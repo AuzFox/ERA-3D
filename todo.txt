@@ -1,6 +1,5 @@
 GENERAL:
-- fix TODOs
-- cleanup+refactor nasty code
+- cleanup+refactor nasty code (looking at you, operator_type_check())
 - implement safeguards on everything
 
 COMPILER:
@@ -15,7 +14,7 @@ COMPILER:
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
 VM:
-- optimize text rendering
+- complete wrapi() and wrapf() negative ranges
 - revise memory map
 - implement debug opcodes
 - implement vertex-lighting mode and api

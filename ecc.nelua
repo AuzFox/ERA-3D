@@ -8,7 +8,6 @@ function e3d.Struct:add_member(member: *e3d.Identifier): void
 end
 
 function e3d.Struct:has_member(name: string): boolean
-	-- TODO: search members in nested structs?
 	return self.member_map:has(name)
 end
 

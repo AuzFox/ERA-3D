@@ -1,0 +1,12 @@
+require("statemachine")
+
+global function state_boot_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function state_boot_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.BOOT
+end
+
+global function state_boot_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.BOOT
+end

@@ -1,0 +1,52 @@
+require("statemachine")
+
+global function state_run_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function state_run_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        return StateID.MAIN
+    end
+    
+    if not vm:call_hook(e3d.Hook.UPDATE) then
+        return StateID.MAIN
+    end
+
+    return StateID.RUN
+end
+
+global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    local return_state: integer = StateID.RUN
+
+    vm.gpu:enable_render_state()
+	
+    rl.beginMode3D(vm.gpu.cameras[0]) -- configure default camera
+        if not vm:call_hook(e3d.Hook.DRAW3D) then
+            io.printf(vm.error)
+
+            return_state = StateID.MAIN
+        end
+
+        vm.gpu:reset_matrix_stack()
+    rl.endMode3D()
+    
+    if return_state == StateID.RUN and (not vm:call_hook(e3d.Hook.DRAW2D)) then
+        io.printf(vm.error)
+
+        return_state = StateID.MAIN
+    end
+    
+    vm.gpu:disable_render_state()
+    
+    rl.beginDrawing()
+        rl.clearBackground(rl.BLACK)
+
+        local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.VSCREEN_W), -(@float32)(e3d.VSCREEN_H) };
+        local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.SCREEN_W), (@float32)(e3d.SCREEN_H) };
+
+        rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+        rl.drawFPS(0,0)
+    rl.endDrawing()
+
+    return return_state
+end

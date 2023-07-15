@@ -352,6 +352,10 @@ global e3d.GPU = @record {
 	triangle_vert_color: rl.color,
 	triangle_vert_uv: rl.vector2,
 	triangle_vert_pos: rl.vector3,
+
+	proj_matrix_count: uinteger, -- used to track matrix stack
+	view_matrix_count: uinteger, -- used to track matrix stack
+	matrix_mode: uinteger,
 	
 	-- graphics state
 	cull_mode: uinteger,
@@ -664,6 +668,22 @@ function e3d.GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
+function e3d.GPU:reset_matrix_stack(): void
+	rlgl.matrixMode(rlgl.PROJECTION)
+
+	while self.proj_matrix_count > 0 do
+		rlgl.popMatrix()
+		self.proj_matrix_count = self.proj_matrix_count - 1
+	end
+
+	rlgl.matrixMode(rlgl.MODELVIEW)
+
+	while self.view_matrix_count > 0 do
+		rlgl.popMatrix()
+		self.view_matrix_count = self.view_matrix_count - 1
+	end
+end
+
 function e3d.GPU:enable_render_state(): void
 	rl.beginTextureMode(self.gfx_rendertex)
 
@@ -686,6 +706,8 @@ function e3d.GPU:enable_render_state(): void
 
 	rlgl.enableScissorTest()
 	rlgl.scissor(0, 0, e3d.VSCREEN_W, e3d.VSCREEN_H)
+
+	self.matrix_mode = rlgl.MODELVIEW
 end
 
 function e3d.GPU:disable_render_state(): void
@@ -694,7 +716,7 @@ function e3d.GPU:disable_render_state(): void
 	rlgl.disableWireMode()
 	rlgl.disableScissorTest()
 
-	-- TODO: pop all extra matrices!
+	self:reset_matrix_stack()
 
 	rl.endTextureMode()
 end
@@ -730,6 +752,8 @@ function e3d.GPU:reset(): void
 
 	self.viewport_w = e3d.VSCREEN_W
 	self.viewport_h = e3d.VSCREEN_H
+	self.proj_matrix_count = 0
+	self.view_matrix_count = 0
 end
 
 function e3d.GPU:init(tmem: *rl.color): void

@@ -1,0 +1,61 @@
+require("e3d")
+
+global StateID = @enum {
+    BOOT = 0,
+    MAIN,
+    RUN,
+    COUNT
+}
+
+global State <forwarddecl> = @record {}
+global StateMachine <forwarddecl> = @record {}
+
+global StateInitFunction: type = @function(*State, *StateMachine, *e3d.EVM): void
+global StateFunction: type = @function(*State, *StateMachine, *e3d.EVM): integer
+
+State = @record {
+    init: StateInitFunction,
+    update: StateFunction,
+    draw: StateFunction,
+    metadata: pointer -- generic metadata pointer
+}
+
+StateMachine = @record {
+    states: [StateID.COUNT]State,
+    state_id: integer,
+    state_ptr: *State,
+    queued_state: integer
+}
+
+function StateMachine:init_state(vm: *e3d.EVM): void
+    self.state_ptr.init(self.state_ptr, self, vm)
+end
+
+function StateMachine:update_state(vm: *e3d.EVM): void
+    self.state_id = self.state_ptr.update(self.state_ptr, self, vm)
+    self.state_ptr = &self.states[self.state_id]
+end
+
+function StateMachine:draw_state(vm: *e3d.EVM): void
+    self.state_id = self.state_ptr.draw(self.state_ptr, self, vm)
+    self.state_ptr = &self.states[self.state_id]
+end
+
+function StateMachine:init(vm: *e3d.EVM): void
+    for i = 0, < StateID.COUNT do
+        local st: *State = &self.states[i]
+        st.init(st, self, vm)
+    end
+    
+    self.state_id = StateID.MAIN -- start with main state
+    self.state_ptr = &self.states[self.state_id]
+    self.queued_state = -1
+end
+
+function StateMachine:set_queued_state(): void
+    if self.queued_state ~= -1 then
+        self.state_id = self.queued_state
+        self.state_ptr = &self.states[self.state_id]
+        self.queued_state = -1
+    end
+end
