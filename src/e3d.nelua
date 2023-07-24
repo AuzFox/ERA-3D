@@ -8,6 +8,8 @@ require("memory")
 require("allocators.default")
 require("math")
 require("coroutine")
+
+require("blipkit")
 require("raylib")
 require("rlgl")
 
@@ -324,6 +326,7 @@ global e3d.APIFunction: type = @function(vm: *e3d.EVM): boolean
 
 -- holds graphics information for the vm
 global e3d.GPU = @record {
+	tmem: [e3d.TMEM_SIZE]rl.color,
 	cameras: [e3d.CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
@@ -371,6 +374,22 @@ global e3d.GPU = @record {
 	fog_color: rl.vector4,
 	viewport_w: cint,
 	viewport_h: cint
+}
+
+global e3d.TrackObject = @record {
+	bk_callback: BKCallback,
+	bk_track: *BKTrack,
+	bk_divider: *BKDivider,
+	track_index: uint8
+}
+
+global e3d.SoundChip = @record {
+	amem: [e3d.SMEM_SIZE]uint8, -- song, chain, phrase, instrument, and state data
+	wmem: [e3d.WMEM_SIZE]uint8, -- sample audio data
+	audio_buffer: [e3d.SOUNDCHIP_FRAMES_PER_UPDATE * 2]BKFrame, -- working audio buffer
+	track_objects: [e3d.SOUNDCHIP_TRACK_COUNT]e3d.TrackObject,
+	bk_context: *BKContext,
+	audio_stream: rl.audioStream,
 }
 
 -- union used internally by the vm to store values of different types
@@ -439,7 +458,6 @@ e3d.Identifier = @record {
 e3d.EVM = @record {
 	-- vm vars
 	heap: [e3d.HEAP_SIZE]uint8,
-	tmem: [e3d.TMEM_SIZE]rl.color,
 	globals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
 	locals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
 	args: [e3d.ARGS_SIZE]e3d.EVMValue,
@@ -498,6 +516,7 @@ e3d.EVM = @record {
 	loop_del_l_stack: sequence(uint16),
 	
 	-- general vars
+	soundchip: e3d.SoundChip,
 	gpu: e3d.GPU,
 	error: string,
 	init_time: float64
@@ -756,7 +775,7 @@ function e3d.GPU:reset(): void
 	self.view_matrix_count = 0
 end
 
-function e3d.GPU:init(tmem: *rl.color): void
+function e3d.GPU:init(): void
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_HIGHDPI) -- enable vsync and HighDPI
 	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
@@ -767,17 +786,17 @@ function e3d.GPU:init(tmem: *rl.color): void
 
 	self.gfx_rendertex = rl.loadRenderTexture(e3d.VSCREEN_W, e3d.VSCREEN_H)
 
-	local img: rl.image = rl.loadImage("test.png")
+	local img: rl.image = rl.loadImage("assets/test.png")
 	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
 		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
 	end
-	memory.copy(tmem, img.data, e3d.TMEM_SIZE * #rl.color)
+	memory.copy(self.tmem, img.data, e3d.TMEM_SIZE * #rl.color)
 	self.gfx_texture = rl.loadTextureFromImage(img)
 	rl.unloadImage(img)
 
-	self.gfx_font_texture = rl.loadTexture("font.png")
+	self.gfx_font_texture = rl.loadTexture("assets/font.png")
 	
-	self.gfx_shader = rl.loadShader(nilptr, "shader.fs")
+	self.gfx_shader = rl.loadShader(nilptr, "assets/shader.fs")
 	
 	self.tex_mode_loc = rl.getShaderLocation(self.gfx_shader, "texMode")
 	self.tex_x_loc = rl.getShaderLocation(self.gfx_shader, "texX")
@@ -799,4 +818,68 @@ function e3d.GPU:cleanup(): void
 	rl.unloadRenderTexture(self.gfx_rendertex)
 
 	rl.closeWindow()
+end
+
+function e3d.SoundChip:init(): void
+	rl.initAudioDevice()
+
+	rl.setAudioStreamBufferSizeDefault(e3d.SOUNDCHIP_FRAMES_PER_UPDATE)
+
+	-- create audio stream (44100hz, 16 bit stereo)
+	self.audio_stream = rl.loadAudioStream(44100, 16, 2)
+
+	-- init BlipKit stuff
+	BKContextAlloc(&self.bk_context, 2, 44100)
+
+	for i = 0, < e3d.SOUNDCHIP_TRACK_COUNT do
+		local tobj: e3d.TrackObject
+		tobj = {
+			bk_callback = {
+				func = divider_callback,
+				userInfo = &tobj
+			},
+			track_index = i
+		}
+
+		--[[
+		openmpt tempo calculations:
+		https://wiki.openmpt.org/Manual:_Song_Properties#Modern_Tempo_Mode
+
+		bpm
+		rpb (rows per beat)
+		tpr (ticks per row)
+
+		ticks per second = (bpm * rpb * tpr) / 60 seconds
+
+		(125 bpm * 4 rpb * 6 tpr) / 60 secs = 50 ticks per second!!! (same as LSDJ)
+
+		set clock to ticks per second, set divider to ticks per row
+
+		]]
+
+		BKTrackAlloc(&tobj.bk_track, BK_SQUARE)
+		BKSetAttr(tobj.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 6)
+		BKSetAttr(tobj.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 2)
+		BKTrackAttach(tobj.bk_track, self.bk_context)
+		BKDividerAlloc(&tobj.bk_divider, 4, &tobj.bk_callback)
+		BKContextAttachDivider(self.bk_context, tobj.bk_divider, BK_CLOCK_TYPE_BEAT)
+
+		self.track_objects[i] = tobj
+	end
+
+	rl.playAudioStream(self.audio_stream)
+end
+
+function e3d.SoundChip:cleanup(): void
+	rl.unloadAudioStream(self.audio_stream)
+	rl.closeAudioDevice()
+
+	for i = 0, < e3d.SOUNDCHIP_TRACK_COUNT do
+		local tobj: e3d.TrackObject = self.track_objects[i]
+
+		BKDispose(tobj.bk_track)
+		BKDispose(tobj.bk_divider)
+	end
+
+	BKDispose(self.bk_context)
 end

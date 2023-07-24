@@ -1,0 +1,20 @@
+audio data layout:
+
+8 tracks, sample-based audio
+
+BlipKit library?
+
+LSDJ/M8 Tracker model (song -> chain -> phrase -> instrument -> samples)
+
+metadata = ??? bytes
+song = 256 bytes * 8 tracks
+chain = 16 * 2 bytes * 255 chains
+phrase = 16 * 12 bytes * 255 chains
+inst = ??? bytes * 255 instruments
+samples = ??? bytes * 128(?) samples
+total = 0xE720 bytes + instr bytes + sample bytes
+
+instrument:
+sample index: 1 byte
+asdr env: 4 bytes
+

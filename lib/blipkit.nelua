@@ -1,0 +1,748 @@
+## cinclude "blipkit/BlipKit.h"
+
+## linklib "blipkit"
+## linklib "m" -- need to link with the math library
+
+global FILE: type <cimport,nodecl,cincomplete> = @record{}
+global BKInt: type <cimport,nodecl> = @int32
+global BKUInt: type <cimport,nodecl> = @uint32
+global BKFrame: type <cimport,nodecl> = @int16
+global BKSize: type <cimport,nodecl> = @isize
+global BKUSize: type <cimport,nodecl> = @usize
+global BKFInt20: type <cimport,nodecl> = @int32
+global BKFUInt20: type <cimport,nodecl> = @uint32
+global BKEnum: type <cimport,nodecl> = @cuint
+global BKTime: type <cimport,nodecl> = @int64
+global BKContext: type <cimport,nodecl,forwarddecl> = @record{}
+global BKCallbackInfo: type <cimport,nodecl,forwarddecl> = @record{}
+global BKCallback: type <cimport,nodecl,forwarddecl> = @record{}
+global BKCallbackFunc: type <cimport,nodecl> = @function(info: *BKCallbackInfo, userInfo: pointer): BKEnum
+BKCallback = @record{
+  func: BKCallbackFunc,
+  userInfo: pointer
+}
+BKCallbackInfo = @record{
+  object: pointer,
+  event: BKEnum,
+  nextTime: BKTime,
+  divider: BKUInt
+}
+global BK_CONTEXT_ATTR_TYPE: cint <comptime> = 4096
+global BK_NUM_CHANNELS: cint <comptime> = 4097
+global BK_SAMPLE_RATE: cint <comptime> = 4098
+global BK_TIME: cint <comptime> = 4099
+global BK_PULSE_KERNEL: cint <comptime> = 4100
+global BK_TRACK_ATTR_TYPE: cint <comptime> = 8192
+global BK_WAVEFORM: cint <comptime> = 8193
+global BK_DUTY_CYCLE: cint <comptime> = 8194
+global BK_PERIOD: cint <comptime> = 8195
+global BK_PHASE: cint <comptime> = 8196
+global BK_PHASE_WRAP: cint <comptime> = 8197
+global BK_NUM_PHASES: cint <comptime> = 8198
+global BK_MASTER_VOLUME: cint <comptime> = 8199
+global BK_VOLUME: cint <comptime> = 8200
+global BK_VOLUME_0: cint <comptime> = 8201
+global BK_VOLUME_1: cint <comptime> = 8202
+global BK_VOLUME_2: cint <comptime> = 8203
+global BK_VOLUME_3: cint <comptime> = 8204
+global BK_VOLUME_4: cint <comptime> = 8205
+global BK_VOLUME_5: cint <comptime> = 8206
+global BK_VOLUME_6: cint <comptime> = 8207
+global BK_VOLUME_7: cint <comptime> = 8208
+global BK_MUTE: cint <comptime> = 8209
+global BK_PITCH: cint <comptime> = 8210
+global BK_SAMPLE_RANGE: cint <comptime> = 8211
+global BK_SAMPLE_REPEAT: cint <comptime> = 8212
+global BK_SAMPLE_SUSTAIN_RANGE: cint <comptime> = 8213
+global BK_SAMPLE_IMMED_RELEASE: cint <comptime> = 8214
+global BK_SAMPLE_PERIOD: cint <comptime> = 8215
+global BK_SAMPLE_PITCH: cint <comptime> = 8216
+global BK_SAMPLE_CALLBACK: cint <comptime> = 8217
+global BK_FLAG_RELEASE: cint <comptime> = 8218
+global BK_NOTE: cint <comptime> = 8219
+global BK_ARPEGGIO: cint <comptime> = 8220
+global BK_PANNING: cint <comptime> = 8221
+global BK_INSTRUMENT: cint <comptime> = 8222
+global BK_CLOCK_PERIOD: cint <comptime> = 8223
+global BK_ARPEGGIO_DIVIDER: cint <comptime> = 8224
+global BK_EFFECT_DIVIDER: cint <comptime> = 8225
+global BK_INSTRUMENT_DIVIDER: cint <comptime> = 8226
+global BK_TRIANGLE_IGNORES_VOLUME: cint <comptime> = 8227
+global BK_DATA_ATTR_TYPE: cint <comptime> = 12288
+global BK_NUM_FRAMES: cint <comptime> = 12289
+global BK_WAVEFORM_TYPE: cint <comptime> = 16384
+global BK_SQUARE: cint <comptime> = 16385
+global BK_TRIANGLE: cint <comptime> = 16386
+global BK_NOISE: cint <comptime> = 16387
+global BK_SAWTOOTH: cint <comptime> = 16388
+global BK_SINE: cint <comptime> = 16389
+global BK_CUSTOM: cint <comptime> = 16390
+global BK_SAMPLE: cint <comptime> = 16391
+global BK_EFFECT_TYPE: cint <comptime> = 20480
+global BK_EFFECT_VOLUME_SLIDE: cint <comptime> = 20481
+global BK_EFFECT_PANNING_SLIDE: cint <comptime> = 20482
+global BK_EFFECT_PORTAMENTO: cint <comptime> = 20483
+global BK_EFFECT_TREMOLO: cint <comptime> = 20484
+global BK_EFFECT_VIBRATO: cint <comptime> = 20485
+global BK_EVENT_TYPE: cint <comptime> = 24576
+global BK_EVENT_CLOCK: cint <comptime> = 24577
+global BK_EVENT_DIVIDER: cint <comptime> = 24578
+global BK_EVENT_SAMPLE_BEGIN: cint <comptime> = 24579
+global BK_EVENT_SAMPLE_RESET: cint <comptime> = 24580
+global BK_NO_REPEAT: cint <comptime> = 0
+global BK_REPEAT: cint <comptime> = 1
+global BK_PALINDROME: cint <comptime> = 2
+global BK_PULSE_KERNEL_SINC: cint <comptime> = 0
+global BK_PULSE_KERNEL_HARM: cint <comptime> = 1
+global BK_SUCCESS: cint <cimport,nodecl,const>
+global BK_RETURN_TYPE: cint <cimport,nodecl,const>
+global BK_ALLOCATION_ERROR: cint <cimport,nodecl,const>
+global BK_INVALID_ATTRIBUTE: cint <cimport,nodecl,const>
+global BK_INVALID_VALUE: cint <cimport,nodecl,const>
+global BK_INVALID_STATE: cint <cimport,nodecl,const>
+global BK_INVALID_NUM_CHANNELS: cint <cimport,nodecl,const>
+global BK_INVALID_NUM_FRAMES: cint <cimport,nodecl,const>
+global BK_INVALID_NUM_BITS: cint <cimport,nodecl,const>
+global BK_INVALID_RETURN_VALUE: cint <cimport,nodecl,const>
+global BK_FILE_ERROR: cint <cimport,nodecl,const>
+global BK_FILE_NOT_READABLE_ERROR: cint <cimport,nodecl,const>
+global BK_FILE_NOT_WRITABLE_ERROR: cint <cimport,nodecl,const>
+global BK_FILE_NOT_SEEKABLE_ERROR: cint <cimport,nodecl,const>
+global BK_OTHER_ERROR: cint <cimport,nodecl,const>
+global BKBuffer: type <cimport,nodecl,forwarddecl> = @record{}
+global BKBufferPulse: type <cimport,nodecl,forwarddecl> = @record{}
+BKBuffer = @record{
+  time: BKFUInt20,
+  capacity: BKUInt,
+  accum: BKInt,
+  frames: [4129]BKInt,
+  pulse: *BKBufferPulse
+}
+BKBufferPulse = @record{
+  frames: [32][32]BKFrame
+}
+global BKClass: type <cimport,nodecl,forwarddecl> = @record{}
+global BKObject: type <cimport,nodecl,forwarddecl> = @record{}
+global BKSetAttrFunc: type <cimport,nodecl> = @function(object: pointer, attr: BKEnum, value: BKInt): BKInt
+global BKGetAttrFunc: type <cimport,nodecl> = @function(object: pointer, attr: BKEnum, outValue: *BKInt): BKInt
+global BKSetPtrFunc: type <cimport,nodecl> = @function(object: pointer, attr: BKEnum, ptr: pointer, size: BKSize): BKInt
+global BKGetPtrFunc: type <cimport,nodecl> = @function(object: pointer, attr: BKEnum, outPtr: pointer, size: BKSize): BKInt
+global BKDisposeFunc: type <cimport,nodecl> = @function(object: pointer): void
+global BKObjectFlag: type = @cint
+global BKObjectFlagInitialized: cint <cimport,nodecl,const>
+global BKObjectFlagAllocated: cint <cimport,nodecl,const>
+global BKObjectFlagLocked: cint <cimport,nodecl,const>
+global BKObjectFlagMask: cint <cimport,nodecl,const>
+global BKObjectFlagUsableMask: cint <cimport,nodecl,const>
+BKClass = @record{
+  flags: BKUInt,
+  instanceSize: BKSize,
+  dispose: BKDisposeFunc,
+  setAttr: BKSetAttrFunc,
+  getAttr: BKGetAttrFunc,
+  setPtr: BKSetPtrFunc,
+  getPtr: BKGetPtrFunc
+}
+BKObject = @record{
+  flags: BKUInt,
+  isa: *BKClass
+}
+global BKDivider: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDividerGroup: type <cimport,nodecl,forwarddecl> = @record{}
+global BKClock: type <cimport,nodecl,forwarddecl> = @record{}
+BKDivider = @record{
+  object: BKObject,
+  group: *BKDividerGroup,
+  prevDivider: *BKDivider,
+  nextDivider: *BKDivider,
+  callback: BKCallback,
+  divider: BKInt,
+  counter: BKInt
+}
+BKDividerGroup = @record{
+  firstDivider: *BKDivider,
+  lastDivider: *BKDivider
+}
+BKClock = @record{
+  object: BKObject,
+  ctx: pointer,
+  prevClock: *BKClock,
+  nextClock: *BKClock,
+  period: BKTime,
+  time: BKTime,
+  nextTime: BKTime,
+  counter: BKUInt,
+  callback: BKCallback,
+  dividers: BKDividerGroup
+}
+global BKUnit: type <cimport,nodecl,forwarddecl> = @record{}
+global BKGenerateCallback: type <cimport,nodecl> = @function(nextTime: *BKTime, info: pointer): BKEnum
+global BK_CLOCK_TYPE_EFFECT: cint <comptime> = 0
+global BK_CLOCK_TYPE_BEAT: cint <comptime> = 1
+global BK_CONTEXT_FLAG_CLOCK_RESET: cint <comptime> = 1
+global BK_CONTEXT_FLAG_COPY_MASK: cint <comptime> = 0
+BKContext = @record{
+  object: BKObject,
+  flags: BKUInt,
+  numChannels: BKUInt,
+  sampleRate: BKUInt,
+  deltaTime: BKFUInt20,
+  currentTime: BKTime,
+  masterClock: BKClock,
+  effectDividers: BKDividerGroup,
+  beatDividers: BKDividerGroup,
+  firstClock: *BKClock,
+  lastClock: *BKClock,
+  firstUnit: *BKUnit,
+  lastUnit: *BKUnit,
+  channels: *BKBuffer
+}
+global BKData: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDataState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDataInfo: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDataConvertInfo: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDataExportInfo: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDataStateCallback: type <cimport,nodecl> = @function(event: BKEnum, userInfo: pointer): BKInt
+global BK_BIG_ENDIAN: cint <comptime> = 65536
+global BK_LITTLE_ENDIAN: cint <comptime> = 131072
+global BK_ENDIAN_MASK: cint <comptime> = 196608
+global BK_1_BIT_UNSIGNED: cint <comptime> = 1
+global BK_2_BIT_UNSIGNED: cint <comptime> = 2
+global BK_4_BIT_UNSIGNED: cint <comptime> = 3
+global BK_8_BIT_SIGNED: cint <comptime> = 4
+global BK_8_BIT_UNSIGNED: cint <comptime> = 5
+global BK_16_BIT_SIGNED: cint <comptime> = 6
+global BK_DATA_BITS_MASK: cint <comptime> = 15
+global BK_DATA_STATE_EVENT_RESET: cint <comptime> = 0
+global BK_DATA_STATE_EVENT_DISPOSE: cint <comptime> = 1
+BKData = @record{
+  object: BKObject,
+  numBits: BKEnum,
+  sampleRate: BKInt,
+  numFrames: BKUInt,
+  numChannels: BKUInt,
+  samplePitch: BKFInt20,
+  sustainOffset: BKUInt,
+  sustainEnd: BKUInt,
+  frames: *BKFrame,
+  stateList: *BKDataState
+}
+BKDataState = @record{
+  data: *BKData,
+  callback: BKDataStateCallback,
+  callbackUserInfo: pointer,
+  nextState: *BKDataState
+}
+BKDataConvertInfo = @record{
+  sourceSampleRate: BKInt,
+  targetSampleRate: BKInt,
+  targetNumBits: BKEnum,
+  ditherSmoothLength: BKInt,
+  ditherSlope: float32,
+  ditherCurve: float32,
+  threshold: float32
+}
+global BKSequence: type <cimport,nodecl,forwarddecl> = @record{}
+global BKSequenceState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKSequenceFuncs: type <cimport,nodecl,forwarddecl> = @record{}
+global BKSequencePhase: type <cimport,nodecl,forwarddecl> = @record{}
+global BK_SEQUENCE_PHASE_MUTE: cint <comptime> = 0
+global BK_SEQUENCE_PHASE_ATTACK: cint <comptime> = 1
+global BK_SEQUENCE_PHASE_RELEASE: cint <comptime> = 2
+global BK_SEQUENCE_RETURN_NONE: cint <comptime> = 0
+global BK_SEQUENCE_RETURN_STEP: cint <comptime> = 1
+global BK_SEQUENCE_RETURN_REPEAT: cint <comptime> = 2
+global BK_SEQUENCE_RETURN_FINISH: cint <comptime> = 4
+global BK_SEQUENCE_RETURN_ACTIVE_MASK: cint <comptime> = 3
+global BK_SEQUENCE_STEP_MAX: cint <comptime> = 0
+global BK_SEQUENCE_STEP_DIVIDED: cint <comptime> = 1
+BKSequenceFuncs = @record{
+  create: function(outSequence: **BKSequence, funcs: *BKSequenceFuncs, values: pointer, length: BKUInt, sustainOffset: BKUInt, sustainLength: BKUInt): BKInt,
+  step: function(state: *BKSequenceState, level: BKEnum): BKEnum,
+  setValue: function(state: *BKSequenceState, value: BKInt): BKInt,
+  setPhase: function(state: *BKSequenceState, phase: BKEnum): BKInt,
+  copy: function(outCopy: **BKSequence, sequence: *BKSequence): BKInt
+}
+BKSequencePhase = @record{
+  steps: BKUInt,
+  value: BKInt
+}
+BKSequence = @record{
+  funcs: *BKSequenceFuncs,
+  stateList: *BKSequenceState,
+  length: BKInt,
+  sustainOffset: BKInt,
+  sustainLength: BKInt,
+  fracShift: BKInt,
+  state: BKEnum,
+  values: pointer
+}
+BKSequenceState = @record{
+  sequence: *BKSequence,
+  prevState: *BKSequenceState,
+  nextState: *BKSequenceState,
+  phase: BKEnum,
+  steps: BKInt,
+  delta: BKInt,
+  offset: BKInt,
+  value: BKInt,
+  shiftedValue: BKInt,
+  endValue: BKInt
+}
+global BKInstrumentState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKInstrument: type <cimport,nodecl,forwarddecl> = @record{}
+global BKInstrumentStateCallback: type <cimport,nodecl> = @function(event: BKEnum, userInfo: pointer): BKInt
+global BK_SEQUENCE_VOLUME: cint <comptime> = 0
+global BK_SEQUENCE_PANNING: cint <comptime> = 1
+global BK_SEQUENCE_PITCH: cint <comptime> = 2
+global BK_SEQUENCE_DUTY_CYCLE: cint <comptime> = 3
+global BK_MAX_SEQUENCES: cint <comptime> = 4
+global BK_INSTR_STATE_EVENT_RESET: cint <comptime> = 0
+global BK_INSTR_STATE_EVENT_DISPOSE: cint <comptime> = 1
+global BK_INSTR_STATE_EVENT_MUTE: cint <comptime> = 2
+BKInstrumentState = @record{
+  instrument: *BKInstrument,
+  prevState: *BKInstrumentState,
+  nextState: *BKInstrumentState,
+  phase: BKUInt,
+  numActiveSequences: BKInt,
+  callback: BKInstrumentStateCallback,
+  callbackUserInfo: pointer,
+  states: [4]BKSequenceState
+}
+BKInstrument = @record{
+  object: BKObject,
+  numSequences: BKUInt,
+  stateList: *BKInstrumentState,
+  sequences: [4]*BKSequence
+}
+global BKSlideState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKIntervalState: type <cimport,nodecl,forwarddecl> = @record{}
+BKSlideState = @record{
+  endValue: BKInt,
+  steps: BKInt,
+  value: BKInt,
+  stepDelta: BKInt,
+  roundBias: BKInt,
+  valueShift: BKUInt,
+  step: BKInt
+}
+BKIntervalState = @record{
+  delta: BKInt,
+  steps: BKInt,
+  value: BKInt,
+  stepDelta: BKInt,
+  roundBias: BKInt,
+  valueShift: BKUInt,
+  phase: BKUInt,
+  step: BKInt
+}
+global BK_C_0: cint <comptime> = 0
+global BK_C_SH_0: cint <comptime> = 1
+global BK_D_0: cint <comptime> = 2
+global BK_D_SH_0: cint <comptime> = 3
+global BK_E_0: cint <comptime> = 4
+global BK_F_0: cint <comptime> = 5
+global BK_F_SH_0: cint <comptime> = 6
+global BK_G_0: cint <comptime> = 7
+global BK_G_SH_0: cint <comptime> = 8
+global BK_A_0: cint <comptime> = 9
+global BK_A_SH_0: cint <comptime> = 10
+global BK_B_0: cint <comptime> = 11
+global BK_C_1: cint <comptime> = 12
+global BK_C_SH_1: cint <comptime> = 13
+global BK_D_1: cint <comptime> = 14
+global BK_D_SH_1: cint <comptime> = 15
+global BK_E_1: cint <comptime> = 16
+global BK_F_1: cint <comptime> = 17
+global BK_F_SH_1: cint <comptime> = 18
+global BK_G_1: cint <comptime> = 19
+global BK_G_SH_1: cint <comptime> = 20
+global BK_A_1: cint <comptime> = 21
+global BK_A_SH_1: cint <comptime> = 22
+global BK_B_1: cint <comptime> = 23
+global BK_C_2: cint <comptime> = 24
+global BK_C_SH_2: cint <comptime> = 25
+global BK_D_2: cint <comptime> = 26
+global BK_D_SH_2: cint <comptime> = 27
+global BK_E_2: cint <comptime> = 28
+global BK_F_2: cint <comptime> = 29
+global BK_F_SH_2: cint <comptime> = 30
+global BK_G_2: cint <comptime> = 31
+global BK_G_SH_2: cint <comptime> = 32
+global BK_A_2: cint <comptime> = 33
+global BK_A_SH_2: cint <comptime> = 34
+global BK_B_2: cint <comptime> = 35
+global BK_C_3: cint <comptime> = 36
+global BK_C_SH_3: cint <comptime> = 37
+global BK_D_3: cint <comptime> = 38
+global BK_D_SH_3: cint <comptime> = 39
+global BK_E_3: cint <comptime> = 40
+global BK_F_3: cint <comptime> = 41
+global BK_F_SH_3: cint <comptime> = 42
+global BK_G_3: cint <comptime> = 43
+global BK_G_SH_3: cint <comptime> = 44
+global BK_A_3: cint <comptime> = 45
+global BK_A_SH_3: cint <comptime> = 46
+global BK_B_3: cint <comptime> = 47
+global BK_C_4: cint <comptime> = 48
+global BK_C_SH_4: cint <comptime> = 49
+global BK_D_4: cint <comptime> = 50
+global BK_D_SH_4: cint <comptime> = 51
+global BK_E_4: cint <comptime> = 52
+global BK_F_4: cint <comptime> = 53
+global BK_F_SH_4: cint <comptime> = 54
+global BK_G_4: cint <comptime> = 55
+global BK_G_SH_4: cint <comptime> = 56
+global BK_A_4: cint <comptime> = 57
+global BK_A_SH_4: cint <comptime> = 58
+global BK_B_4: cint <comptime> = 59
+global BK_C_5: cint <comptime> = 60
+global BK_C_SH_5: cint <comptime> = 61
+global BK_D_5: cint <comptime> = 62
+global BK_D_SH_5: cint <comptime> = 63
+global BK_E_5: cint <comptime> = 64
+global BK_F_5: cint <comptime> = 65
+global BK_F_SH_5: cint <comptime> = 66
+global BK_G_5: cint <comptime> = 67
+global BK_G_SH_5: cint <comptime> = 68
+global BK_A_5: cint <comptime> = 69
+global BK_A_SH_5: cint <comptime> = 70
+global BK_B_5: cint <comptime> = 71
+global BK_C_6: cint <comptime> = 72
+global BK_C_SH_6: cint <comptime> = 73
+global BK_D_6: cint <comptime> = 74
+global BK_D_SH_6: cint <comptime> = 75
+global BK_E_6: cint <comptime> = 76
+global BK_F_6: cint <comptime> = 77
+global BK_F_SH_6: cint <comptime> = 78
+global BK_G_6: cint <comptime> = 79
+global BK_G_SH_6: cint <comptime> = 80
+global BK_A_6: cint <comptime> = 81
+global BK_A_SH_6: cint <comptime> = 82
+global BK_B_6: cint <comptime> = 83
+global BK_C_7: cint <comptime> = 84
+global BK_C_SH_7: cint <comptime> = 85
+global BK_D_7: cint <comptime> = 86
+global BK_D_SH_7: cint <comptime> = 87
+global BK_E_7: cint <comptime> = 88
+global BK_F_7: cint <comptime> = 89
+global BK_F_SH_7: cint <comptime> = 90
+global BK_G_7: cint <comptime> = 91
+global BK_G_SH_7: cint <comptime> = 92
+global BK_A_7: cint <comptime> = 93
+global BK_A_SH_7: cint <comptime> = 94
+global BK_B_7: cint <comptime> = 95
+global BK_C_8: cint <comptime> = 96
+global BKUnitFlagSampleSustainRange: cint <cimport,nodecl,const>
+global BKUnitFlagSampleSustainJump: cint <cimport,nodecl,const>
+global BKUnitFlagRelease: cint <cimport,nodecl,const>
+global BKUnitFlagsClearMask: cint <cimport,nodecl,const>
+global BKUnitFuncs: type <cimport,nodecl,forwarddecl> = @record{}
+global BKUnitRunFunc: type <cimport,nodecl> = @function(unit: pointer, endTime: BKFUInt20): BKInt
+global BKUnitEndFunc: type <cimport,nodecl> = @function(unit: pointer, time: BKFUInt20): void
+global BKUnitResetFunc: type <cimport,nodecl> = @function(unit: pointer): void
+BKUnit = @record{
+  object: BKObject,
+  ctx: *BKContext,
+  run: BKUnitRunFunc,
+  end_: BKUnitEndFunc,
+  reset: BKUnitResetFunc,
+  prevUnit: *BKUnit,
+  nextUnit: *BKUnit,
+  time: BKFUInt20,
+  period: BKFUInt20,
+  lastPulse: [8]BKInt,
+  waveform: BKEnum,
+  dutyCycle: BKUInt,
+  volume: [8]BKInt,
+  mute: BKInt,
+  phase: record{
+    phase: BKUInt,
+    wrap: BKUInt,
+    wrapCount: BKInt,
+    count: BKUInt
+  },
+  sample: record{
+    dataState: BKDataState,
+    numChannels: BKUInt,
+    length: BKUInt,
+    offset: BKUInt,
+    end_: BKUInt,
+    repeatMode: BKUInt,
+    repeatCount: BKUInt,
+    sustainOffset: BKUInt,
+    sustainEnd: BKUInt,
+    timeFrac: BKFInt20,
+    period: BKFInt20,
+    callback: BKCallback,
+    frames: *BKFrame
+  }
+}
+global BKTrack: type <cimport,nodecl,forwarddecl> = @record{}
+global BKDividerState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKArpeggioState: type <cimport,nodecl,forwarddecl> = @record{}
+global BKVolumeSlideFlag: cint <comptime> = 65536
+global BKPanningSlideFlag: cint <comptime> = 131072
+global BKPortamentoFlag: cint <comptime> = 262144
+global BKTremoloFlag: cint <comptime> = 524288
+global BKVibratoFlag: cint <comptime> = 1048576
+global BKInstrumentFlag: cint <comptime> = 1
+global BKArpeggioFlag: cint <comptime> = 2
+global BKPanningEnabledFlag: cint <comptime> = 4
+global BKTriangleIgnoresVolumeFlag: cint <comptime> = 8
+global BKIgnoreVolumeFlag: cint <comptime> = 16
+global BKTrackAttrUpdateFlagVolume: cint <comptime> = 32
+global BKTrackAttrUpdateFlagNote: cint <comptime> = 64
+global BKTrackAttrUpdateFlagDutyCycle: cint <comptime> = 128
+global BKEffectMask: cint <comptime> = 2031616
+BKDividerState = @record{
+  divider: BKInt,
+  counter: BKInt
+}
+BKArpeggioState = @record{
+  offset: BKInt,
+  delta: BKInt,
+  count: BKInt,
+  notes: [8]BKInt
+}
+BKTrack = @record{
+  unit: BKUnit,
+  flags: BKUInt,
+  divider: BKDivider,
+  arpeggioDivider: BKDividerState,
+  instrDivider: BKDividerState,
+  effectDivider: BKDividerState,
+  waveform: BKInt,
+  dutyCycle: BKInt,
+  sample: *BKData,
+  samplePitch: BKFInt20,
+  masterVolume: BKInt,
+  volume: BKSlideState,
+  panning: BKSlideState,
+  curNote: BKInt,
+  note: BKSlideState,
+  pitch: BKFInt20,
+  tremolo: BKIntervalState,
+  tremoloDelta: BKSlideState,
+  tremoloSteps: BKSlideState,
+  vibrato: BKIntervalState,
+  vibratoDelta: BKSlideState,
+  vibratoSteps: BKSlideState,
+  arpeggio: BKArpeggioState,
+  instrState: BKInstrumentState
+}
+global BKWaveFileReader: type <cimport,nodecl,forwarddecl> = @record{}
+BKWaveFileReader = @record{
+  object: BKObject,
+  file: *FILE,
+  sampleRate: BKInt,
+  numChannels: BKInt,
+  numBits: BKInt,
+  numFrames: BKInt,
+  dataSize: BKSize
+}
+global BKWaveFileWriter: type <cimport,nodecl,forwarddecl> = @record{}
+BKWaveFileWriter = @record{
+  object: BKObject,
+  file: *FILE,
+  initOffset: BKSize,
+  sampleRate: BKInt,
+  numChannels: BKInt,
+  numBits: BKInt,
+  fileSize: BKSize,
+  dataSize: BKSize,
+  reverseEndian: BKInt
+}
+global BKVersion: cstring <cimport,nodecl>
+global function BKStatusGetName(status: BKEnum): cstring <cimport,nodecl> end
+global BKBufferPulseKernels: [0]*BKBufferPulse <cimport,nodecl>
+global function BKBufferInit(buf: *BKBuffer): BKInt <cimport,nodecl> end
+global function BKBufferDispose(buf: *BKBuffer): void <cimport,nodecl> end
+global function BKBufferRead(buf: *BKBuffer, outFrames: *[0]BKFrame, size: BKUInt, interlace: BKUInt): BKInt <cimport,nodecl> end
+global function BKBufferClear(buf: *BKBuffer): void <cimport,nodecl> end
+global function BKBufferEnd(buf: *BKBuffer, time: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKBufferShift(buf: *BKBuffer, time: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKBufferSize(buf: *BKBuffer): BKInt <cimport,nodecl> end
+global function BKBufferAddPulse(buf: *BKBuffer, time: BKFUInt20, pulse: BKFrame): BKInt <cimport,nodecl> end
+global function BKBufferAddFrame(buf: *BKBuffer, time: BKFUInt20, frame: BKFrame): BKInt <cimport,nodecl> end
+global function BKObjectInit(object: pointer, isa: *BKClass, guardSize: BKSize): BKInt <cimport,nodecl> end
+global function BKObjectAlloc(outObject: *pointer, isa: *BKClass, extraSize: BKSize): BKInt <cimport,nodecl> end
+global function BKSetAttr(object: pointer, attr: BKEnum, value: BKInt): BKInt <cimport,nodecl> end
+global function BKGetAttr(object: pointer, attr: BKEnum, outValue: *BKInt): BKInt <cimport,nodecl> end
+global function BKSetPtr(object: pointer, attr: BKEnum, ptr: pointer, size: BKSize): BKInt <cimport,nodecl> end
+global function BKGetPtr(object: pointer, attr: BKEnum, outPtr: pointer, size: BKSize): BKInt <cimport,nodecl> end
+global function BKDispose(object: pointer): void <cimport,nodecl> end
+global function BKTimeMake(samples: BKInt, frac: BKFUInt20): BKTime <cimport,nodecl> end
+global function BKTimeGetTime(a: BKTime): BKInt <cimport,nodecl> end
+global function BKTimeGetFrac(a: BKTime): BKFUInt20 <cimport,nodecl> end
+global function BKTimeGetFUInt20(a: BKTime): BKFUInt20 <cimport,nodecl> end
+global function BKTimeAdd(a: BKTime, b: BKTime): BKTime <cimport,nodecl> end
+global function BKTimeAddFUInt20(a: BKTime, b: BKFUInt20): BKTime <cimport,nodecl> end
+global function BKTimeSub(a: BKTime, b: BKTime): BKTime <cimport,nodecl> end
+global function BKTimeSubFUInt20(a: BKTime, b: BKFUInt20): BKTime <cimport,nodecl> end
+global function BKTimeIsEqual(a: BKTime, b: BKTime): BKInt <cimport,nodecl> end
+global function BKTimeIsGreater(a: BKTime, b: BKTime): BKInt <cimport,nodecl> end
+global function BKTimeIsGreaterFUInt20(a: BKTime, b: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKTimeIsGreaterEqual(a: BKTime, b: BKTime): BKInt <cimport,nodecl> end
+global function BKTimeIsLess(a: BKTime, b: BKTime): BKInt <cimport,nodecl> end
+global function BKTimeIsLessFUInt20(a: BKTime, b: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKTimeIsLessEqual(a: BKTime, b: BKTime): BKInt <cimport,nodecl> end
+global function BKClockInit(clock: *BKClock, period: BKTime, callback: *BKCallback): BKInt <cimport,nodecl> end
+global function BKClockAlloc(outClock: **BKClock, period: BKTime, callback: *BKCallback): BKInt <cimport,nodecl> end
+global function BKClockAttach(clock: *BKClock, ctx: *BKContext, beforeClock: *BKClock): BKInt <cimport,nodecl> end
+global function BKClockDetach(clock: *BKClock): void <cimport,nodecl> end
+global function BKClockSetPeriod(clock: *BKClock, period: BKTime): void <cimport,nodecl> end
+global function BKClockReset(clock: *BKClock): void <cimport,nodecl> end
+global function BKClockAdvance(clock: *BKClock, period: BKFUInt20): void <cimport,nodecl> end
+global function BKClockTick(clock: *BKClock): BKInt <cimport,nodecl> end
+global function BKDividerInit(divider: *BKDivider, count: BKUInt, callback: *BKCallback): BKInt <cimport,nodecl> end
+global function BKDividerAlloc(outDivider: **BKDivider, count: BKUInt, callback: *BKCallback): BKInt <cimport,nodecl> end
+global function BKDividerAttachToClock(divider: *BKDivider, clock: *BKClock): BKInt <cimport,nodecl> end
+global function BKDividerAttachToGroup(divider: *BKDivider, group: *BKDividerGroup): BKInt <cimport,nodecl> end
+global function BKDividerDetach(divider: *BKDivider): void <cimport,nodecl> end
+global function BKDividerTick(divider: *BKDivider, info: *BKCallbackInfo): BKInt <cimport,nodecl> end
+global function BKDividerReset(divider: *BKDivider): void <cimport,nodecl> end
+global function BKContextInit(ctx: *BKContext, numChannels: BKUInt, sampleRate: BKUInt): BKInt <cimport,nodecl> end
+global function BKContextAlloc(outCtx: **BKContext, numChannels: BKUInt, sampleRate: BKUInt): BKInt <cimport,nodecl> end
+global function BKContextSetAttr(ctx: *BKContext, attr: BKEnum, value: BKInt): BKInt <cimport,nodecl> end
+global function BKContextGetAttr(ctx: *BKContext, attr: BKEnum, outValue: *BKInt): BKInt <cimport,nodecl> end
+global function BKContextSetPtr(ctx: *BKContext, attr: BKEnum, ptr: pointer): BKInt <cimport,nodecl> end
+global function BKContextGetPtr(ctx: *BKContext, attr: BKEnum, outPtr: pointer): BKInt <cimport,nodecl> end
+global function BKContextGenerate(ctx: *BKContext, outFrames: *[0]BKFrame, size: BKUInt): BKInt <cimport,nodecl> end
+global function BKContextGenerateToTime(ctx: *BKContext, endTime: BKTime, write: function(inFrames: *[0]BKFrame, size: BKUInt, info: pointer): BKInt, info: pointer): BKInt <cimport,nodecl> end
+global function BKContextRun(ctx: *BKContext, endTime: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKContextEnd(ctx: *BKContext, endTime: BKFUInt20): BKInt <cimport,nodecl> end
+global function BKContextSize(ctx: *BKContext): BKInt <cimport,nodecl> end
+global function BKContextRead(ctx: *BKContext, outFrames: *[0]BKFrame, size: BKUInt): BKInt <cimport,nodecl> end
+global function BKContextReset(ctx: *BKContext): void <cimport,nodecl> end
+global function BKContextAttachDivider(ctx: *BKContext, divider: *BKDivider, type: BKEnum): BKInt <cimport,nodecl> end
+global function BKTimeFromSeconds(ctx: *BKContext, seconds: float64): BKTime <cimport,nodecl> end
+global function BKDataInit(data: *BKData): BKInt <cimport,nodecl> end
+global function BKDataAlloc(outData: **BKData): BKInt <cimport,nodecl> end
+global function BKDataDetach(data: *BKData): void <cimport,nodecl> end
+global function BKDataInitCopy(copy: *BKData, original: *BKData): BKInt <cimport,nodecl> end
+global function BKDataSetAttr(data: *BKData, attr: BKEnum, value: BKInt): BKInt <cimport,nodecl> end
+global function BKDataGetAttr(data: *BKData, attr: BKEnum, outValue: *BKInt): BKInt <cimport,nodecl> end
+global function BKDataSetFrames(data: *BKData, frames: *BKFrame, numFrames: BKUInt, numChannels: BKUInt, copy: BKInt): BKInt <cimport,nodecl> end
+global function BKDataSetData(data: *BKData, frameData: pointer, dataSize: BKUInt, numChannels: BKUInt, params: BKEnum): BKInt <cimport,nodecl> end
+global function BKDataLoadRaw(data: *BKData, file: *FILE, numChannels: BKUInt, params: BKEnum): BKInt <cimport,nodecl> end
+global function BKDataLoadWAVE(data: *BKData, file: *FILE): BKInt <cimport,nodecl> end
+global function BKDataNormalize(data: *BKData): BKInt <cimport,nodecl> end
+global function BKDataConvert(data: *BKData, info: *BKDataConvertInfo): BKInt <cimport,nodecl> end
+global BKSequenceFuncsSimple: BKSequenceFuncs <cimport,nodecl>
+global BKSequenceFuncsEnvelope: BKSequenceFuncs <cimport,nodecl>
+global function BKSequenceCreate(outSequence: **BKSequence, funcs: *BKSequenceFuncs, values: pointer, length: BKUInt, sustainOffset: BKUInt, sustainLength: BKUInt): BKInt <cimport,nodecl> end
+global function BKSequenceCopy(outSequence: **BKSequence, sequence: *BKSequence): BKInt <cimport,nodecl> end
+global function BKSequenceDispose(sequence: *BKSequence): void <cimport,nodecl> end
+global function BKSequenceStateSetSequence(state: *BKSequenceState, sequence: *BKSequence): BKInt <cimport,nodecl> end
+global function BKSequenceStateSetPhase(state: *BKSequenceState, phase: BKEnum): BKInt <cimport,nodecl> end
+global function BKSequenceStateStep(state: *BKSequenceState, level: BKEnum): BKInt <cimport,nodecl> end
+global function BKSequenceStateSetValue(state: *BKSequenceState, value: BKInt): BKInt <cimport,nodecl> end
+global function BKInstrumentInit(instr: *BKInstrument): BKInt <cimport,nodecl> end
+global function BKInstrumentAlloc(outInstr: **BKInstrument): BKInt <cimport,nodecl> end
+global function BKInstrumentDetach(instr: *BKInstrument): void <cimport,nodecl> end
+global function BKInstrumentInitCopy(copy: *BKInstrument, original: *BKInstrument): BKInt <cimport,nodecl> end
+global function BKInstrumentSetSequence(instr: *BKInstrument, sequence: BKEnum, values: *BKInt, length: BKUInt, sustainOffset: BKInt, sustainLength: BKInt): BKInt <cimport,nodecl> end
+global function BKInstrumentSetEnvelope(instr: *BKInstrument, sequence: BKEnum, phases: *BKSequencePhase, length: BKUInt, sustainOffset: BKInt, sustainLength: BKInt): BKInt <cimport,nodecl> end
+global function BKInstrumentSetEnvelopeADSR(instr: *BKInstrument, attack: BKUInt, decay: BKUInt, sustain: BKInt, release: BKUInt): BKInt <cimport,nodecl> end
+global function BKInstrumentGetSequence(instr: *BKInstrument, sequence: BKEnum): *BKSequence <cimport,nodecl> end
+global function BKSlideStateInit(state: *BKSlideState, maxValue: BKInt): void <cimport,nodecl> end
+global function BKSlideStateSetValueAndSteps(state: *BKSlideState, endValue: BKInt, steps: BKInt): void <cimport,nodecl> end
+global function BKIntervalStateInit(state: *BKIntervalState, maxValue: BKInt): void <cimport,nodecl> end
+global function BKIntervalStateSetDeltaAndSteps(state: *BKIntervalState, delta: BKInt, steps: BKInt): void <cimport,nodecl> end
+global function BKIntervalStateStep(state: *BKIntervalState): void <cimport,nodecl> end
+global function BKSlideStateSetValue(state: *BKSlideState, endValue: BKInt): void <cimport,nodecl> end
+global function BKSlideStateSetSteps(state: *BKSlideState, steps: BKInt): void <cimport,nodecl> end
+global function BKSlideStateHalt(state: *BKSlideState, setEndValue: BKInt): void <cimport,nodecl> end
+global function BKSlideStateStep(state: *BKSlideState): void <cimport,nodecl> end
+global function BKSlideStateGetValue(state: *BKSlideState): BKInt <cimport,nodecl> end
+global function BKIntervalStateSetDelta(state: *BKIntervalState, delta: BKInt): void <cimport,nodecl> end
+global function BKIntervalStateSetSteps(state: *BKIntervalState, steps: BKInt): void <cimport,nodecl> end
+global function BKIntervalStateGetValue(state: *BKIntervalState): BKInt <cimport,nodecl> end
+global function BKTonePeriodLookup(tone: BKFInt20, sampleRate: BKUInt): BKFUInt20 <cimport,nodecl> end
+global function BKLog2PeriodLookup(tone: BKFInt20): BKFUInt20 <cimport,nodecl> end
+global function BKUnitInit(unit: *BKUnit, waveform: BKEnum): BKInt <cimport,nodecl> end
+global function BKUnitAttach(unit: *BKUnit, ctx: *BKContext): BKInt <cimport,nodecl> end
+global function BKUnitDetach(unit: *BKUnit): void <cimport,nodecl> end
+global function BKUnitSetAttr(unit: *BKUnit, attr: BKEnum, value: BKInt): BKInt <cimport,nodecl> end
+global function BKUnitGetAttr(unit: *BKUnit, attr: BKEnum, outValue: *BKInt): BKInt <cimport,nodecl> end
+global function BKUnitSetPtr(unit: *BKUnit, attr: BKEnum, ptr: pointer): BKInt <cimport,nodecl> end
+global function BKUnitGetPtr(unit: *BKUnit, attr: BKEnum, outPtr: pointer): BKInt <cimport,nodecl> end
+global function BKTrackInit(track: *BKTrack, waveform: BKEnum): BKInt <cimport,nodecl> end
+global function BKTrackAlloc(outTrack: **BKTrack, waveform: BKEnum): BKInt <cimport,nodecl> end
+global function BKTrackReset(track: *BKTrack): void <cimport,nodecl> end
+global function BKTrackClear(track: *BKTrack): void <cimport,nodecl> end
+global function BKTrackAttach(track: *BKTrack, ctx: *BKContext): BKInt <cimport,nodecl> end
+global function BKTrackDetach(track: *BKTrack): void <cimport,nodecl> end
+global function BKTrackSetAttr(track: *BKTrack, attr: BKEnum, value: BKInt): BKInt <cimport,nodecl> end
+global function BKTrackGetAttr(track: *BKTrack, attr: BKEnum, outValue: *BKInt): BKInt <cimport,nodecl> end
+global function BKTrackSetPtr(track: *BKTrack, attr: BKEnum, ptr: pointer): BKInt <cimport,nodecl> end
+global function BKTrackGetPtr(track: *BKTrack, attr: BKEnum, outPtr: pointer): BKInt <cimport,nodecl> end
+global function BKTrackSetEffect(track: *BKTrack, effect: BKEnum, ptr: pointer, size: BKUInt): BKInt <cimport,nodecl> end
+global function BKTrackGetEffect(track: *BKTrack, effect: BKEnum, outValues: pointer, size: BKUInt): BKInt <cimport,nodecl> end
+global function BKWaveFileReaderInit(reader: *BKWaveFileReader, file: *FILE): BKInt <cimport,nodecl> end
+global function BKWaveFileReaderReadHeader(reader: *BKWaveFileReader, outNumChannels: *BKInt, outSampleRate: *BKInt, outNumFrames: *BKInt): BKInt <cimport,nodecl> end
+global function BKWaveFileReaderReadFrames(reader: *BKWaveFileReader, outFrames: *[0]BKFrame): BKInt <cimport,nodecl> end
+global function BKWaveFileWriterInit(writer: *BKWaveFileWriter, file: *FILE, numChannels: BKInt, sampleRate: BKInt, numBits: BKInt): BKInt <cimport,nodecl> end
+global function BKWaveFileWriterAppendFrames(writer: *BKWaveFileWriter, frames: *BKFrame, numFrames: BKInt): BKInt <cimport,nodecl> end
+global function BKWaveFileWriterTerminate(writer: *BKWaveFileWriter): BKInt <cimport,nodecl> end
+global function BKWaveFileWriteData(file: *FILE, data: *BKData, sampleRate: BKInt, numBits: BKInt): BKInt <cimport,nodecl> end
+global BK_VERSION: cstring <comptime> = "0.17.6"
+global BK_IS_64_BIT: cint <comptime> = 1
+global BK_INT_SHIFT: cint <comptime> = 32
+global BK_FRAME_SHIFT: cint <comptime> = 16
+global BK_VOLUME_SHIFT: cint <comptime> = 15
+global BK_FINT20_SHIFT: cint <comptime> = 20
+global BK_FINT20_UNIT: cint <comptime> = 1048576
+global BK_FINT20_FRAC: cint <comptime> = 1048575
+global BK_FRAME_MAX: cint <cimport,nodecl,const>
+global BK_MAX_CHANNELS: cint <comptime> = 8
+global BK_MAX_PERIOD: cint <comptime> = 16777216
+global BK_MAX_VOLUME: cint <comptime> = 32767
+global BK_MIN_DUTY_CYCLE: cint <comptime> = 1
+global BK_MAX_ARPEGGIO: cint <comptime> = 8
+global BK_MIN_SAMPLE_RATE: cint <comptime> = 16000
+global BK_MAX_SAMPLE_RATE: cint <comptime> = 96000
+global BK_MIN_SAMPLE_PERIOD: cint <comptime> = 4096
+global BK_MAX_SAMPLE_PERIOD: cint <comptime> = 268435456
+global BK_MAX_GENERATE_SAMPLES: cint <comptime> = 1024
+global BK_WAVE_MAX_LENGTH: cint <comptime> = 64
+global BK_SQUARE_PHASES: cint <comptime> = 16
+global BK_TRIANGLE_PHASES: cint <comptime> = 32
+global BK_NOISE_PHASES: cint <comptime> = 8
+global BK_SAWTOOTH_PHASES: cint <comptime> = 7
+global BK_SINE_PHASES: cint <comptime> = 32
+global BK_DEFAULT_SAMPLE_RATE: cint <comptime> = 44100
+global BK_DEFAULT_CLOCK_RATE: cint <comptime> = 240
+global BK_DEFAULT_ARPEGGIO_DIVIDER: cint <comptime> = 4
+global BK_DEFAULT_INSTR_DIVIDER: cint <comptime> = 4
+global BK_DEFAULT_EFFECT_DIVIDER: cint <comptime> = 1
+global BK_DEFAULT_DUTY_CYCLE: cint <comptime> = 2
+global BK_FIRST_ELEMENT_PTR: pointer <cimport,nodecl,const>
+global BK_ATTR_TYPE_SHIFT: cint <comptime> = 12
+global BK_ATTR_TYPE_MASK: cint <cimport,nodecl,const>
+global BK_STEP_SHIFT: cint <comptime> = 5
+global BK_STEP_UNIT: cint <comptime> = 32
+global BK_STEP_FRAC: cint <comptime> = 31
+global BK_STEP_WIDTH: cint <comptime> = 32
+global BK_HIGH_PASS_SHIFT: cint <comptime> = 23
+global BK_BUFFER_CAPACITY: cint <comptime> = 4129
+global BK_TIME_ZERO: cint <comptime> = 0
+global BK_STATE_STEP_FRAC_SHIFT: cint <comptime> = 8
+global BK_STATE_MAX_STEPS: cint <comptime> = 8388608
+global BK_MIN_NOTE: cint <comptime> = 0
+global BK_MAX_NOTE: cint <comptime> = 96
+global BK_NOTE_RELEASE: cint <comptime> = -1
+global BK_NOTE_MUTE: cint <comptime> = -2
+global BK_MIN_PIANO_TONE: cint <comptime> = -45
+global BK_MAX_PIANO_TONE: cint <comptime> = 51
+global BK_MIN_SAMPLE_TONE: cint <comptime> = -48
+global BK_MAX_SAMPLE_TONE: cint <comptime> = 48
+global BK_TONE_SHIFT: cint <comptime> = 16
+global BK_TONE_UNIT: cint <comptime> = 65536
+global BK_TONE_FRAC: cint <comptime> = 65535
+global BK_TONE_SAMPLE_RATE_SHIFT: cint <comptime> = 18
+global BK_EFFECT_FLAG_SHIFT: cint <comptime> = -20465
+global BK_MIN_PERIOD: cint <comptime> = 0
+global BK_MAX_DUTY_CYCLE: cint <comptime> = 15

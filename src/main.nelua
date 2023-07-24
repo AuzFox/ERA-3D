@@ -37,9 +37,12 @@ local function run(): void
 	while not rl.windowShouldClose() do
 		sm:update_state(vm)
 
+		-- update audio stream
+		vm.soundchip:update_audio()
+
 		-- update render settings
 		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
-			rl.updateTexture(vm.gpu.gfx_texture, &vm.tmem)
+			rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.tmem)
 			vm.gpu.update_tex = false
 		end
 

@@ -266,7 +266,7 @@ function e3d.EVM:get_ram8(addr: uint32): uint8
 		addr = addr & (~0b11_u32) -- truncate to word address
 		
 		local word_addr = (addr - e3d.TMEM_START_ADDR) /// 4
-		local col: rl.color = self.tmem[word_addr]
+		local col: rl.color = self.gpu.tmem[word_addr]
 
 		switch byte_index do
 			case 0 then
@@ -325,7 +325,7 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 		addr = addr & (~0b11_u32) -- truncate to word address
 		
 		local word_addr = (addr - e3d.TMEM_START_ADDR) /// 4
-		local col: rl.color = self.tmem[word_addr]
+		local col: rl.color = self.gpu.tmem[word_addr]
 
 		switch byte_index do
 			case 0 then
@@ -338,7 +338,7 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 				col.a = (@cuchar)(val)
 		end
 
-		self.tmem[word_addr] = col
+		self.gpu.tmem[word_addr] = col
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
 		addr = addr & (~0b11_u32) -- truncate to word address
@@ -384,7 +384,7 @@ function e3d.EVM:get_ram32(addr: uint32): uint32
 		return ((@uint32)(self.heap[addr]) << 24) | ((@uint32)(self.heap[addr + 1]) << 16) | ((@uint32)(self.heap[addr + 2]) << 8) | (@uint32)(self.heap[addr + 3])
 	elseif addr < e3d.GLOBALS_START_ADDR then
 		-- tmem
-		local col: rl.color = self.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
+		local col: rl.color = self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
 		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
@@ -418,7 +418,7 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean
 		col.g = (val & 0xFF0000) >> 16
 		col.b = (val & 0x00FF00) >> 8
 		col.a = val & 0xFF
-		self.tmem[addr] = col
+		self.gpu.tmem[addr] = col
 		self.gpu.update_tex = true
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
@@ -1763,6 +1763,7 @@ function e3d.EVM:call_hook(hook: integer): boolean
 end
 
 function e3d.EVM:__gc(): void
+	self.soundchip:cleanup()
 	self.gpu:cleanup()
 end
 
@@ -1772,7 +1773,8 @@ function e3d.new_vm(): *e3d.EVM
 	vm:register_api()
 	vm:register_builtins()
 	
-	vm.gpu:init(&vm.tmem)
+	vm.gpu:init()
+	vm.soundchip:init()
 	vm:reset_vm(false)
 	return vm
 end
