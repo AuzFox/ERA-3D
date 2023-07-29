@@ -1,0 +1,213 @@
+require("raylib")
+require("rlgl")
+
+-- screen dimentions (vscreen is console's virtual resolution)
+global GPU_VSCREEN_W <comptime> = 320
+global GPU_VSCREEN_H <comptime> = 240
+global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * 3)
+global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * 3)
+global GPU_CAMERAS_COUNT  <comptime> = 4
+
+global GPU_TMEM_WIDTH <comptime> = 1024
+global GPU_TMEM_HEIGHT <comptime> = 1024
+global GPU_TMEM_SIZE <comptime> = (GPU_TMEM_WIDTH * GPU_TMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
+global GPU_OMEM_SIZE <comptime> = (32768 * (36 * 3)) -- 32768 vertices
+
+-- holds graphics information for the vm
+global GPU = @record {
+	tmem: [GPU_TMEM_SIZE]rl.color,
+	omem: [GPU_OMEM_SIZE]uint8,
+	cameras: [GPU_CAMERAS_COUNT]rl.camera,
+	gfx_texture: rl.texture,
+	gfx_shader: rl.shader,
+	gfx_rendertex: rl.renderTexture,
+	gfx_font_texture: rl.texture,
+	
+	-- shader uniform locations
+	tex_mode_loc: cint,
+	tex_x_loc: cint,
+	tex_y_loc: cint,
+	tex_w_loc: cint,
+	tex_h_loc: cint,
+	fog_mode_loc: cint,
+	fog_start_loc: cint,
+	fog_end_loc: cint,
+	fog_color_loc: cint,
+
+	update_tex: boolean, -- set when TMEM is updated. when set, TMEM is uploaded to the real GPU
+
+	-- "triangle mode" data
+	--
+	-- RLGL currently doesn't allow primitives created using RL_TRIANGLES to use UV coordinates for textures.
+	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
+	triangle_mode: boolean,
+	triangle_vert_index: integer,
+	triangle_vert_color: rl.color,
+	triangle_vert_uv: rl.vector2,
+	triangle_vert_pos: rl.vector3,
+
+	proj_matrix_count: uinteger, -- used to track matrix stack
+	view_matrix_count: uinteger, -- used to track matrix stack
+	matrix_mode: uinteger,
+	
+	-- graphics state
+	cull_mode: uinteger,
+	wire_mode: boolean,
+	tex_mode: cint,
+	tex_x: cint,
+	tex_y: cint,
+	tex_w: cint,
+	tex_h: cint,
+	fog_mode: cint,
+	fog_start: float32,
+	fog_end: float32,
+	fog_color: rl.vector4,
+	viewport_w: cint,
+	viewport_h: cint
+}
+
+function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
+	self.tex_x = (@cint)(x)
+	self.tex_y = (@cint)(y)
+	self.tex_w = (@cint)(w)
+	self.tex_h = (@cint)(h)
+	
+	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
+end
+
+function GPU:reset_matrix_stack(): void
+	rlgl.matrixMode(rlgl.PROJECTION)
+
+	while self.proj_matrix_count > 0 do
+		rlgl.popMatrix()
+		self.proj_matrix_count = self.proj_matrix_count - 1
+	end
+
+	rlgl.matrixMode(rlgl.MODELVIEW)
+
+	while self.view_matrix_count > 0 do
+		rlgl.popMatrix()
+		self.view_matrix_count = self.view_matrix_count - 1
+	end
+end
+
+function GPU:enable_render_state(): void
+	rl.beginTextureMode(self.gfx_rendertex)
+
+	switch self.cull_mode do
+		case 0 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+		case 1 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
+		else
+			rlgl.disableBackfaceCulling()
+	end
+
+	if self.wire_mode then
+		rlgl.enableWireMode()
+	else
+		rlgl.disableWireMode()
+	end
+
+	rlgl.enableScissorTest()
+	rlgl.scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+
+	self.matrix_mode = rlgl.MODELVIEW
+end
+
+function GPU:disable_render_state(): void
+	rlgl.enableBackfaceCulling()
+	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+	rlgl.disableWireMode()
+	rlgl.disableScissorTest()
+
+	self:reset_matrix_stack()
+
+	rl.endTextureMode()
+end
+
+function GPU:reset(): void
+	for i = 0, < #self.cameras do
+		self.cameras[i] = {
+			position={0,0,4},
+			target={0,0,0},
+			up={0,1,0},
+			fovy=45,
+			projection=rl.cameraProjection.PERSPECTIVE
+		}
+	end
+
+	self.cull_mode = 0
+	self.wire_mode = false
+	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
+	
+	self.tex_mode = 0
+	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
+	
+	self.fog_mode = 0
+	self.fog_start = 700.0
+	self.fog_end = 1000.0
+	self.fog_color = {1.0, 1.0, 1.0, 1.0}
+	rl.setShaderValue(self.gfx_shader, self.fog_mode_loc, &self.fog_mode, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &self.fog_start, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &self.fog_end, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &self.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
+	
+	self:texture(0, 0, 64, 64)
+
+	self.viewport_w = GPU_VSCREEN_W
+	self.viewport_h = GPU_VSCREEN_H
+	self.proj_matrix_count = 0
+	self.view_matrix_count = 0
+end
+
+function GPU:init(): void
+	-- TODO: check window dpi scale and recreate window with correct flag
+	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_HIGHDPI) -- enable vsync and HighDPI
+	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+
+	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
+	rl.setTargetFPS(30)
+
+	rl.setExitKey(rl.keyboardKey.NULL)
+
+	self.gfx_rendertex = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+
+	local img: rl.image = rl.loadImage("assets/test.png")
+	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
+		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
+	end
+	memory.copy(&self.tmem, img.data, GPU_TMEM_SIZE * #rl.color)
+	self.gfx_texture = rl.loadTextureFromImage(img)
+	rl.unloadImage(img)
+
+	self.gfx_font_texture = rl.loadTexture("assets/font.png")
+	
+	self.gfx_shader = rl.loadShader(nilptr, "assets/shader.fs")
+	
+	self.tex_mode_loc = rl.getShaderLocation(self.gfx_shader, "texMode")
+	self.tex_x_loc = rl.getShaderLocation(self.gfx_shader, "texX")
+	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
+	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
+	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
+	self.fog_mode_loc = rl.getShaderLocation(self.gfx_shader, "fogMode")
+	self.fog_start_loc = rl.getShaderLocation(self.gfx_shader, "fogStart")
+	self.fog_end_loc = rl.getShaderLocation(self.gfx_shader, "fogEnd")
+	self.fog_color_loc = rl.getShaderLocation(self.gfx_shader, "fogColor")
+
+	self:reset()
+end
+
+function GPU:cleanup(): void
+	rl.unloadShader(self.gfx_shader)
+	rl.unloadTexture(self.gfx_font_texture)
+	rl.unloadTexture(self.gfx_texture)
+	rl.unloadRenderTexture(self.gfx_rendertex)
+
+	rl.closeWindow()
+end

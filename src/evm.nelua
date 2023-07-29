@@ -230,7 +230,7 @@ function e3d.EVM:popstr(): e3d.EVMString
 	}
 end
 
-function e3d.EVM:reset_vm(reset_gpu: boolean): void
+function e3d.EVM:reset_vm(reset_all: boolean): void
 	-- TODO: free all vm program memory, clear ram?
 
 	self.cf = {}
@@ -241,7 +241,8 @@ function e3d.EVM:reset_vm(reset_gpu: boolean): void
 	self.csp = 0
 	self.init_time = rl.getTime()
 
-	if reset_gpu then
+	if reset_all then
+		self.soundchip:reset()
 		self.gpu:reset()
 	end
 
@@ -258,10 +259,34 @@ function e3d.EVM:get_ram8(addr: uint32): uint8
 	local byte_shift: uinteger = 8 * (3 - byte_index)
 	local byte_mask: uinteger = 0xFF << byte_shift
 	
-	if addr < e3d.TMEM_START_ADDR then
+	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		return self.heap[addr]
-	elseif addr < e3d.GLOBALS_START_ADDR then
+	elseif addr < e3d.LOCALS_START_ADDR then
+		-- globals
+		addr = addr & (~0b11_u32) -- truncate to word address
+		
+		local word_addr = (addr - e3d.GLOBALS_START_ADDR) /// 4
+		local word: uint32 = self.globals[word_addr].u
+
+		return (@uint8)((word & byte_mask) >> byte_shift)
+	elseif addr < e3d.ARGS_START_ADDR then
+		-- locals
+		addr = addr & (~0b11_u32) -- truncate to word address
+		
+		local word_addr = (addr - e3d.LOCALS_START_ADDR) /// 4
+		local word: uint32 = self.locals[word_addr].u
+
+		return (@uint8)((word & byte_mask) >> byte_shift)
+	elseif addr < e3d.TMEM_START_ADDR then
+		-- args
+		
+		addr = addr & (~0b11_u32) -- truncate to word address
+		local word_addr = (addr - e3d.ARGS_START_ADDR) /// 4
+		local word: uint32 = self.args[word_addr].u
+
+		return (@uint8)((word & byte_mask) >> byte_shift)
+	elseif addr < e3d.OMEM_START_ADDR then
 		-- tmem
 		addr = addr & (~0b11_u32) -- truncate to word address
 		
@@ -281,30 +306,23 @@ function e3d.EVM:get_ram8(addr: uint32): uint8
 				-- should not happen
 				return 0
 		end
-	elseif addr < e3d.LOCALS_START_ADDR then
-		-- globals
-		addr = addr & (~0b11_u32) -- truncate to word address
+	elseif addr < e3d.WMEM_START_ADDR then
+		-- omem
+		return self.gpu.omem[addr - e3d.OMEM_START_ADDR]
+	elseif addr < e3d.SMEM_START_ADDR then
+		-- wmem
+		addr = addr & (~1_u32) -- truncate to int16 address
 		
-		local word_addr = (addr - e3d.GLOBALS_START_ADDR) /// 4
-		local word: uint32 = self.globals[word_addr].u
+		local word_addr = (addr - e3d.WMEM_START_ADDR) /// 2
+		local word: uint16 = self.soundchip.wmem[word_addr]
 
 		return (@uint8)((word & byte_mask) >> byte_shift)
-	elseif addr < e3d.ARGS_START_ADDR then
-		-- locals
-		addr = addr & (~0b11_u32) -- truncate to word address
-		
-		local word_addr = (addr - e3d.LOCALS_START_ADDR) /// 4
-		local word: uint32 = self.locals[word_addr].u
-
-		return (@uint8)((word & byte_mask) >> byte_shift)
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- smem
+		return self.soundchip.smem[addr - e3d.SMEM_START_ADDR]
 	elseif addr < e3d.ROM_START_ADDR then
-		-- args
-		
-		addr = addr & (~0b11_u32) -- truncate to word address
-		local word_addr = (addr - e3d.ARGS_START_ADDR) /// 4
-		local word: uint32 = self.args[word_addr].u
-
-		return (@uint8)((word & byte_mask) >> byte_shift)
+		-- unused
+		return 0
 	else
 		-- rom
 		return self.rom[addr - e3d.ROM_START_ADDR]
@@ -316,29 +334,10 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 	local byte_index: uinteger = addr & 0b11
 	local byte_shift: uinteger = 8 * (3 - byte_index)
 	local byte_mask: uinteger = 0xFF << byte_shift
-	
-	if addr < e3d.TMEM_START_ADDR then
+
+	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		self.heap[addr] = val
-	elseif addr < e3d.GLOBALS_START_ADDR then
-		-- tmem
-		addr = addr & (~0b11_u32) -- truncate to word address
-		
-		local word_addr = (addr - e3d.TMEM_START_ADDR) /// 4
-		local col: rl.color = self.gpu.tmem[word_addr]
-
-		switch byte_index do
-			case 0 then
-				col.r = (@cuchar)(val)
-			case 1 then
-				col.g = (@cuchar)(val)
-			case 2 then
-				col.b = (@cuchar)(val)
-			case 3 then
-				col.a = (@cuchar)(val)
-		end
-
-		self.gpu.tmem[word_addr] = col
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
 		addr = addr & (~0b11_u32) -- truncate to word address
@@ -359,7 +358,7 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 		word = word & (~byte_mask) -- clear byte bits
 
 		self.locals[word_addr].u = word | ((@uint32)(val) << byte_shift)
-	elseif addr < e3d.ROM_START_ADDR then
+	elseif addr < e3d.TMEM_START_ADDR then
 		-- args
 		addr = addr & (~0b11_u32) -- truncate to word address
 
@@ -369,8 +368,46 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 		word = word & (~byte_mask) -- clear byte bits
 
 		self.args[word_addr].u = word | ((@uint32)(val) << byte_shift)
+	elseif addr < e3d.OMEM_START_ADDR then
+		-- tmem
+		addr = addr & (~0b11_u32) -- truncate to word address
+		
+		local word_addr = (addr - e3d.TMEM_START_ADDR) /// 4
+		local col: rl.color = self.gpu.tmem[word_addr]
+
+		switch byte_index do
+			case 0 then
+				col.r = (@cuchar)(val)
+			case 1 then
+				col.g = (@cuchar)(val)
+			case 2 then
+				col.b = (@cuchar)(val)
+			case 3 then
+				col.a = (@cuchar)(val)
+		end
+
+		self.gpu.tmem[word_addr] = col
+	elseif addr < e3d.WMEM_START_ADDR then
+		-- omem
+		self.gpu.omem[addr - e3d.OMEM_START_ADDR] = val
+	elseif addr < e3d.SMEM_START_ADDR then
+		-- wmem
+		addr = addr & (~0b11_u32) -- truncate to word address
+
+		local word_addr = (addr - e3d.ARGS_START_ADDR) /// 4
+		local word: uint32 = self.args[word_addr].u
+
+		word = word & (~byte_mask) -- clear byte bits
+
+		self.args[word_addr].u = word | ((@uint32)(val) << byte_shift)
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- smem
+		self.soundchip.smem[addr - e3d.SMEM_START_ADDR] = val
+	elseif addr < e3d.ROM_START_ADDR then
+		-- unused
+		return false
 	else
-		-- rom, can't write here!
+		-- rom
 		return false
 	end
 

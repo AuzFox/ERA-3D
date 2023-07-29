@@ -1,0 +1,12 @@
+require("statemachine")
+
+global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.TRACKER
+end
+
+global function state_tracker_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.TRACKER
+end

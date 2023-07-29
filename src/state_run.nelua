@@ -5,11 +5,12 @@ end
 
 global function state_run_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
-        return StateID.MAIN
+        print(sm.prev_state)
+        return sm.prev_state
     end
     
     if not vm:call_hook(e3d.Hook.UPDATE) then
-        return StateID.MAIN
+        return sm.prev_state
     end
 
     return StateID.RUN
@@ -24,7 +25,7 @@ global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): i
         if not vm:call_hook(e3d.Hook.DRAW3D) then
             io.printf(vm.error)
 
-            return_state = StateID.MAIN
+            return_state = sm.prev_state
         end
 
         vm.gpu:reset_matrix_stack()
@@ -33,7 +34,7 @@ global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): i
     if return_state == StateID.RUN and (not vm:call_hook(e3d.Hook.DRAW2D)) then
         io.printf(vm.error)
 
-        return_state = StateID.MAIN
+        return_state = sm.prev_state
     end
     
     vm.gpu:disable_render_state()
@@ -41,8 +42,8 @@ global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): i
     rl.beginDrawing()
         rl.clearBackground(rl.BLACK)
 
-        local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.VSCREEN_W), -(@float32)(e3d.VSCREEN_H) };
-        local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(e3d.SCREEN_W), (@float32)(e3d.SCREEN_H) };
+        local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H) };
+        local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H) };
 
         rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
         rl.drawFPS(0,0)

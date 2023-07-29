@@ -114,6 +114,7 @@ local function _drawchar2D(vm: *e3d.EVM, c: uint8, x: *int32, y: int32, color: r
 	if c < ' '_u8 then
 		c = '?'_u8
 	elseif c == ' '_u8 then
+		$x = $x + 6
 		return
 	elseif c == '\t'_u8 then
 		$x = $x + 12 -- tabs = 2 spaces
@@ -139,7 +140,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 	local col: uint32 = vm:get_argu(2)
 	local fmt: e3d.EVMString = vm:get_argstr(3)
 
-	if y >= e3d.VSCREEN_H or x >= e3d.VSCREEN_W then
+	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
 		-- we're off screen, no need to render
 		return true
 	end
@@ -168,7 +169,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 		local c: uint8
 
 		-- stop if we're going offscreen
-		if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+		if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 			return true
 		end
 
@@ -195,7 +196,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 					local s: string = vm.sb:view()
 
 					for j = 0, < #s do
-						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 							return true
 						end
 
@@ -218,7 +219,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 					local s: string = vm.sb:view()
 
 					for j = 0, < #s do
-						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 							return true
 						end
 
@@ -241,7 +242,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 					local s: string = vm.sb:view()
 
 					for j = 0, < #s do
-						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 							return true
 						end
 
@@ -264,7 +265,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 					local s: string = vm.sb:view()
 
 					for j = 0, < #s do
-						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 							return true
 						end
 
@@ -287,7 +288,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 					local s: string = vm.sb:view()
 
 					for j = 0, < #s do
-						if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 							return true
 						end
 
@@ -315,7 +316,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							local s: string = vm.sb:view()
 		
 							for j = 0, < #s do
-								if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+								if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 									return true
 								end
 		
@@ -340,7 +341,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							local s: string = vm.sb:view()
 		
 							for j = 0, < #s do
-								if y >= e3d.VSCREEN_H or cur_x >= e3d.VSCREEN_W then
+								if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
 									return true
 								end
 		
@@ -1256,7 +1257,7 @@ local function api_camera3D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera3D(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
 
 	-- copy Raylib's BeginMode3D(),
@@ -1298,7 +1299,7 @@ local function api_getCamPos(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCamPos(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
 	vm:pushv3(vm.gpu.cameras[id].position)
 
@@ -1309,7 +1310,7 @@ local function api_setCamPos(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCamPos(int id, vec3 pos);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local pos: rl.vector3 = vm:get_argv3(1)
 
 	vm.gpu.cameras[id].position = pos
@@ -1321,7 +1322,7 @@ local function api_getCamTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCamTarget(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
 	vm:pushv3(vm.gpu.cameras[id].target)
 
@@ -1332,7 +1333,7 @@ local function api_setCamTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCamTarget(int id, vec3 target);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local target: rl.vector3 = vm:get_argv3(1)
 
 	vm.gpu.cameras[id].target = target
@@ -1344,7 +1345,7 @@ local function api_getCamUp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCamUp(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
 	vm:pushv3(vm.gpu.cameras[id].up)
 
@@ -1355,7 +1356,7 @@ local function api_setCamUp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCamUp(int id, vec3 up);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local up: rl.vector3 = vm:get_argv3(1)
 
 	vm.gpu.cameras[id].up = up
@@ -1367,7 +1368,7 @@ local function api_getCamFOV(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getCamFOV(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
 	vm:pushf(vm.gpu.cameras[id].fovy)
 
@@ -1378,7 +1379,7 @@ local function api_setCamFOV(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCamFOV(int id, float fov);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local fov: float32 = vm:get_argf(1)
 
 	vm.gpu.cameras[id].fovy = fov
@@ -1390,7 +1391,7 @@ local function api_getCamProj(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getCamProj(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
 	vm:pushi((@int32)(vm.gpu.cameras[id].projection))
 
@@ -1401,7 +1402,7 @@ local function api_setCamProj(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCamProj(int id, int mode);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local proj: float32 = vm:get_argi(1)
 
 	vm.gpu.cameras[id].projection = (@cint)(math.clamp(proj, 0, 1))
@@ -1430,7 +1431,7 @@ local function api_getCamRight(vm: *e3d.EVM): boolean
 	-- vec3 getCamRight(int id);
 
 	-- get camera
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
 
 	-- calculate forward vector
@@ -1459,7 +1460,7 @@ local function api_getCamForward(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCamForward(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, e3d.CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
 
 	vm:pushv3(
@@ -1722,12 +1723,12 @@ local function api_viewport(vm: *e3d.EVM): boolean
 	local w: cint = (@cint)(vm:get_argi(2))
 	local h: cint = (@cint)(vm:get_argi(3))
 
-	w = math.clamp(w, 1, e3d.VSCREEN_W)
-	h = math.clamp(h, 1, e3d.VSCREEN_H)
-	x = math.clamp(x, 0, e3d.VSCREEN_W - w)
-	y = math.clamp(y, 0, e3d.VSCREEN_H - h)
+	w = math.clamp(w, 1, GPU_VSCREEN_W)
+	h = math.clamp(h, 1, GPU_VSCREEN_H)
+	x = math.clamp(x, 0, GPU_VSCREEN_W - w)
+	y = math.clamp(y, 0, GPU_VSCREEN_H - h)
 
-	y = e3d.VSCREEN_H - (y + h) -- flip y
+	y = GPU_VSCREEN_H - (y + h) -- flip y
 
 	vm.gpu.viewport_w = w
 	vm.gpu.viewport_h = h

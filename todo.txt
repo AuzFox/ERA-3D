@@ -15,7 +15,6 @@ COMPILER:
 
 VM:
 - complete wrapi() and wrapf() negative ranges
-- revise memory map
 - implement debug opcodes
 - implement vertex-lighting mode and api
 - implement memory allocator and api for vm heap
@@ -23,9 +22,9 @@ VM:
 - implement cartridge data loading api
 - implement sound/music api
 - implement physics api
-- implement actor+model+animation api
+- implement model api
+- implement triangle rendering limit
 - implement cycle limit (how to deal with incomplete calls?)
-- implement triangle rendering limit?
 
 HOST:
 - rewrite main.nelua

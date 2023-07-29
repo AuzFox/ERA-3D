@@ -3,6 +3,7 @@ require("ecc")
 require("evm")
 require("state_boot")
 require("state_main")
+require("state_tracker")
 require("state_run")
 
 global vm: *e3d.EVM
@@ -11,6 +12,17 @@ global sm: StateMachine
 local function init(): void
 	vm = e3d.new_vm()
 	e3d.set_default_btnmap()
+
+	io.printf("0x%08X - 0x%08X\n", 0, e3d.GLOBALS_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.GLOBALS_START_ADDR, e3d.LOCALS_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.LOCALS_START_ADDR, e3d.ARGS_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.ARGS_START_ADDR, e3d.TMEM_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.TMEM_START_ADDR, e3d.OMEM_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.OMEM_START_ADDR, e3d.WMEM_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.WMEM_START_ADDR, e3d.SMEM_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.SMEM_START_ADDR, e3d.UNUSED_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.UNUSED_START_ADDR, e3d.ROM_START_ADDR - 1)
+	io.printf("0x%08X - 0x%08X\n", e3d.ROM_START_ADDR, e3d.RAM_MAX_ADDR)
 
 	sm.states = {
 		{
@@ -22,6 +34,11 @@ local function init(): void
 			state_main_init,
 			state_main_update,
 			state_main_draw
+		},
+		{
+			state_tracker_init,
+			state_tracker_update,
+			state_tracker_draw
 		},
 		{
 			state_run_init,
@@ -36,7 +53,7 @@ end
 local function run(): void
 	while not rl.windowShouldClose() do
 		sm:update_state(vm)
-
+		
 		-- update audio stream
 		vm.soundchip:update_audio()
 

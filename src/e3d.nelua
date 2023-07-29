@@ -9,9 +9,8 @@ require("allocators.default")
 require("math")
 require("coroutine")
 
-require("blipkit")
-require("raylib")
-require("rlgl")
+require("soundchip")
+require("gpu")
 
 global e3d = @record{}
 
@@ -21,56 +20,67 @@ global e3d = @record{}
 --                         --
 -----------------------------
 
---[[ VM RAM logical memory map
+--[[ VM RAM logical memory map (WIP)
 	TODO: revise to allow for audio and model data(?)
 
 	note: 1 vm word = 4 bytes
 
-	heap:    8 MiB
-	tmem:    4 MiB  (1024*1024 pixels (32BPP))
-	globals: 256KiB (65536 words)
-	locals:  256KiB (65536 words)
-	args:    256KiB (65536 words)
-	rom:     64KiB  (65536 bytes)
-	TOTAL: 12 MiB + 832KiB
+	heap:      8 MiB
+	globals: 256 KiB             (65536 vm words)
+	locals:  256 KiB             (65536 vm words)
+	args:    256 KiB             (65536 vm words)
+	tmem:      4 MiB             (1024*1024 pixels (32BPP))
+	omem:      3 MiB + 384 KiB   (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+	wmem:     15 MiB             (~2min 58s of audio wave data (22050hz, 16bit, stereo))
+	smem:     64 KiB             (sfx data)
+		song data:         2 KiB (256 * 8 bytes)
+		chain data:        8 KiB (256 * 16 * 2 bytes (phrase, transpose))
+		phrase data:      32 KiB (256 * 16 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
+		instrument data:   2 KiB (256 * 8 bytes (sample start (24bit), sample end(24bit), attack, decay, sustain, release))
+		groove data:     256 B   (16 * 16 bytes)
+		audio state:       2 B   (2 bytes (bpm, track playing flags))
+		track state:      64 B   (8 * 8 bytes (song id+pos, chain id+pos, phrase id+pos, groove id+pos))
+		unused:          --- --- (the rest of the 64 KiB)
+	unused:   832 KiB
+	rom:       64 KiB            (65536 bytes)
+	
+	TOTAL: 32 MiB
 
-	0x000000 - 0x7FFFFF: heap
-	0x800000 - 0xBFFFFF: tmem
-	0xC00000 - 0xC3FFFF: globals
-	0xC40000 - 0xC7FFFF: locals
-	0xC80000 - 0xCBFFFF: args
-	0xCC0000 - 0xCCFFFF: rom
+	0x00000000 - 0x007FFFFF: heap
+	0x00800000 - 0x0083FFFF: globals
+	0x00840000 - 0x0087FFFF: locals
+	0x00880000 - 0x008BFFFF: args
+	0x008C0000 - 0x00CBFFFF: tmem
+	0x00CC0000 - 0x0101FFFF: omem
+	0x01020000 - 0x01F1FFFF: wmem
+	0x01F20000 - 0x01F2FFFF: smem
+	0x01F30000 - 0x01FEFFFF: unused
+	0x01FF0000 - 0x01FFFFFF: rom
 ]]
-
--- screen dimentions (vscreen is console's virtual resolution)
-global e3d.VSCREEN_W <comptime> = 320
-global e3d.VSCREEN_H <comptime> = 240
-global e3d.SCREEN_W <comptime> = (e3d.VSCREEN_W * 3)
-global e3d.SCREEN_H <comptime> = (e3d.VSCREEN_H * 3)
-
-global e3d.TMEM_WIDTH <comptime> = 1024
-global e3d.TMEM_HEIGHT <comptime> = 1024
 
 -- memory size and address constants
 global e3d.HEAP_SIZE      <comptime> = (1024*1024*8) -- 8MiB
-global e3d.TMEM_SIZE      <comptime> = (e3d.TMEM_WIDTH*e3d.TMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
 global e3d.GLOBALS_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE    <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE      <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.ROM_SIZE       <comptime> = 65536 -- 64KiB (65536 bytes)
+global e3d.ROM_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
 global e3d.OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
+global e3d.BYTECODE_SIZE  <comptime> = 65536 --  64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE <comptime> = 256
 global e3d.API_FUNCS_SIZE <comptime> = 65536
-global e3d.CAMERAS_COUNT  <comptime> = 4
 global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
+global e3d.OMEM_SIZE <comptime> = (3*1024*1024) + (640*1024) -- 3 MiB + 640 KiB
 
-global e3d.TMEM_START_ADDR <comptime> = 0x800000
-global e3d.GLOBALS_START_ADDR <comptime> = 0xC00000
-global e3d.LOCALS_START_ADDR <comptime> = 0xC40000
-global e3d.ARGS_START_ADDR <comptime> = 0xC80000
-global e3d.ROM_START_ADDR <comptime> = 0xCC0000
-global e3d.RAM_MAX_ADDR <comptime> = 0xCCFFFF
+global e3d.RAM_MAX_ADDR       <comptime> = 0x01FFFFFF
+global e3d.GLOBALS_START_ADDR <comptime> = e3d.HEAP_SIZE
+global e3d.LOCALS_START_ADDR  <comptime> = e3d.GLOBALS_START_ADDR + (e3d.GLOBALS_SIZE * 4)
+global e3d.ARGS_START_ADDR    <comptime> = e3d.LOCALS_START_ADDR + (e3d.LOCALS_SIZE * 4)
+global e3d.TMEM_START_ADDR    <comptime> = e3d.ARGS_START_ADDR + (e3d.ARGS_SIZE * 4)
+global e3d.OMEM_START_ADDR    <comptime> = e3d.TMEM_START_ADDR + (GPU_TMEM_SIZE * 4)
+global e3d.WMEM_START_ADDR    <comptime> = e3d.OMEM_START_ADDR + GPU_OMEM_SIZE
+global e3d.SMEM_START_ADDR    <comptime> = e3d.WMEM_START_ADDR + (SOUNDCHIP_WMEM_SIZE * 2)
+global e3d.UNUSED_START_ADDR  <comptime> = e3d.SMEM_START_ADDR + SOUNDCHIP_SMEM_SIZE
+global e3d.ROM_START_ADDR     <comptime> = (e3d.RAM_MAX_ADDR + 1) - e3d.ROM_SIZE
 
 global e3d.NULL <comptime> = 0xFFFFFFFF
 
@@ -324,74 +334,6 @@ global e3d.Identifier <forwarddecl> = @record {}
 
 global e3d.APIFunction: type = @function(vm: *e3d.EVM): boolean
 
--- holds graphics information for the vm
-global e3d.GPU = @record {
-	tmem: [e3d.TMEM_SIZE]rl.color,
-	cameras: [e3d.CAMERAS_COUNT]rl.camera,
-	gfx_texture: rl.texture,
-	gfx_shader: rl.shader,
-	gfx_rendertex: rl.renderTexture,
-	gfx_font_texture: rl.texture,
-	
-	-- shader uniform locations
-	tex_mode_loc: cint,
-	tex_x_loc: cint,
-	tex_y_loc: cint,
-	tex_w_loc: cint,
-	tex_h_loc: cint,
-	fog_mode_loc: cint,
-	fog_start_loc: cint,
-	fog_end_loc: cint,
-	fog_color_loc: cint,
-
-	update_tex: boolean, -- set when TMEM is updated. when set, TMEM is uploaded to the real GPU
-
-	-- "triangle mode" data
-	--
-	-- RLGL currently doesn't allow primitives created using RL_TRIANGLES to use UV coordinates for textures.
-	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
-	triangle_mode: boolean,
-	triangle_vert_index: integer,
-	triangle_vert_color: rl.color,
-	triangle_vert_uv: rl.vector2,
-	triangle_vert_pos: rl.vector3,
-
-	proj_matrix_count: uinteger, -- used to track matrix stack
-	view_matrix_count: uinteger, -- used to track matrix stack
-	matrix_mode: uinteger,
-	
-	-- graphics state
-	cull_mode: uinteger,
-	wire_mode: boolean,
-	tex_mode: cint,
-	tex_x: cint,
-	tex_y: cint,
-	tex_w: cint,
-	tex_h: cint,
-	fog_mode: cint,
-	fog_start: float32,
-	fog_end: float32,
-	fog_color: rl.vector4,
-	viewport_w: cint,
-	viewport_h: cint
-}
-
-global e3d.TrackObject = @record {
-	bk_callback: BKCallback,
-	bk_track: *BKTrack,
-	bk_divider: *BKDivider,
-	track_index: uint8
-}
-
-global e3d.SoundChip = @record {
-	amem: [e3d.SMEM_SIZE]uint8, -- song, chain, phrase, instrument, and state data
-	wmem: [e3d.WMEM_SIZE]uint8, -- sample audio data
-	audio_buffer: [e3d.SOUNDCHIP_FRAMES_PER_UPDATE * 2]BKFrame, -- working audio buffer
-	track_objects: [e3d.SOUNDCHIP_TRACK_COUNT]e3d.TrackObject,
-	bk_context: *BKContext,
-	audio_stream: rl.audioStream,
-}
-
 -- union used internally by the vm to store values of different types
 global e3d.EVMValue = @union {
 	i: int32,
@@ -516,8 +458,8 @@ e3d.EVM = @record {
 	loop_del_l_stack: sequence(uint16),
 	
 	-- general vars
-	soundchip: e3d.SoundChip,
-	gpu: e3d.GPU,
+	soundchip: SoundChip,
+	gpu: GPU,
 	error: string,
 	init_time: float64
 }
@@ -673,213 +615,4 @@ function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
 	end
 	
 	return 1
-end
-
-function e3d.GPU:texture(x: int32, y: int32, w: int32, h: int32): void
-	self.tex_x = (@cint)(x)
-	self.tex_y = (@cint)(y)
-	self.tex_w = (@cint)(w)
-	self.tex_h = (@cint)(h)
-	
-	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
-end
-
-function e3d.GPU:reset_matrix_stack(): void
-	rlgl.matrixMode(rlgl.PROJECTION)
-
-	while self.proj_matrix_count > 0 do
-		rlgl.popMatrix()
-		self.proj_matrix_count = self.proj_matrix_count - 1
-	end
-
-	rlgl.matrixMode(rlgl.MODELVIEW)
-
-	while self.view_matrix_count > 0 do
-		rlgl.popMatrix()
-		self.view_matrix_count = self.view_matrix_count - 1
-	end
-end
-
-function e3d.GPU:enable_render_state(): void
-	rl.beginTextureMode(self.gfx_rendertex)
-
-	switch self.cull_mode do
-		case 0 then
-			rlgl.enableBackfaceCulling()
-			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
-		case 1 then
-			rlgl.enableBackfaceCulling()
-			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
-		else
-			rlgl.disableBackfaceCulling()
-	end
-
-	if self.wire_mode then
-		rlgl.enableWireMode()
-	else
-		rlgl.disableWireMode()
-	end
-
-	rlgl.enableScissorTest()
-	rlgl.scissor(0, 0, e3d.VSCREEN_W, e3d.VSCREEN_H)
-
-	self.matrix_mode = rlgl.MODELVIEW
-end
-
-function e3d.GPU:disable_render_state(): void
-	rlgl.enableBackfaceCulling()
-	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
-	rlgl.disableWireMode()
-	rlgl.disableScissorTest()
-
-	self:reset_matrix_stack()
-
-	rl.endTextureMode()
-end
-
-function e3d.GPU:reset(): void
-	for i = 0, < #self.cameras do
-		self.cameras[i] = {
-			position={0,0,4},
-			target={0,0,0},
-			up={0,1,0},
-			fovy=45,
-			projection=rl.cameraProjection.PERSPECTIVE
-		}
-	end
-
-	self.cull_mode = 0
-	self.wire_mode = false
-	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
-	
-	self.tex_mode = 0
-	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
-	
-	self.fog_mode = 0
-	self.fog_start = 700.0
-	self.fog_end = 1000.0
-	self.fog_color = {1.0, 1.0, 1.0, 1.0}
-	rl.setShaderValue(self.gfx_shader, self.fog_mode_loc, &self.fog_mode, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &self.fog_start, rl.shaderUniformDataType.UNIFORM_FLOAT)
-	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &self.fog_end, rl.shaderUniformDataType.UNIFORM_FLOAT)
-	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &self.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
-	
-	self:texture(0, 0, 64, 64)
-
-	self.viewport_w = e3d.VSCREEN_W
-	self.viewport_h = e3d.VSCREEN_H
-	self.proj_matrix_count = 0
-	self.view_matrix_count = 0
-end
-
-function e3d.GPU:init(): void
-	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_HIGHDPI) -- enable vsync and HighDPI
-	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
-
-	rl.initWindow(e3d.SCREEN_W, e3d.SCREEN_H, "ERA-3D")
-	rl.setTargetFPS(30)
-
-	rl.setExitKey(rl.keyboardKey.NULL)
-
-	self.gfx_rendertex = rl.loadRenderTexture(e3d.VSCREEN_W, e3d.VSCREEN_H)
-
-	local img: rl.image = rl.loadImage("assets/test.png")
-	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
-		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
-	end
-	memory.copy(self.tmem, img.data, e3d.TMEM_SIZE * #rl.color)
-	self.gfx_texture = rl.loadTextureFromImage(img)
-	rl.unloadImage(img)
-
-	self.gfx_font_texture = rl.loadTexture("assets/font.png")
-	
-	self.gfx_shader = rl.loadShader(nilptr, "assets/shader.fs")
-	
-	self.tex_mode_loc = rl.getShaderLocation(self.gfx_shader, "texMode")
-	self.tex_x_loc = rl.getShaderLocation(self.gfx_shader, "texX")
-	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
-	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
-	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
-	self.fog_mode_loc = rl.getShaderLocation(self.gfx_shader, "fogMode")
-	self.fog_start_loc = rl.getShaderLocation(self.gfx_shader, "fogStart")
-	self.fog_end_loc = rl.getShaderLocation(self.gfx_shader, "fogEnd")
-	self.fog_color_loc = rl.getShaderLocation(self.gfx_shader, "fogColor")
-
-	self:reset()
-end
-
-function e3d.GPU:cleanup(): void
-	rl.unloadShader(self.gfx_shader)
-	rl.unloadTexture(self.gfx_font_texture)
-	rl.unloadTexture(self.gfx_texture)
-	rl.unloadRenderTexture(self.gfx_rendertex)
-
-	rl.closeWindow()
-end
-
-function e3d.SoundChip:init(): void
-	rl.initAudioDevice()
-
-	rl.setAudioStreamBufferSizeDefault(e3d.SOUNDCHIP_FRAMES_PER_UPDATE)
-
-	-- create audio stream (44100hz, 16 bit stereo)
-	self.audio_stream = rl.loadAudioStream(44100, 16, 2)
-
-	-- init BlipKit stuff
-	BKContextAlloc(&self.bk_context, 2, 44100)
-
-	for i = 0, < e3d.SOUNDCHIP_TRACK_COUNT do
-		local tobj: e3d.TrackObject
-		tobj = {
-			bk_callback = {
-				func = divider_callback,
-				userInfo = &tobj
-			},
-			track_index = i
-		}
-
-		--[[
-		openmpt tempo calculations:
-		https://wiki.openmpt.org/Manual:_Song_Properties#Modern_Tempo_Mode
-
-		bpm
-		rpb (rows per beat)
-		tpr (ticks per row)
-
-		ticks per second = (bpm * rpb * tpr) / 60 seconds
-
-		(125 bpm * 4 rpb * 6 tpr) / 60 secs = 50 ticks per second!!! (same as LSDJ)
-
-		set clock to ticks per second, set divider to ticks per row
-
-		]]
-
-		BKTrackAlloc(&tobj.bk_track, BK_SQUARE)
-		BKSetAttr(tobj.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 6)
-		BKSetAttr(tobj.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 2)
-		BKTrackAttach(tobj.bk_track, self.bk_context)
-		BKDividerAlloc(&tobj.bk_divider, 4, &tobj.bk_callback)
-		BKContextAttachDivider(self.bk_context, tobj.bk_divider, BK_CLOCK_TYPE_BEAT)
-
-		self.track_objects[i] = tobj
-	end
-
-	rl.playAudioStream(self.audio_stream)
-end
-
-function e3d.SoundChip:cleanup(): void
-	rl.unloadAudioStream(self.audio_stream)
-	rl.closeAudioDevice()
-
-	for i = 0, < e3d.SOUNDCHIP_TRACK_COUNT do
-		local tobj: e3d.TrackObject = self.track_objects[i]
-
-		BKDispose(tobj.bk_track)
-		BKDispose(tobj.bk_divider)
-	end
-
-	BKDispose(self.bk_context)
 end

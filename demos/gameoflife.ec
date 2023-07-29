@@ -209,6 +209,8 @@ void update(float delta_time) {
 }
 
 void draw2D() {
+	clear(0x00000000);
+
 	// get y texturesheet coordinate of the current grid
 	int srcy = 0;
 	if (current_grid != TMEM_START) {
