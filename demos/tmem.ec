@@ -10,7 +10,7 @@ enum {
 	BLUE  = 0x0000FFFF,
 	WHITE = 0xFFFFFFFF,
 	
-	TMEM_ADDR = 0x800000
+	TMEM_ADDR = 0x008C0000
 };
 
 int* tmem;

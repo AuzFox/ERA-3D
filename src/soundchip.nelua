@@ -13,12 +13,12 @@ global SOUNDCHIP_CHAIN_SIZE <comptime> = 16 * 2
 global SOUNDCHIP_CHAIN_COUNT <comptime> = 256
 global SOUNDCHIP_PHRASE_SIZE <comptime> = 16 * 8
 global SOUNDCHIP_PHRASE_COUNT <comptime> = 256
-global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 8
+global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 10
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
 global SOUNDCHIP_GROOVE_SIZE <comptime> = 16
 global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
-global SOUNDCHIP_AUDIO_STATE_SIZE <comptime> = 2
-global SOUNDCHIP_TRACK_STATE_SIZE <comptime> = 16
+global SOUNDCHIP_AUDIO_STATE_SIZE <comptime> = 1
+global SOUNDCHIP_TRACK_STATE_SIZE <comptime> = 10
 
 global SOUNDCHIP_CHAIN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_PHRASE_DATA_START <comptime> = SOUNDCHIP_CHAIN_DATA_START + (SOUNDCHIP_CHAIN_COUNT * SOUNDCHIP_CHAIN_SIZE)
@@ -32,7 +32,6 @@ global SOUNDCHIP_SMEM_SIZE <comptime> = 64*1024 -- 64 KiB
 global SoundChip <forwarddecl> = @record {}
 
 global AudioState = @record {
-	bpm: uint8,
 	playing_flags: uint8
 }
 
@@ -46,6 +45,9 @@ global TrackContext = @record {
 
 -- track state object, stored in smem
 global TrackState = @record {
+	bpm: uint8,
+	volume: uint8,
+	pan: uint8,
 	song_id: uint8,
 	song_pos: uint8,
 	chain_id: uint8,
@@ -151,8 +153,7 @@ function SoundChip:update_audio(): void
 end
 
 function SoundChip:reset(): void
-	self.audio_state.bpm = 128
-	self.audio_state.playing_flags = 0b11000000 -- TODO: set to 0
+	self.audio_state.playing_flags = 0b10000000 -- TODO: set to 0
 
     -- reset song
 	memory.set(self.song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
@@ -206,6 +207,9 @@ function SoundChip:reset(): void
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
 		local state: *TrackState = (@*TrackState)(&self.smem[SOUNDCHIP_TRACK_STATE_START + (i * #TrackState)])
+		state.bpm = 128
+		state.volume = 127
+		state.pan = 0
 		state.song_id = 0
 		state.song_pos = 0
 		state.chain_id = 0
@@ -262,8 +266,8 @@ function SoundChip:init(): void
         else
             BKTrackInit(&tc.bk_track, BK_SQUARE)
         end
-		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8)
-		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 2)
+		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume
+		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 2) -- note volume
 		BKTrackAttach(&tc.bk_track, &self.bk_context)
 		
 		BKDividerInit(&tc.bk_divider, 6, &callback)

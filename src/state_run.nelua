@@ -5,7 +5,6 @@ end
 
 global function state_run_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
-        print(sm.prev_state)
         return sm.prev_state
     end
     

@@ -13,17 +13,6 @@ local function init(): void
 	vm = e3d.new_vm()
 	e3d.set_default_btnmap()
 
-	io.printf("0x%08X - 0x%08X\n", 0, e3d.GLOBALS_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.GLOBALS_START_ADDR, e3d.LOCALS_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.LOCALS_START_ADDR, e3d.ARGS_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.ARGS_START_ADDR, e3d.TMEM_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.TMEM_START_ADDR, e3d.OMEM_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.OMEM_START_ADDR, e3d.WMEM_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.WMEM_START_ADDR, e3d.SMEM_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.SMEM_START_ADDR, e3d.UNUSED_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.UNUSED_START_ADDR, e3d.ROM_START_ADDR - 1)
-	io.printf("0x%08X - 0x%08X\n", e3d.ROM_START_ADDR, e3d.RAM_MAX_ADDR)
-
 	sm.states = {
 		{
 			state_boot_init,

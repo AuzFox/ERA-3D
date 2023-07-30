@@ -26,7 +26,7 @@ enum {
 	WHITE_NO_ALPHA = 0xFFFFFF00, // used as a base for non-tinted transparency
 	WHITE          = 0xFFFFFFFF,
 
-	TMEM_START = 0x800000, // TMEM start address
+	TMEM_START = 0x008C0000, // TMEM start address
 	TMEM_W = 1024,         // each row in TMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
 	GRID_W = 64,
 	GRID_H = 64,
