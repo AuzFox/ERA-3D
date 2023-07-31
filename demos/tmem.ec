@@ -33,7 +33,8 @@ void update(float delta_time) {
 	}
 }
 
-void draw2D() {
+void draw() {
 	clear(0x000000FF);
+	camera2D(0);
 	sprite2D(0, 0, 8, 8, 8, 8);
 }

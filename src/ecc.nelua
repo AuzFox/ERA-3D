@@ -3638,10 +3638,8 @@ local function global_declaration(vm: *e3d.EVM): void
 			hook_index = e3d.Hook.INIT
 		elseif vm.current_id.name == "update" then
 			hook_index = e3d.Hook.UPDATE
-		elseif vm.current_id.name == "draw2D" then
-			hook_index = e3d.Hook.DRAW2D
-		elseif vm.current_id.name == "draw3D" then
-			hook_index = e3d.Hook.DRAW3D
+		elseif vm.current_id.name == "draw" then
+			hook_index = e3d.Hook.DRAW
 		end
 
 		if hook_index ~= -1 then
@@ -3742,7 +3740,7 @@ local function program(vm: *e3d.EVM): void
 	vm.bytecode_len = 0
 	vm.globals_len = 0
 
-	for i = 0, < 4 do
+	for i = 0, < e3d.Hook.COUNT do
 		vm.hook_addresses[i] = 0
 		vm.hook_flags[i] = false
 	end

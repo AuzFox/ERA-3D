@@ -18,35 +18,13 @@ end
 global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     local return_state: integer = StateID.RUN
 
+    vm.gpu:camera3D(0) -- configure default camera
     vm.gpu:enable_render_state()
-	
-    rl.beginMode3D(vm.gpu.cameras[0]) -- configure default camera
-        if not vm:call_hook(e3d.Hook.DRAW3D) then
-            io.printf(vm.error)
-
-            return_state = sm.prev_state
-        end
-
-        vm.gpu:reset_matrix_stack()
-    rl.endMode3D()
-    
-    if return_state == StateID.RUN and (not vm:call_hook(e3d.Hook.DRAW2D)) then
+    if not vm:call_hook(e3d.Hook.DRAW) then
         io.printf(vm.error)
-
         return_state = sm.prev_state
     end
-    
     vm.gpu:disable_render_state()
-    
-    rl.beginDrawing()
-        rl.clearBackground(rl.BLACK)
-
-        local src_rect: rl.rectangle = { 0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H) };
-        local dest_rect: rl.rectangle = { 0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H) };
-
-        rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
-        rl.drawFPS(0,0)
-    rl.endDrawing()
 
     return return_state
 end

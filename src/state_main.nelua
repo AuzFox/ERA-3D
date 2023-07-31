@@ -26,14 +26,10 @@ global function state_main_update(this: *State, sm: *StateMachine, vm: *e3d.EVM)
 end
 
 global function state_main_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    rl.beginDrawing()
-        rl.clearBackground(rl.RAYWHITE)
-        rl.drawFPS(0,0)
-        
-        rl.drawText("PRESS [C] TO COMPILE", 10, 10, 20, rl.BLACK)
-        rl.drawText("PRESS [B] TO DUMP BYTECODE", 10, 30, 20, rl.BLACK)
-        rl.drawText("PRESS [R] TO RUN", 10, 50, 20, rl.BLACK)
-    rl.endDrawing()
+    vm.gpu:clear(0xFFFFFFFF)
+    
+    vm.gpu:camera2D(0)
+    --vm.gpu:print2D(0, 0, 0x000000FF, "MAIN STATE")
 
     return StateID.MAIN
 end

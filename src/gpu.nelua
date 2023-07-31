@@ -1,6 +1,9 @@
 require("raylib")
 require("rlgl")
 
+local GL_DEPTH_BUFFER_BIT <comptime> = 0x00000100
+local function glClear(mask: cint): void <cimport> end
+
 -- screen dimentions (vscreen is console's virtual resolution)
 global GPU_VSCREEN_W <comptime> = 320
 global GPU_VSCREEN_H <comptime> = 240
@@ -17,6 +20,7 @@ global GPU_OMEM_SIZE <comptime> = (32768 * (36 * 3)) -- 32768 vertices
 global GPU = @record {
 	tmem: [GPU_TMEM_SIZE]rl.color,
 	omem: [GPU_OMEM_SIZE]uint8,
+	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
 	cameras: [GPU_CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
@@ -66,6 +70,82 @@ global GPU = @record {
 	viewport_h: cint
 }
 
+function GPU:clear(col: uint32): void
+	local alpha: cuchar = (@cuchar)(col & 0xFF)
+
+	if alpha ~= 0 then
+		local clear_color: rl.color = {
+			(@cuchar)(col >> 24),
+			(@cuchar)((col & 0xFF0000) >> 16),
+			(@cuchar)((col & 0x00FF00) >> 8),
+			0xFF
+		}
+
+		rl.clearBackground(clear_color)
+	else
+		glClear(GL_DEPTH_BUFFER_BIT) -- clear the depth buffer, but not the color buffer
+	end
+end
+
+function GPU:camera2D(id: uinteger): void
+	local cam: rl.camera2D = self.cameras2D[id]
+
+	rlgl.disableDepthTest()
+	
+	rlgl.drawRenderBatchActive()
+
+	rlgl.matrixMode(rlgl.PROJECTION)
+	rlgl.loadIdentity()
+	rlgl.ortho(0.0, self.viewport_w, self.viewport_h, 0.0, 0.0, 1.0)
+
+	rlgl.matrixMode(rlgl.MODELVIEW)
+	rlgl.loadIdentity()
+
+	rl.beginMode2D(cam)
+	
+	self.matrix_mode = rlgl.MODELVIEW
+end
+
+function GPU:camera3D(id: uinteger): void
+	local cam: rl.camera = self.cameras[id]
+
+	-- copy Raylib's BeginMode3D(),
+	-- but we don't need to push a new projection matrix
+
+	rlgl.drawRenderBatchActive()
+
+	rlgl.matrixMode(rlgl.PROJECTION)
+    rlgl.loadIdentity()
+
+	local aspect: float32 = (@float32)(self.viewport_w) / (@float32)(self.viewport_h)
+
+	-- 0.01 is the near clipping value
+	-- 1000.0 is the far clipping value
+	-- TODO: allow setting near/far?
+	if cam.projection == rl.cameraProjection.PERSPECTIVE then
+		local top: float64 = 0.01 * math.tan(cam.fovy * 0.5 * (math.pi / 180.0))
+		local right: float64 = top * aspect
+
+		rlgl.frustum(-right, right, -top, top, 0.01, 1000.0)
+	elseif cam.projection == rl.cameraProjection.ORTHOGRAPHIC then
+		local top: float64 = cam.fovy / 2.0
+		local right: float64 = top * aspect
+
+		rlgl.ortho(-right, right, -top, top, 0.01, 1000.0)
+	end
+
+	rlgl.matrixMode(rlgl.MODELVIEW)
+	rlgl.loadIdentity()
+
+	local mat_view: rl.matrix = rl.matrix.lookAt(cam.position, cam.target, cam.up)
+	local asfloat16: rl.float16 = rl.matrix.toFloatV(mat_view)
+	rlgl.multMatrixf((@*float32)(&asfloat16.v))
+
+	rlgl.enableDepthTest()
+
+	self.matrix_mode = rlgl.MODELVIEW
+end
+
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	self.tex_x = (@cint)(x)
 	self.tex_y = (@cint)(y)
@@ -95,8 +175,6 @@ function GPU:reset_matrix_stack(): void
 end
 
 function GPU:enable_render_state(): void
-	rl.beginTextureMode(self.gfx_rendertex)
-
 	switch self.cull_mode do
 		case 0 then
 			rlgl.enableBackfaceCulling()
@@ -125,14 +203,18 @@ function GPU:disable_render_state(): void
 	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
 	rlgl.disableWireMode()
 	rlgl.disableScissorTest()
-
-	self:reset_matrix_stack()
-
-	rl.endTextureMode()
+	rlgl.viewport(0, 0, GPU_SCREEN_W, GPU_SCREEN_H)
 end
 
 function GPU:reset(): void
-	for i = 0, < #self.cameras do
+	for i = 0, < GPU_CAMERAS_COUNT do
+		self.cameras2D[i] = {
+			offset={0.0,0.0},
+			target={0.0,0.0},
+			rotation=0.0,
+			zoom=1.0
+		}
+
 		self.cameras[i] = {
 			position={0,0,4},
 			target={0,0,0},
@@ -169,7 +251,7 @@ end
 function GPU:init(): void
 	-- TODO: check window dpi scale and recreate window with correct flag
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_HIGHDPI) -- enable vsync and HighDPI
-	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 	rl.setTargetFPS(30)

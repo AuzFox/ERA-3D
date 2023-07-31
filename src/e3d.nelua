@@ -318,8 +318,8 @@ global e3d.DivVMode = @enum {
 global e3d.Hook = @enum {
 	INIT = 0,
 	UPDATE,
-	DRAW2D,
-	DRAW3D
+	DRAW,
+	COUNT
 }
 
 -------------------------
@@ -417,8 +417,8 @@ e3d.EVM = @record {
 	ap: uinteger, -- ap for current function
 	osp: uinteger,
 	csp: uinteger,
-	hook_addresses: [4]uint16,
-	hook_flags: [4]boolean,
+	hook_addresses: [3]uint16,
+	hook_flags: [3]boolean,
 	current_hook: uinteger,
 	
 	-- compiler vars

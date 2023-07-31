@@ -99,7 +99,7 @@ end
 function SoundChip:set_bpm(): void
 end
 
-local function track_callback(info: *BKCallbackInfo, userdata: pointer): BKEnum
+local function _track_callback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 	local tc: *TrackContext = (@*TrackContext)(userdata)
 	local sc: *SoundChip = tc.soundchip
 	local track_index: uinteger = tc.track_index
@@ -237,7 +237,7 @@ function SoundChip:init(): void
 		local tc: *TrackContext = &self.track_contexts[i]
 
 		local callback: BKCallback = {
-			func = track_callback,
+			func = _track_callback,
 			userInfo = tc
 		}
 

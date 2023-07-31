@@ -9,6 +9,9 @@ require("state_run")
 global vm: *e3d.EVM
 global sm: StateMachine
 
+local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
+local dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
+
 local function init(): void
 	vm = e3d.new_vm()
 	e3d.set_default_btnmap()
@@ -52,7 +55,16 @@ local function run(): void
 			vm.gpu.update_tex = false
 		end
 
-		sm:draw_state(vm)
+		rl.beginTextureMode(vm.gpu.gfx_rendertex)
+			sm:draw_state(vm)
+			vm.gpu:reset_matrix_stack()
+		rl.endTextureMode()
+
+		rl.beginDrawing()
+			rl.clearBackground(rl.BLACK)
+			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+		rl.endDrawing()
+
 		sm:set_queued_state()
 	end
 end

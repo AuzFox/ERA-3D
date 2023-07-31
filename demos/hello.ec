@@ -57,8 +57,8 @@ void update(float delta_time) {
 }
 
 // this function is called after update() every frame,
-// use it to draw 3D objects to the screen
-void draw3D() {
+// use it to draw objects to the screen
+void draw() {
 
     // clear the screen to black
     clear(BLACK);
@@ -124,11 +124,9 @@ void draw3D() {
     
     // pop the matrix off of the stack
     popMatrix();
-}
 
-// this function is called after draw3D() every frame,
-// use it to draw 2D objects to the screen
-void draw2D() {
+    // use the default 2D camera
+    camera2D(0);
 
     // render some text in the center of the screen
     // 

@@ -1,8 +1,5 @@
 require("e3d")
 
-local GL_DEPTH_BUFFER_BIT <comptime> = 0x00000100
-local function glClear(mask: cint): void <cimport> end
-
 function e3d.EVM:get_argi(i: uint16): int32 <forwarddecl> end
 function e3d.EVM:get_argu(i: uint16): uint32 <forwarddecl> end
 function e3d.EVM:get_argf(i: uint16): float32 <forwarddecl> end
@@ -1252,45 +1249,24 @@ local function api_vec3Invert(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function api_camera2D(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void camera2D(int id);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	
+	vm.gpu:camera2D(id)
+
+	return true
+end
 
 local function api_camera3D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera3D(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local cam: rl.camera = vm.gpu.cameras[id]
-
-	-- copy Raylib's BeginMode3D(),
-	-- but we don't need to push a new projection matrix or enable depth testing
-
-	rlgl.drawRenderBatchActive()
-
-	rlgl.matrixMode(rlgl.PROJECTION)
-    rlgl.loadIdentity()
-
-	local aspect: float32 = (@float32)(vm.gpu.viewport_w) / (@float32)(vm.gpu.viewport_h)
-
-	-- 0.01 is the near clipping value
-	-- 1000.0 is the far clipping value
-	-- TODO: allow setting near/far?
-	if cam.projection == rl.cameraProjection.PERSPECTIVE then
-		local top: float64 = 0.01 * math.tan(cam.fovy * 0.5 * (math.pi / 180.0))
-		local right: float64 = top * aspect
-
-		rlgl.frustum(-right, right, -top, top, 0.01, 1000.0)
-	elseif cam.projection == rl.cameraProjection.ORTHOGRAPHIC then
-		local top: float64 = cam.fovy / 2.0
-		local right: float64 = top * aspect
-
-		rlgl.ortho(-right, right, -top, top, 0.01, 1000.0)
-	end
-
-	rlgl.matrixMode(rlgl.MODELVIEW)
-	rlgl.loadIdentity()
-
-	local mat_view: rl.matrix = rl.matrix.lookAt(cam.position, cam.target, cam.up)
-	local asfloat16: rl.float16 = rl.matrix.toFloatV(mat_view)
-	rlgl.multMatrixf((@*float32)(&asfloat16.v))
+	
+	vm.gpu:camera3D(id)
 
 	return true
 end
@@ -1696,20 +1672,7 @@ local function api_clear(vm: *e3d.EVM): boolean
 
 	local col: uint32 = vm:get_argu(0)
 
-	local alpha: cuchar = (@cuchar)(col & 0xFF)
-
-	if alpha ~= 0 then
-		local clear_color: rl.color = {
-			(@cuchar)(col >> 24),
-			(@cuchar)((col & 0xFF0000) >> 16),
-			(@cuchar)((col & 0x00FF00) >> 8),
-			0xFF
-		}
-
-		rl.clearBackground(clear_color)
-	else
-		glClear(GL_DEPTH_BUFFER_BIT) -- clear the depth buffer, but not the color buffer
-	end
+	vm.gpu:clear(col)
 
 	return true
 end
@@ -2496,6 +2459,7 @@ function e3d.EVM:register_api(): void
 		},
 		{name="vec3Invert", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}}, func=api_vec3Invert},
 		
+		{name="camera2D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera2D},
 		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera3D},
 		{
 			name="getCamPos",

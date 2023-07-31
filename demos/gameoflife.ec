@@ -208,8 +208,9 @@ void update(float delta_time) {
 	}
 }
 
-void draw2D() {
-	clear(0x00000000);
+void draw() {
+	clear(0x000000FF);
+	camera2D(0);
 
 	// get y texturesheet coordinate of the current grid
 	int srcy = 0;

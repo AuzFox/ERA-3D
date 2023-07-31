@@ -77,7 +77,7 @@ void update(float delta_time) {
 	setCamPos(0, cam_pos);
 }
 
-void draw3D() {
+void draw() {
 	clear(BLACK);
 
 	pushMatrix();

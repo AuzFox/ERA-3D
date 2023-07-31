@@ -1789,6 +1789,11 @@ function e3d.EVM:call_hook(hook: integer): boolean
 		self:push_callframe(argc)
 		local result: boolean = self:run(0)
 		self:pop_callframe()
+
+		if self.current_hook == e3d.Hook.DRAW then
+			rlgl.drawRenderBatchActive()
+		end
+
 		return result
 	end
 	return true
