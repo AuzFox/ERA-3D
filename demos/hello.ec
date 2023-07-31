@@ -70,8 +70,8 @@ void draw() {
     // position, rotation, and scale of the geometry to be rendered
     // 
     // at the start of every frame, ERA-3D sets up a matrix configured to the view of
-    // the default camera (camera 0).
-    // the default camera starts at position (0, 0, 4) and is looking at the origin (0, 0, 0)
+    // the default 3D camera (camera3D(0)).
+    // the default 3D camera starts at position (0, 0, 4) and is looking at the origin (0, 0, 0)
     //
     // pushing a new matrix copies the previous matrix,
     // so we can modify the copy by translating, rotating, scaling, etc.
@@ -125,7 +125,7 @@ void draw() {
     // pop the matrix off of the stack
     popMatrix();
 
-    // use the default 2D camera
+    // switch to the default 2D camera for 2D drawing
     camera2D(0);
 
     // render some text in the center of the screen

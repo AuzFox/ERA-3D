@@ -7,6 +7,7 @@ global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 2048
 global SOUNDCHIP_EMPTY_VALUE <comptime> = 0xFF
 global SOUNDCHIP_NOTE_MUTE <comptime> = 0xFE
 global SOUNDCHIP_NOTE_RELEASE <comptime> = 0xFD
+global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
 
 global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
 global SOUNDCHIP_CHAIN_SIZE <comptime> = 16 * 2
@@ -153,7 +154,7 @@ function SoundChip:update_audio(): void
 end
 
 function SoundChip:reset(): void
-	self.audio_state.playing_flags = 0b10000000 -- TODO: set to 0
+	self.audio_state.playing_flags = 0
 
     -- reset song
 	memory.set(self.song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
@@ -183,26 +184,7 @@ function SoundChip:reset(): void
     end
 
 	-- reset instruments
-
-	self:get_phrase_row(0, 0)[0] = (@uint8)(BK_C_2)
-	self:get_phrase_row(0, 8)[0] = (@uint8)(BK_E_2)
-
-	self:get_phrase_row(1, 0)[0] = (@uint8)(BK_C_4)
-	self:get_phrase_row(1, 1)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 2)[0] = (@uint8)(BK_D_4)
-	self:get_phrase_row(1, 3)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 4)[0] = (@uint8)(BK_E_4)
-	self:get_phrase_row(1, 5)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 6)[0] = (@uint8)(BK_G_4)
-	self:get_phrase_row(1, 7)[0] = (@uint8)(BK_NOTE_MUTE)
-    self:get_phrase_row(1, 8)[0] = (@uint8)(BK_C_5)
-	self:get_phrase_row(1, 9)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 10)[0] = (@uint8)(BK_G_4)
-	self:get_phrase_row(1, 11)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 12)[0] = (@uint8)(BK_E_4)
-	self:get_phrase_row(1, 13)[0] = (@uint8)(BK_NOTE_MUTE)
-	self:get_phrase_row(1, 14)[0] = (@uint8)(BK_D_4)
-	self:get_phrase_row(1, 15)[0] = (@uint8)(BK_NOTE_MUTE)
+	-- ...
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -214,7 +196,7 @@ function SoundChip:reset(): void
 		state.song_pos = 0
 		state.chain_id = 0
 		state.chain_pos = 0
-		state.phrase_id = i
+		state.phrase_id = 0
 		state.phrase_pos = 0
 		state.groove_id = 0
 		state.groove_pos = 0

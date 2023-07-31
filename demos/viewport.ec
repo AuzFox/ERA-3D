@@ -83,7 +83,7 @@ void init() {
 
     // init subscreen cameras
     for (int i = 0; i < SUBSCREEN_COUNT; i = i + 1) {
-        setCamPos(i, (vec3){0, 0, 2.5});
+        setCam3DPos(i, (vec3){0, 0, 2.5});
     }
 }
 

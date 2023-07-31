@@ -20,16 +20,21 @@ global function state_main_update(this: *State, sm: *StateMachine, vm: *e3d.EVM)
         else
             io.printf(vm.error)
         end
+    elseif rl.isKeyPressed(rl.keyboardKey.M) then
+        sm.queued_state = StateID.TRACKER -- switch to tracker state next frame
     end
 
     return StateID.MAIN
 end
 
 global function state_main_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    vm.gpu:clear(0xFFFFFFFF)
+    vm.gpu:clear(GPU_BLACK)
     
     vm.gpu:camera2D(0)
-    --vm.gpu:print2D(0, 0, 0x000000FF, "MAIN STATE")
+    vm.gpu:print2D(6, 10, GPU_RED, "MAIN")
+    vm.gpu:print2D(6, 20, GPU_WHITE, "PRESS [CTRL+R] TO COMPILE AND RUN")
+    vm.gpu:print2D(6, 30, GPU_WHITE, "PRESS [B] TO DUMP BYTECODE")
+    vm.gpu:print2D(6, 40, GPU_WHITE, "PRESS [M] TO SWITCH TO TRACKER")
 
     return StateID.MAIN
 end

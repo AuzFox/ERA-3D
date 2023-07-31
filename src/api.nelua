@@ -100,34 +100,6 @@ local function _vargv(vm: *e3d.EVM, offset: uint32): uint32
 	return addr
 end
 
-local function _drawchar2D(vm: *e3d.EVM, c: uint8, x: *int32, y: int32, color: rl.color): void
-	local fx: float32 = (@float32)($x)
-	local fy: float32 = (@float32)(y)
-
-	if fx <= -6.0 or y <= -9.0 or color.a == 0 then
-		return
-	end
-
-	if c < ' '_u8 then
-		c = '?'_u8
-	elseif c == ' '_u8 then
-		$x = $x + 6
-		return
-	elseif c == '\t'_u8 then
-		$x = $x + 12 -- tabs = 2 spaces
-	end
-
-	local srcx: float32 = (@float32)((c %%% 32) * 6)
-	local srcy: float32 = (@float32)((c /// 32) * 9)
-
-	local src_rect: rl.rectangle = { srcx, srcy, 6.0, 9.0 };
-	local dest_rect: rl.rectangle = { fx, fy, 6.0, 9.0 };
-
-	rl.drawTexturePro(vm.gpu.gfx_font_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, color)
-
-	$x = $x + 6
-end
-
 local function api_print2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void print2D(int x, int y, int color, string fmt, ...);
@@ -197,7 +169,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -220,7 +192,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -243,7 +215,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -266,7 +238,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -289,7 +261,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -317,7 +289,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 									return true
 								end
 		
-								_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+								vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -342,7 +314,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 									return true
 								end
 		
-								_drawchar2D(vm, s[j + 1], &cur_x, y, ray_col)
+								vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -358,7 +330,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 			cur_x = x
 			y = y + 9
 		else
-			_drawchar2D(vm, c, &cur_x, y, ray_col)
+			vm.gpu:drawchar2D(c, &cur_x, y, ray_col)
 		end
 
 		i = i + 1
@@ -1260,6 +1232,98 @@ local function api_camera2D(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function api_getCam2DOrigin(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec2 getCam2DOrigin(int id);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+
+	vm:pushv2(vm.gpu.cameras2D[id].offset)
+
+	return true
+end
+
+local function api_setCam2DOrigin(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setCam2DOrigin(int id, vec2 origin);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local origin: rl.vector2 = vm:get_argv2(1)
+
+	vm.gpu.cameras2D[id].offset = origin
+
+	return true
+end
+
+local function api_getCam2DTarget(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec2 getCam2DTarget(int id);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+
+	vm:pushv2(vm.gpu.cameras2D[id].target)
+
+	return true
+end
+
+local function api_setCam2DTarget(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setCam2DTarget(int id, vec2 target);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local target: rl.vector2 = vm:get_argv2(1)
+
+	vm.gpu.cameras2D[id].target = target
+
+	return true
+end
+
+local function api_getCam2DAngle(vm: *e3d.EVM): boolean
+	-- signature:
+	-- float getCam2DAngle(int id);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+
+	vm:pushf(vm.gpu.cameras2D[id].rotation)
+
+	return true
+end
+
+local function api_setCam2DAngle(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setCam2DAngle(int id, float angle);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local angle: float32 = vm:get_argf(1)
+
+	vm.gpu.cameras2D[id].rotation = angle
+
+	return true
+end
+
+local function api_getCam2DZoom(vm: *e3d.EVM): boolean
+	-- signature:
+	-- float getCam2DZoom(int id);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+
+	vm:pushf(vm.gpu.cameras2D[id].zoom)
+
+	return true
+end
+
+local function api_setCam2DZoom(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setCam2DZoom(int id, float zoom);
+
+	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local zoom: float32 = vm:get_argf(1)
+
+	vm.gpu.cameras2D[id].zoom = zoom
+
+	return true
+end
+
 local function api_camera3D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera3D(int id);
@@ -1271,9 +1335,9 @@ local function api_camera3D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamPos(vm: *e3d.EVM): boolean
+local function api_getCam3DPos(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCamPos(int id);
+	-- vec3 getCam3DPos(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1282,9 +1346,9 @@ local function api_getCamPos(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_setCamPos(vm: *e3d.EVM): boolean
+local function api_setCam3DPos(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCamPos(int id, vec3 pos);
+	-- void setCam3DPos(int id, vec3 pos);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local pos: rl.vector3 = vm:get_argv3(1)
@@ -1294,9 +1358,9 @@ local function api_setCamPos(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamTarget(vm: *e3d.EVM): boolean
+local function api_getCam3DTarget(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCamTarget(int id);
+	-- vec3 getCam3DTarget(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1305,9 +1369,9 @@ local function api_getCamTarget(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_setCamTarget(vm: *e3d.EVM): boolean
+local function api_setCam3DTarget(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCamTarget(int id, vec3 target);
+	-- void setCam3DTarget(int id, vec3 target);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local target: rl.vector3 = vm:get_argv3(1)
@@ -1317,9 +1381,9 @@ local function api_setCamTarget(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamUp(vm: *e3d.EVM): boolean
+local function api_getCam3DUp(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCamUp(int id);
+	-- vec3 getCam3DUp(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1328,9 +1392,9 @@ local function api_getCamUp(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_setCamUp(vm: *e3d.EVM): boolean
+local function api_setCam3DUp(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCamUp(int id, vec3 up);
+	-- void setCam3DUp(int id, vec3 up);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local up: rl.vector3 = vm:get_argv3(1)
@@ -1340,9 +1404,9 @@ local function api_setCamUp(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamFOV(vm: *e3d.EVM): boolean
+local function api_getCam3DFOV(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float getCamFOV(int id);
+	-- float getCam3DFOV(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1351,9 +1415,9 @@ local function api_getCamFOV(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_setCamFOV(vm: *e3d.EVM): boolean
+local function api_setCam3DFOV(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCamFOV(int id, float fov);
+	-- void setCam3DFOV(int id, float fov);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local fov: float32 = vm:get_argf(1)
@@ -1363,9 +1427,9 @@ local function api_setCamFOV(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamProj(vm: *e3d.EVM): boolean
+local function api_getCam3DProj(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int getCamProj(int id);
+	-- int getCam3DProj(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1374,9 +1438,9 @@ local function api_getCamProj(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_setCamProj(vm: *e3d.EVM): boolean
+local function api_setCam3DProj(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCamProj(int id, int mode);
+	-- void setCam3DProj(int id, int mode);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local proj: float32 = vm:get_argi(1)
@@ -1402,9 +1466,9 @@ local function _v3norm(v: rl.vector3): rl.vector3
 	return v
 end
 
-local function api_getCamRight(vm: *e3d.EVM): boolean
+local function api_getCam3DRight(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCamRight(int id);
+	-- vec3 getCam3DRight(int id);
 
 	-- get camera
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
@@ -1432,9 +1496,9 @@ local function api_getCamRight(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCamForward(vm: *e3d.EVM): boolean
+local function api_getCam3DForward(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCamForward(int id);
+	-- vec3 getCam3DForward(int id);
 
 	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
@@ -1493,6 +1557,8 @@ local function api_setCullMode(vm: *e3d.EVM): boolean
 
 	local mode: uint32 = vm:get_argu(0)
 
+	rlgl.drawRenderBatchActive()
+
 	switch mode do
 		case 0 then
 			rlgl.enableBackfaceCulling()
@@ -1524,9 +1590,11 @@ end
 local function api_setWireMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setWireMode(int mode);
-
+	
 	local enable: boolean = vm:get_argu(0) ~= 0
-
+	
+	rlgl.drawRenderBatchActive()
+	
 	if enable then
 		rlgl.enableWireMode()
 	else
@@ -2005,9 +2073,9 @@ local function api_rotate(vm: *e3d.EVM): boolean
 
 	local v: rl.vector3 = vm:get_argv3(0)
 	
-	rlgl.rotatef(v.x, 1, 0, 0)
-	rlgl.rotatef(v.y, 0, 1, 0)
 	rlgl.rotatef(v.z, 0, 0, 1)
+	rlgl.rotatef(v.y, 0, 1, 0)
+	rlgl.rotatef(v.x, 1, 0, 0)
 	
 	return true
 end
@@ -2460,93 +2528,153 @@ function e3d.EVM:register_api(): void
 		{name="vec3Invert", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}}, func=api_vec3Invert},
 		
 		{name="camera2D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera2D},
-		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera3D},
 		{
-			name="getCamPos",
+			name="getCam2DOrigin",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamPos
+			func=api_getCam2DOrigin
 		},
 		{
-			name="setCamPos",
+			name="setCam2DOrigin",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCamPos
+			func=api_setCam2DOrigin
 		},
 		{
-			name="getCamTarget",
+			name="getCam2DTarget",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamTarget
+			func=api_getCam2DTarget
 		},
 		{
-			name="setCamTarget",
+			name="setCam2DTarget",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCamTarget
+			func=api_setCam2DTarget
 		},
 		{
-			name="getCamUp",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamUp
-		},
-		{
-			name="setCamUp",
-			type_info={e3d.EVMType.VOID},
-			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
-			},
-			func=api_setCamUp
-		},
-		{
-			name="getCamFOV",
+			name="getCam2DAngle",
 			type_info={e3d.EVMType.FLOAT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamFOV
+			func=api_getCam2DAngle
 		},
 		{
-			name="setCamFOV",
+			name="setCam2DAngle",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_setCamFOV
+			func=api_setCam2DAngle
 		},
 		{
-			name="getCamProj",
+			name="getCam2DZoom",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_getCam2DZoom
+		},
+		{
+			name="setCam2DZoom",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.FLOAT}
+			},
+			func=api_setCam2DZoom
+		},
+		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera3D},
+		{
+			name="getCam3DPos",
+			type_info={e3d.EVMType.VEC3},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_getCam3DPos
+		},
+		{
+			name="setCam3DPos",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.VEC3}
+			},
+			func=api_setCam3DPos
+		},
+		{
+			name="getCam3DTarget",
+			type_info={e3d.EVMType.VEC3},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_getCam3DTarget
+		},
+		{
+			name="setCam3DTarget",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.VEC3}
+			},
+			func=api_setCam3DTarget
+		},
+		{
+			name="getCam3DUp",
+			type_info={e3d.EVMType.VEC3},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_getCam3DUp
+		},
+		{
+			name="setCam3DUp",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.VEC3}
+			},
+			func=api_setCam3DUp
+		},
+		{
+			name="getCam3DFOV",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{type_id=e3d.EVMType.INT}},
+			func=api_getCam3DFOV
+		},
+		{
+			name="setCam3DFOV",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.FLOAT}
+			},
+			func=api_setCam3DFOV
+		},
+		{
+			name="getCam3DProj",
 			type_info={e3d.EVMType.INT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamProj
+			func=api_getCam3DProj
 		},
 		{
-			name="setCamProj",
+			name="setCam3DProj",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_setCamProj
+			func=api_setCam3DProj
 		},
 		{
-			name="getCamRight",
+			name="getCam3DRight",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamRight
+			func=api_getCam3DRight
 		},
 		{
-			name="getCamForward",
+			name="getCam3DForward",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCamForward
+			func=api_getCam3DForward
 		},
 		
 		{

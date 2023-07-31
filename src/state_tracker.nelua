@@ -1,12 +1,90 @@
 require("statemachine")
 
+local TrackerData = @record {
+    clipboard: [SOUNDCHIP_SONG_SIZE]uint8,
+    clipboard_len: uinteger,
+    clipboard_type: uinteger, -- type of data currently in clipboard
+    selection_start: uinteger,
+    selection_len: uinteger,
+    current_screen: uinteger,
+    track: uint8,
+    song_id: uint8,
+    song_pos: uint8,
+    chain_id: uint8,
+    chain_pos: uint8,
+    phrase_id: uint8,
+    phrase_pos: uint8
+}
+
+local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
+    "C ",
+    "C#",
+    "D ",
+    "D#",
+    "E ",
+    "F ",
+    "F#",
+    "G ",
+    "G#",
+    "A ",
+    "A#",
+    "B "
+}
+
+local function new_trackerdata(): *TrackerData
+    local data: *TrackerData = new(@TrackerData)
+
+    data.clipboard_len = 0
+    data.clipboard_type = 0
+    data.selection_start = 0
+    data.selection_len = 0
+    data.current_screen = 0
+    data.track = 0
+    data.song_id = 0
+    data.song_pos = 0
+    data.chain_id = 0
+    data.chain_pos = 0
+    data.phrase_id = 0
+    data.phrase_pos = 0
+
+    return data
+end
+
 global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+    this.metadata = (@pointer)(new_trackerdata())
 end
 
 global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    local data: *TrackerData = (@*TrackerData)(this.metadata)
+    
+    if rl.isKeyPressed(rl.keyboardKey.M) then
+        sm.queued_state = StateID.MAIN -- switch to main state next frame
+    end
+    
     return StateID.TRACKER
 end
 
 global function state_tracker_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    local data: *TrackerData = (@*TrackerData)(this.metadata)
+
+    vm.gpu:clear(GPU_BLACK)
+    
+    vm.gpu:camera2D(0)
+
+    vm.gpu:print2D(0, 0, GPU_WHITE, "SONG")
+
+    for x = 0, < SOUNDCHIP_TRACK_COUNT do
+        for y = 0, < 5 do
+            vm.gpu:print2D(x * 18, 9 + y * 9, GPU_WHITE, ">00")
+        end
+    end
+
+    vm.gpu:print2D(0, 54, GPU_WHITE, "PHRASE 00")
+    
+    vm.gpu:print2D(0, 54, GPU_WHITE, ">")
+    for i = 0, < 16 do
+        vm.gpu:print2D(6, 63 + i * 9, GPU_WHITE, "C#4 A0 00 01 ... ...")
+    end
+
     return StateID.TRACKER
 end

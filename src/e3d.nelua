@@ -59,17 +59,17 @@ global e3d = @record{}
 ]]
 
 -- memory size and address constants
-global e3d.HEAP_SIZE      <comptime> = (1024*1024*8) -- 8MiB
-global e3d.GLOBALS_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.LOCALS_SIZE    <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.ARGS_SIZE      <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.ROM_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
-global e3d.OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.BYTECODE_SIZE  <comptime> = 65536 --  64KiB (65536 bytes)
-global e3d.CALLSTACK_SIZE <comptime> = 256
-global e3d.API_FUNCS_SIZE <comptime> = 65536
+global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
+global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.ROM_SIZE            <comptime> = 65536 --  64KiB (65536 bytes)
+global e3d.OPSTACK_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
+global e3d.BYTECODE_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
+global e3d.CALLSTACK_SIZE      <comptime> = 256
+global e3d.API_FUNCS_SIZE      <comptime> = 65536
 global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
-global e3d.OMEM_SIZE <comptime> = (3*1024*1024) + (640*1024) -- 3 MiB + 640 KiB
+global e3d.OMEM_SIZE           <comptime> = (3*1024*1024) + (640*1024) -- 3 MiB + 640 KiB
 
 global e3d.RAM_MAX_ADDR       <comptime> = 0x01FFFFFF
 global e3d.GLOBALS_START_ADDR <comptime> = e3d.HEAP_SIZE

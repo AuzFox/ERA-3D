@@ -74,7 +74,7 @@ void update(float delta_time) {
 	cam_pos.x = cos(asrad) * cam_radius;
 	cam_pos.z = sin(asrad) * cam_radius;
 
-	setCamPos(0, cam_pos);
+	setCam3DPos(0, cam_pos);
 }
 
 void draw() {
