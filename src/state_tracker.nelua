@@ -1,19 +1,30 @@
 require("statemachine")
 
+local Editor = @enum {
+    SONG = 0,
+    CHAIN,
+    PHRASE,
+    COUNT
+}
+
 local TrackerData = @record {
     clipboard: [SOUNDCHIP_SONG_SIZE]uint8,
     clipboard_len: uinteger,
     clipboard_type: uinteger, -- type of data currently in clipboard
     selection_start: uinteger,
     selection_len: uinteger,
-    current_editor: uinteger,
-    track: uint8,
+    current_editor: integer,
     song_id: uint8,
-    song_pos: uint8,
+    song_x: integer,
+    song_y: integer,
     chain_id: uint8,
-    chain_pos: uint8,
+    chain_x: integer,
+    chain_y: integer,
     phrase_id: uint8,
-    phrase_pos: uint8
+    phrase_x: integer,
+    phrase_y: integer,
+    cursor_x: *integer,
+    cursor_y: *integer
 }
 
 local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
@@ -34,9 +45,20 @@ local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
 local data: TrackerData
 
 local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:drawRect2D(18 + ((data.song_pos %%% 8) * 12), 9 + ((data.song_pos /// 8) * 9), 12, 9, 0xFF0000FF)
+    local cursor_color: uint32
+    local text_color: uint32
 
-    vm.gpu:print2D(18, 0, GPU_WHITE, "0 1 2 3 4 5 6 7")
+    if data.current_editor == Editor.SONG then
+        cursor_color = GPU_RED
+        text_color = GPU_WHITE
+    else
+        cursor_color = 0x808080FF
+        text_color = 0x808080FF
+    end
+
+    vm.gpu:drawRect2D(18 + (data.song_x * 12), 9 + (data.song_y * 9), 12, 9, cursor_color)
+
+    vm.gpu:print2D(18, 0, text_color, "0 1 2 3 4 5 6 7")
 
     for x = 0, < SOUNDCHIP_TRACK_COUNT do
         for y = 0, < 16 do
@@ -44,21 +66,32 @@ local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
             local starty: int32 = 9 + y * 9
             local byte_val: uint8 = vm.soundchip.song_data[8 * y + x]
 
-            vm.gpu:printHexByte2D(0, starty, GPU_WHITE, y)
+            vm.gpu:printHexByte2D(0, starty, text_color, y)
 
             if byte_val == SOUNDCHIP_EMPTY_VALUE then
-                vm.gpu:print2D(startx + 18, starty, 0xCCCCCCFF, "..")
+                vm.gpu:print2D(startx + 18, starty, text_color, "..")
             else
-                vm.gpu:printHexByte2D(startx + 18, starty, GPU_WHITE, byte_val)
+                vm.gpu:printHexByte2D(startx + 18, starty, text_color, byte_val)
             end
         end
     end
 end
 
 local function draw_chain(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:drawRect2D(132 + ((data.chain_pos %%% 2) * 12), 9 + ((data.chain_pos /// 2) * 9), 12, 9, 0xFF0000FF)
+    local cursor_color: uint32
+    local text_color: uint32
 
-    vm.gpu:printHexByte2D(120, 0, GPU_WHITE, data.chain_id)
+    if data.current_editor == Editor.CHAIN then
+        cursor_color = GPU_RED
+        text_color = GPU_WHITE
+    else
+        cursor_color = 0x808080FF
+        text_color = 0x808080FF
+    end
+
+    vm.gpu:drawRect2D(132 + (data.chain_x * 12), 9 + (data.chain_y * 9), 12, 9, cursor_color)
+
+    vm.gpu:printHexByte2D(120, 0, text_color, data.chain_id)
 
     local chain: *[0]uint8 = vm.soundchip:get_chain(data.chain_id)
     for i = 0, < 16 do
@@ -67,15 +100,15 @@ local function draw_chain(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
         local phrase_val: uint8 = chain[byte_index]
         local transpose_val: uint8 = chain[byte_index + 1]
 
-        vm.gpu:printHexNibble2D(120, y, GPU_WHITE, (@uint8)(i))
+        vm.gpu:printHexNibble2D(120, y, text_color, (@uint8)(i))
 
         if phrase_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(132, y, 0xCCCCCCFF, "..")
+            vm.gpu:print2D(132, y, text_color, "..")
         else
-            vm.gpu:printHexByte2D(132, y, GPU_WHITE, phrase_val)
+            vm.gpu:printHexByte2D(132, y, text_color, phrase_val)
         end
 
-        vm.gpu:printHexByte2D(144, y, GPU_WHITE, transpose_val)
+        vm.gpu:printHexByte2D(144, y, text_color, transpose_val)
     end
 end
 
@@ -92,15 +125,24 @@ local function get_note_text(note: uint8): string
 end
 
 local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    local cursor_column: uinteger = data.phrase_pos %%% 8
+    local cursor_color: uint32
+    local text_color: uint32
 
-    if cursor_column == 0 then
-        vm.gpu:drawRect2D(174, 9 + ((data.phrase_pos /// 8) * 9), 18, 9, 0xFF0000FF)
+    if data.current_editor == Editor.PHRASE then
+        cursor_color = GPU_RED
+        text_color = GPU_WHITE
     else
-        vm.gpu:drawRect2D(192 + ((cursor_column - 1) * 12), 9 + ((data.phrase_pos /// 8) * 9), 12, 9, 0xFF0000FF)
+        cursor_color = 0x808080FF
+        text_color = 0x808080FF
     end
 
-    vm.gpu:printHexByte2D(162, 0, GPU_WHITE, data.phrase_id)
+    if data.phrase_x == 0 then
+        vm.gpu:drawRect2D(174, 9 + (data.phrase_y * 9), 18, 9, cursor_color)
+    else
+        vm.gpu:drawRect2D(192 + ((data.phrase_x - 1) * 12), 9 + (data.phrase_y * 9), 12, 9, cursor_color)
+    end
+
+    vm.gpu:printHexByte2D(162, 0, text_color, data.phrase_id)
 
     for i = 0, < 16 do
         local y: int32 = 9 + i * 9
@@ -109,21 +151,21 @@ local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
         -- note, vol, pan, instr, fx0, arg0, fx1, arg1
         local note_val: uint8 = row[0]
 
-        vm.gpu:printHexNibble2D(162, y, GPU_WHITE, (@uint8)(i))
+        vm.gpu:printHexNibble2D(162, y, text_color, (@uint8)(i))
 
         if note_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(174, y, 0xCCCCCCFF, "...")
+            vm.gpu:print2D(174, y, text_color, "...")
         else
-            vm.gpu:print2D(174, y, GPU_WHITE, get_note_text(note_val))
+            vm.gpu:print2D(174, y, text_color, get_note_text(note_val))
         end
 
         for i = 1, < 8 do
             local val: uint8 = row[i]
             local x: int32 = 192 + ((i - 1) * 12)
             if val == SOUNDCHIP_EMPTY_VALUE then
-                vm.gpu:print2D(x, y, 0xCCCCCCFF, "..")
+                vm.gpu:print2D(x, y, text_color, "..")
             else
-                vm.gpu:printHexByte2D(x, y, GPU_WHITE, val)
+                vm.gpu:printHexByte2D(x, y, text_color, val)
             end
         end
     end
@@ -134,19 +176,57 @@ global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM
     data.clipboard_type = 0
     data.selection_start = 0
     data.selection_len = 0
-    data.current_editor = 0
-    data.track = 0
+    data.current_editor = Editor.SONG
     data.song_id = 0
-    data.song_pos = 0
+    data.song_x = 0
+    data.song_y = 0
     data.chain_id = 0
-    data.chain_pos = 0
+    data.chain_x = 0
+    data.chain_y = 0
     data.phrase_id = 0
-    data.phrase_pos = 0
+    data.phrase_x = 0
+    data.phrase_y = 0
+    data.cursor_x = &data.song_x
+    data.cursor_y = &data.song_y
 end
 
 global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     if rl.isKeyPressed(rl.keyboardKey.M) then
         sm.queued_state = StateID.MAIN -- switch to main state next frame
+    elseif rl.isKeyPressed(rl.keyboardKey.TAB) then
+        if rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT) then
+            data.current_editor = data.current_editor - 1
+        else
+            data.current_editor = data.current_editor + 1
+        end
+
+        if data.current_editor < 0 then
+            data.current_editor = Editor.COUNT - 1
+        elseif data.current_editor > Editor.COUNT - 1 then
+            data.current_editor = 0
+        end
+
+        switch data.current_editor do
+            case Editor.SONG then
+                data.cursor_x = &data.song_x
+                data.cursor_y = &data.song_y
+            case Editor.CHAIN then
+                data.cursor_x = &data.chain_x
+                data.cursor_y = &data.chain_y
+            case Editor.PHRASE then
+                data.cursor_x = &data.phrase_x
+                data.cursor_y = &data.phrase_y
+        end
+    else
+        if rl.isKeyPressed(rl.keyboardKey.UP) then
+            $data.cursor_y = $data.cursor_y - 1
+        elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
+            $data.cursor_y = $data.cursor_y + 1
+        elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
+            $data.cursor_x = $data.cursor_x - 1
+        elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+            $data.cursor_x = $data.cursor_x + 1
+        end
     end
     
     return StateID.TRACKER
