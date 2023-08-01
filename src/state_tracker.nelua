@@ -31,9 +31,110 @@ local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
     "B "
 }
 
-local function new_trackerdata(): *TrackerData
-    local data: *TrackerData = new(@TrackerData)
+local data: TrackerData
 
+local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:print2D(0, 0, GPU_WHITE, "SONG")
+
+    for x = 0, < SOUNDCHIP_TRACK_COUNT do
+        for y = 0, < 5 do
+            local startx: int32 = x * 18
+            local starty: int32 = 9 + y * 9
+            local byte_val: uint8 = vm.soundchip.song_data[8 * y + x]
+
+            vm.gpu:printHexByte2D(0, starty, GPU_WHITE, y)
+
+            if byte_val == SOUNDCHIP_EMPTY_VALUE then
+                vm.gpu:print2D(startx + 18, starty, 0xCCCCCCFF, "--")
+            else
+                vm.gpu:printHexByte2D(startx + 18, starty, GPU_WHITE, byte_val)
+            end
+        end
+    end
+end
+
+local function draw_chain(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:print2D(0, 63, GPU_WHITE, "CHAIN")
+    vm.gpu:printHexByte2D(36, 63, GPU_WHITE, data.chain_id)
+
+    local chain: *[0]uint8 = vm.soundchip:get_chain(data.chain_id)
+    for i = 0, < 16 do
+        local y: int32 = 72 + i * 9
+        local byte_index: uinteger = 2 * i
+        local phrase_val: uint8 = chain[byte_index]
+        local transpose_val: uint8 = chain[byte_index + 1]
+
+        vm.gpu:printHexNibble2D(0, y, GPU_WHITE, (@uint8)(i))
+
+        if phrase_val == SOUNDCHIP_EMPTY_VALUE then
+            vm.gpu:print2D(12, y, 0xCCCCCCFF, "--")
+        else
+            vm.gpu:printHexByte2D(12, y, GPU_WHITE, phrase_val)
+        end
+
+        vm.gpu:printHexByte2D(30, y, GPU_WHITE, transpose_val)
+    end
+end
+
+local function get_note_text(note: uint8): string
+    if note == SOUNDCHIP_NOTE_MUTE then
+        return "MUT"
+    elseif note == SOUNDCHIP_NOTE_MUTE then
+        return "REL"
+    else
+        local base_note: uint8 = note %%% SOUNDCHIP_OCTAVE_SIZE
+        local octave: uint8 = note /// SOUNDCHIP_OCTAVE_SIZE
+        return string.format("%s%1X", note_names[base_note], octave)
+    end
+end
+
+local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:print2D(54, 63, GPU_WHITE, "PRASE")
+    vm.gpu:printHexByte2D(90, 63, GPU_WHITE, data.phrase_id)
+
+    for i = 0, < 16 do
+        local y: int32 = 72 + i * 9
+        local row: *[0]uint8 = vm.soundchip:get_phrase_row(data.phrase_id, i)
+
+        -- note, vol, pan, instr, fx0, arg0, fx1, arg1
+        local note_val: uint8 = row[0]
+        local vol_val: uint8 = row[1]
+        local pan_val: uint8 = row[2]
+        local instr_val: uint8 = row[3]
+        local fx0_val: uint8 = row[4]
+        local arg0_val: uint8 = row[5]
+        local fx1_val: uint8 = row[6]
+        local arg1_val: uint8 = row[7]
+
+        vm.gpu:printHexNibble2D(54, y, GPU_WHITE, (@uint8)(i))
+
+        if note_val == SOUNDCHIP_EMPTY_VALUE then
+            vm.gpu:print2D(66, y, 0xCCCCCCFF, "---")
+        else
+            vm.gpu:print2D(66, y, GPU_WHITE, get_note_text(note_val))
+        end
+
+        if vol_val == SOUNDCHIP_EMPTY_VALUE then
+            vm.gpu:print2D(90, y, 0xCCCCCCFF, "--")
+        else
+            vm.gpu:printHexByte2D(90, y, GPU_WHITE, vol_val)
+        end
+
+        if pan_val == SOUNDCHIP_EMPTY_VALUE then
+            vm.gpu:print2D(108, y, 0xCCCCCCFF, "--")
+        else
+            vm.gpu:printHexByte2D(108, y, GPU_WHITE, pan_val)
+        end
+
+        if instr_val == SOUNDCHIP_EMPTY_VALUE then
+            vm.gpu:print2D(126, y, 0xCCCCCCFF, "--")
+        else
+            vm.gpu:printHexByte2D(126, y, GPU_WHITE, instr_val)
+        end
+    end
+end
+
+global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     data.clipboard_len = 0
     data.clipboard_type = 0
     data.selection_start = 0
@@ -46,17 +147,9 @@ local function new_trackerdata(): *TrackerData
     data.chain_pos = 0
     data.phrase_id = 0
     data.phrase_pos = 0
-
-    return data
-end
-
-global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    this.metadata = (@pointer)(new_trackerdata())
 end
 
 global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    local data: *TrackerData = (@*TrackerData)(this.metadata)
-    
     if rl.isKeyPressed(rl.keyboardKey.M) then
         sm.queued_state = StateID.MAIN -- switch to main state next frame
     end
@@ -65,26 +158,13 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
 end
 
 global function state_tracker_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    local data: *TrackerData = (@*TrackerData)(this.metadata)
-
-    vm.gpu:clear(GPU_BLACK)
+    vm.gpu:clear(0x808080FF)
     
     vm.gpu:camera2D(0)
 
-    vm.gpu:print2D(0, 0, GPU_WHITE, "SONG")
-
-    for x = 0, < SOUNDCHIP_TRACK_COUNT do
-        for y = 0, < 5 do
-            vm.gpu:print2D(x * 18, 9 + y * 9, GPU_WHITE, ">00")
-        end
-    end
-
-    vm.gpu:print2D(0, 54, GPU_WHITE, "PHRASE 00")
-    
-    vm.gpu:print2D(0, 54, GPU_WHITE, ">")
-    for i = 0, < 16 do
-        vm.gpu:print2D(6, 63 + i * 9, GPU_WHITE, "C#4 A0 00 01 ... ...")
-    end
+    draw_song(this, sm, vm)
+    draw_chain(this, sm, vm)
+    draw_phrase(this, sm, vm)
 
     return StateID.TRACKER
 end

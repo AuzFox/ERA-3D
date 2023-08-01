@@ -186,6 +186,8 @@ function SoundChip:reset(): void
 	-- reset instruments
 	-- ...
 
+	self:get_phrase_row(0, 4)[0] = (@uint8)(BK_A_SH_4)
+
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
 		local state: *TrackState = (@*TrackState)(&self.smem[SOUNDCHIP_TRACK_STATE_START + (i * #TrackState)])
@@ -243,11 +245,7 @@ function SoundChip:init(): void
 
 		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((128.0 * 4.0 * 6.0) / 60.0)), nilptr)
 
-		if i == 0 then
-            BKTrackInit(&tc.bk_track, BK_SAWTOOTH)
-        else
-            BKTrackInit(&tc.bk_track, BK_SQUARE)
-        end
+		BKTrackInit(&tc.bk_track, BK_SQUARE)
 		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume
 		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 2) -- note volume
 		BKTrackAttach(&tc.bk_track, &self.bk_context)

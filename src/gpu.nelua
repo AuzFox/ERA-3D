@@ -221,6 +221,70 @@ function GPU:print2D(x: int32, y: int32, col: uint32, text: string): void
 	end
 end
 
+-- printHexNibble2D function for host program, doesn't do formatting
+function GPU:printHexNibble2D(x: int32, y: int32, col: uint32, val: uint8): void
+	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
+		-- we're off screen, no need to render
+		return
+	end
+
+	local cur_x: int32 = x
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF),
+	}
+
+	local nibble: uint8 = val & 0xF
+	if nibble < 0xA then
+		nibble = '0'_u8 + nibble
+	else
+		nibble = 'A'_u8 + (nibble - 0xA)
+	end
+
+	self:drawchar2D(nibble, &cur_x, y, ray_col)
+end
+
+-- printHexByte2D function for host program, doesn't do formatting
+function GPU:printHexByte2D(x: int32, y: int32, col: uint32, val: uint8): void
+	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
+		-- we're off screen, no need to render
+		return
+	end
+
+	local cur_x: int32 = x
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF),
+	}
+
+	local msn: uint8 = val >> 4
+	if msn < 0xA then
+		msn = '0'_u8 + msn
+	else
+		msn = 'A'_u8 + (msn - 0xA)
+	end
+
+	self:drawchar2D(msn, &cur_x, y, ray_col)
+
+	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
+		-- we're off screen, no need to render
+		return
+	end
+
+	local lsn: uint8 = val & 0xF
+	if lsn < 0xA then
+		lsn = '0'_u8 + lsn
+	else
+		lsn = 'A'_u8 + (lsn - 0xA)
+	end
+
+	self:drawchar2D(lsn, &cur_x, y, ray_col)
+end
+
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	self.tex_x = (@cint)(x)
 	self.tex_y = (@cint)(y)
