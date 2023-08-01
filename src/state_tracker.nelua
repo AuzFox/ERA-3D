@@ -6,7 +6,7 @@ local TrackerData = @record {
     clipboard_type: uinteger, -- type of data currently in clipboard
     selection_start: uinteger,
     selection_len: uinteger,
-    current_screen: uinteger,
+    current_editor: uinteger,
     track: uint8,
     song_id: uint8,
     song_pos: uint8,
@@ -34,18 +34,20 @@ local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
 local data: TrackerData
 
 local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:print2D(0, 0, GPU_WHITE, "SONG")
+    vm.gpu:drawRect2D(18 + ((data.song_pos %%% 8) * 12), 9 + ((data.song_pos /// 8) * 9), 12, 9, 0xFF0000FF)
+
+    vm.gpu:print2D(18, 0, GPU_WHITE, "0 1 2 3 4 5 6 7")
 
     for x = 0, < SOUNDCHIP_TRACK_COUNT do
-        for y = 0, < 5 do
-            local startx: int32 = x * 18
+        for y = 0, < 16 do
+            local startx: int32 = x * 12
             local starty: int32 = 9 + y * 9
             local byte_val: uint8 = vm.soundchip.song_data[8 * y + x]
 
             vm.gpu:printHexByte2D(0, starty, GPU_WHITE, y)
 
             if byte_val == SOUNDCHIP_EMPTY_VALUE then
-                vm.gpu:print2D(startx + 18, starty, 0xCCCCCCFF, "--")
+                vm.gpu:print2D(startx + 18, starty, 0xCCCCCCFF, "..")
             else
                 vm.gpu:printHexByte2D(startx + 18, starty, GPU_WHITE, byte_val)
             end
@@ -54,25 +56,26 @@ local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 local function draw_chain(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:print2D(0, 63, GPU_WHITE, "CHAIN")
-    vm.gpu:printHexByte2D(36, 63, GPU_WHITE, data.chain_id)
+    vm.gpu:drawRect2D(132 + ((data.chain_pos %%% 2) * 12), 9 + ((data.chain_pos /// 2) * 9), 12, 9, 0xFF0000FF)
+
+    vm.gpu:printHexByte2D(120, 0, GPU_WHITE, data.chain_id)
 
     local chain: *[0]uint8 = vm.soundchip:get_chain(data.chain_id)
     for i = 0, < 16 do
-        local y: int32 = 72 + i * 9
+        local y: int32 = 9 + i * 9
         local byte_index: uinteger = 2 * i
         local phrase_val: uint8 = chain[byte_index]
         local transpose_val: uint8 = chain[byte_index + 1]
 
-        vm.gpu:printHexNibble2D(0, y, GPU_WHITE, (@uint8)(i))
+        vm.gpu:printHexNibble2D(120, y, GPU_WHITE, (@uint8)(i))
 
         if phrase_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(12, y, 0xCCCCCCFF, "--")
+            vm.gpu:print2D(132, y, 0xCCCCCCFF, "..")
         else
-            vm.gpu:printHexByte2D(12, y, GPU_WHITE, phrase_val)
+            vm.gpu:printHexByte2D(132, y, GPU_WHITE, phrase_val)
         end
 
-        vm.gpu:printHexByte2D(30, y, GPU_WHITE, transpose_val)
+        vm.gpu:printHexByte2D(144, y, GPU_WHITE, transpose_val)
     end
 end
 
@@ -89,47 +92,39 @@ local function get_note_text(note: uint8): string
 end
 
 local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:print2D(54, 63, GPU_WHITE, "PRASE")
-    vm.gpu:printHexByte2D(90, 63, GPU_WHITE, data.phrase_id)
+    local cursor_column: uinteger = data.phrase_pos %%% 8
+
+    if cursor_column == 0 then
+        vm.gpu:drawRect2D(174, 9 + ((data.phrase_pos /// 8) * 9), 18, 9, 0xFF0000FF)
+    else
+        vm.gpu:drawRect2D(192 + ((cursor_column - 1) * 12), 9 + ((data.phrase_pos /// 8) * 9), 12, 9, 0xFF0000FF)
+    end
+
+    vm.gpu:printHexByte2D(162, 0, GPU_WHITE, data.phrase_id)
 
     for i = 0, < 16 do
-        local y: int32 = 72 + i * 9
+        local y: int32 = 9 + i * 9
         local row: *[0]uint8 = vm.soundchip:get_phrase_row(data.phrase_id, i)
 
         -- note, vol, pan, instr, fx0, arg0, fx1, arg1
         local note_val: uint8 = row[0]
-        local vol_val: uint8 = row[1]
-        local pan_val: uint8 = row[2]
-        local instr_val: uint8 = row[3]
-        local fx0_val: uint8 = row[4]
-        local arg0_val: uint8 = row[5]
-        local fx1_val: uint8 = row[6]
-        local arg1_val: uint8 = row[7]
 
-        vm.gpu:printHexNibble2D(54, y, GPU_WHITE, (@uint8)(i))
+        vm.gpu:printHexNibble2D(162, y, GPU_WHITE, (@uint8)(i))
 
         if note_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(66, y, 0xCCCCCCFF, "---")
+            vm.gpu:print2D(174, y, 0xCCCCCCFF, "...")
         else
-            vm.gpu:print2D(66, y, GPU_WHITE, get_note_text(note_val))
+            vm.gpu:print2D(174, y, GPU_WHITE, get_note_text(note_val))
         end
 
-        if vol_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(90, y, 0xCCCCCCFF, "--")
-        else
-            vm.gpu:printHexByte2D(90, y, GPU_WHITE, vol_val)
-        end
-
-        if pan_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(108, y, 0xCCCCCCFF, "--")
-        else
-            vm.gpu:printHexByte2D(108, y, GPU_WHITE, pan_val)
-        end
-
-        if instr_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(126, y, 0xCCCCCCFF, "--")
-        else
-            vm.gpu:printHexByte2D(126, y, GPU_WHITE, instr_val)
+        for i = 1, < 8 do
+            local val: uint8 = row[i]
+            local x: int32 = 192 + ((i - 1) * 12)
+            if val == SOUNDCHIP_EMPTY_VALUE then
+                vm.gpu:print2D(x, y, 0xCCCCCCFF, "..")
+            else
+                vm.gpu:printHexByte2D(x, y, GPU_WHITE, val)
+            end
         end
     end
 end
@@ -139,7 +134,7 @@ global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM
     data.clipboard_type = 0
     data.selection_start = 0
     data.selection_len = 0
-    data.current_screen = 0
+    data.current_editor = 0
     data.track = 0
     data.song_id = 0
     data.song_pos = 0
@@ -158,7 +153,7 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
 end
 
 global function state_tracker_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    vm.gpu:clear(0x808080FF)
+    vm.gpu:clear(0x000000FF)
     
     vm.gpu:camera2D(0)
 

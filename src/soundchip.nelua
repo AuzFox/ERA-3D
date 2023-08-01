@@ -168,25 +168,11 @@ function SoundChip:reset(): void
         end
     end
 
-    -- reset phrases, each phrase row set to [EMPTY, 0, 0, 0, EMPTY, 0, EMPTY 0]
-    for i = 0, < SOUNDCHIP_PHRASE_COUNT do
-        local phrase: *[0]uint8 = self:get_phrase(i)
-        for j = 0, < 16 do
-            phrase[j * 8] = SOUNDCHIP_EMPTY_VALUE
-            phrase[j * 8 + 1] = 0
-            phrase[j * 8 + 2] = 0
-            phrase[j * 8 + 3] = 0
-            phrase[j * 8 + 4] = SOUNDCHIP_EMPTY_VALUE
-            phrase[j * 8 + 5] = 0
-            phrase[j * 8 + 6] = SOUNDCHIP_EMPTY_VALUE
-            phrase[j * 8 + 7] = 0
-        end
-    end
+    -- reset phrases, each phrase row set to all EMPTY
+    memory.set(self.phrase_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_PHRASE_COUNT * SOUNDCHIP_PHRASE_SIZE)
 
 	-- reset instruments
 	-- ...
-
-	self:get_phrase_row(0, 4)[0] = (@uint8)(BK_A_SH_4)
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]

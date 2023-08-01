@@ -1842,11 +1842,7 @@ local function api_beginMesh(vm: *e3d.EVM): boolean
 			return false
 	end
 
-	rl.beginShaderMode(vm.gpu.gfx_shader)
-
-	rlgl.setTexture(vm.gpu.gfx_texture.id)
-	
-	rlgl.begin(mode)
+	vm.gpu:beginMesh(mode)
 	
 	return true
 end
@@ -1855,9 +1851,7 @@ local function api_endMesh(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void endMesh();
 
-	rlgl.ending()
-
-	rl.endShaderMode()
+	vm.gpu:endMesh()
 	
 	return true
 end

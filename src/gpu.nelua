@@ -156,6 +156,20 @@ function GPU:camera3D(id: uinteger): void
 	self.matrix_mode = rlgl.MODELVIEW
 end
 
+function GPU:beginMesh(mode: uint32): void
+	rl.beginShaderMode(self.gfx_shader)
+
+	rlgl.setTexture(self.gfx_texture.id)
+	
+	rlgl.begin(mode)
+end
+
+function GPU:endMesh(): void
+	rlgl.ending()
+
+	rl.endShaderMode()
+end
+
 function GPU:drawchar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 	local fx: float32 = (@float32)($x)
 	local fy: float32 = (@float32)(y)
@@ -283,6 +297,21 @@ function GPU:printHexByte2D(x: int32, y: int32, col: uint32, val: uint8): void
 	end
 
 	self:drawchar2D(lsn, &cur_x, y, ray_col)
+end
+
+function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
+	local fx0: float32 = (@float32)(x)
+	local fy0: float32 = (@float32)(y)
+	local fx1: float32 = (@float32)(x + w)
+	local fy1: float32 = (@float32)(y + h)
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF),
+	}
+
+	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
