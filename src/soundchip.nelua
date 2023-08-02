@@ -7,6 +7,8 @@ global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 2048
 global SOUNDCHIP_EMPTY_VALUE <comptime> = 0xFF
 global SOUNDCHIP_NOTE_MUTE <comptime> = 0xFE
 global SOUNDCHIP_NOTE_RELEASE <comptime> = 0xFD
+global SOUNDCHIP_MIN_OCTAVE <comptime> = 0
+global SOUNDCHIP_MAX_OCTAVE <comptime> = 7
 global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
 
 global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
@@ -100,6 +102,12 @@ end
 function SoundChip:set_bpm(): void
 end
 
+function SoundChip:stopTrack(track: uint8): void
+	local tc: *TrackContext = &self.track_contexts[track]
+	self.audio_state.playing_flags = self.audio_state.playing_flags & ~(0x80 >> track)
+	BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
+end
+
 local function _track_callback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 	local tc: *TrackContext = (@*TrackContext)(userdata)
 	local sc: *SoundChip = tc.soundchip
@@ -111,8 +119,8 @@ local function _track_callback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 		local state: *TrackState = sc:get_track_state(track_index)
 
 		if state.phrase_id == SOUNDCHIP_EMPTY_VALUE then
-			sc.audio_state.playing_flags = sc.audio_state.playing_flags & ~(0x80 >> track_index)
-			BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
+			sc:stopTrack(track_index)
+			return 0
 		end
 		
 		state.phrase_pos = math.min(15, state.phrase_pos)
@@ -138,12 +146,78 @@ local function _track_callback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 		state.phrase_pos = state.phrase_pos + 1
 		if state.phrase_pos > 15 then
 			state.phrase_pos = 0
+
+			state.chain_pos = state.chain_pos + 1
+			if state.chain_pos > 15 then
+				state.chain_pos = 0
+
+				state.song_pos = state.song_pos + 1
+			else
+				state.phrase_id = sc:get_chain(state.chain_id)[state.chain_pos * 2]
+				if state.phrase_id == SOUNDCHIP_EMPTY_VALUE then
+					state.chain_pos = 0
+					state.song_pos = state.song_pos + 1
+				end
+			end
+
+			state.chain_id = sc.song_data[state.song_pos * 8 + track_index]
+			if state.chain_id == SOUNDCHIP_EMPTY_VALUE then
+				sc:stopTrack(track_index)
+				return 0
+			end
+
+			state.phrase_id = sc:get_chain(state.chain_id)[state.chain_pos * 2]
+			if state.phrase_id == SOUNDCHIP_EMPTY_VALUE then
+				sc:stopTrack(track_index)
+				return 0
+			end
 		end
 	else
 		BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
 	end
 
 	return 0
+end
+
+function SoundChip:stopAllTracks(): void
+	for i = 0, < SOUNDCHIP_TRACK_COUNT do
+		self:stopTrack(i)
+	end
+end
+
+function SoundChip:playPhrase(track: uint8, phrase: uint8): void
+	self.audio_state.playing_flags = self.audio_state.playing_flags | (0x80 >> track)
+	local state: *TrackState = self:get_track_state(track)
+	state.phrase_id = phrase
+	state.phrase_pos = 0
+end
+
+function SoundChip:playSongRow(song_row: uint8): void
+	for i = 0, < SOUNDCHIP_TRACK_COUNT do
+		local tc: *TrackContext = &self.track_contexts[i]
+		local state: *TrackState = self:get_track_state(i)
+
+		local chain_id: uint8 = self.song_data[((@uinteger)(song_row) * 8) + i]
+		if chain_id == SOUNDCHIP_EMPTY_VALUE then
+			self.audio_state.playing_flags = self.audio_state.playing_flags & ~(0x80 >> i)
+			BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
+			continue
+		end
+
+		local chain: *[0]uint8 = self:get_chain(chain_id)
+		local phrase_id: uint8 = chain[0]
+
+		if phrase_id == SOUNDCHIP_EMPTY_VALUE then
+			self.audio_state.playing_flags = self.audio_state.playing_flags & ~(0x80 >> i)
+			BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
+			continue
+		end
+
+		state.song_pos = song_row
+		state.chain_id = chain_id
+		state.chain_pos = 0
+		self:playPhrase(i, phrase_id)
+	end
 end
 
 function SoundChip:update_audio(): void
@@ -174,10 +248,23 @@ function SoundChip:reset(): void
 	-- reset instruments
 	-- ...
 
+	self.song_data[0] = 0x00
+	self.song_data[8] = 0x01
+
+	self:get_chain(0x00)[0] = 0x00
+	self:get_chain(0x00)[2] = 0x01
+	self:get_chain(0x00)[4] = 0x02
+	self:get_chain(0x00)[6] = 0x03
+
+	self:get_chain(0x01)[0] = 0x04
+	self:get_chain(0x01)[2] = 0x05
+	self:get_chain(0x01)[4] = 0x06
+	self:get_chain(0x01)[6] = 0x07
+
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
-		local state: *TrackState = (@*TrackState)(&self.smem[SOUNDCHIP_TRACK_STATE_START + (i * #TrackState)])
-		state.bpm = 128
+		local state: *TrackState = self:get_track_state(i)
+		state.bpm = 154
 		state.volume = 127
 		state.pan = 0
 		state.song_id = 0
@@ -229,7 +316,7 @@ function SoundChip:init(): void
 		tc.soundchip = self
 		tc.track_index = i
 
-		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((128.0 * 4.0 * 6.0) / 60.0)), nilptr)
+		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((154.0 * 4.0 * 6.0) / 60.0)), nilptr)
 
 		BKTrackInit(&tc.bk_track, BK_SQUARE)
 		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume

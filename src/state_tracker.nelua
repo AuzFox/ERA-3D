@@ -1,5 +1,7 @@
 require("statemachine")
 
+local PIANO_KEYS_COUNT <comptime> = SOUNDCHIP_OCTAVE_SIZE * 2
+
 local Editor = @enum {
     SONG = 0,
     CHAIN,
@@ -14,6 +16,7 @@ local TrackerData = @record {
     selection_start: uinteger,
     selection_len: uinteger,
     current_editor: integer,
+    octave: uint8,
     song_id: uint8,
     song_x: integer,
     song_y: integer,
@@ -28,18 +31,48 @@ local TrackerData = @record {
 }
 
 local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
-    "C ",
+    "C-",
     "C#",
-    "D ",
+    "D-",
     "D#",
-    "E ",
-    "F ",
+    "E-",
+    "F-",
     "F#",
-    "G ",
+    "G-",
     "G#",
-    "A ",
+    "A-",
     "A#",
-    "B "
+    "B-"
+}
+
+local piano_keys: [PIANO_KEYS_COUNT]cint = {
+    -- base octave
+    rl.keyboardKey.Z, -- C
+    rl.keyboardKey.S, -- C#
+    rl.keyboardKey.X, -- D
+    rl.keyboardKey.D, -- D#
+    rl.keyboardKey.C, -- E
+    rl.keyboardKey.V, -- F
+    rl.keyboardKey.G, -- F#
+    rl.keyboardKey.B, -- G
+    rl.keyboardKey.H, -- G#
+    rl.keyboardKey.N, -- A
+    rl.keyboardKey.J, -- A#
+    rl.keyboardKey.M, -- B
+
+    -- octave + 1
+    rl.keyboardKey.Q,     -- C
+    rl.keyboardKey.TWO,   -- C#
+    rl.keyboardKey.W,     -- D
+    rl.keyboardKey.THREE, -- D#
+    rl.keyboardKey.E,     -- E
+    rl.keyboardKey.R,     -- F
+    rl.keyboardKey.FIVE,  -- F#
+    rl.keyboardKey.T,     -- G
+    rl.keyboardKey.SIX,   -- G#
+    rl.keyboardKey.Y,     -- A
+    rl.keyboardKey.SEVEN, -- A#
+    rl.keyboardKey.U,     -- B
 }
 
 local data: TrackerData
@@ -114,8 +147,8 @@ end
 
 local function get_note_text(note: uint8): string
     if note == SOUNDCHIP_NOTE_MUTE then
-        return "MUT"
-    elseif note == SOUNDCHIP_NOTE_MUTE then
+        return "OFF"
+    elseif note == SOUNDCHIP_NOTE_RELEASE then
         return "REL"
     else
         local base_note: uint8 = note %%% SOUNDCHIP_OCTAVE_SIZE
@@ -171,12 +204,39 @@ local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     end
 end
 
+local function do_note_input(vm: *e3d.EVM): void
+    local row: *[0]uint8 = vm.soundchip:get_phrase_row(data.phrase_id, data.phrase_y)
+
+    if rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
+        row[0] = SOUNDCHIP_EMPTY_VALUE
+        data.phrase_y = data.phrase_y + 1
+    elseif rl.isKeyPressed(rl.keyboardKey.COMMA) then
+        row[0] = SOUNDCHIP_NOTE_RELEASE
+        data.phrase_y = data.phrase_y + 1
+    elseif rl.isKeyPressed(rl.keyboardKey.PERIOD) then
+        row[0] = SOUNDCHIP_NOTE_MUTE
+        data.phrase_y = data.phrase_y + 1
+    else
+        for i = 0, < PIANO_KEYS_COUNT do
+            if rl.isKeyPressed(piano_keys[i]) then
+                row[0] = (@uint8)(i + data.octave * SOUNDCHIP_OCTAVE_SIZE)
+                data.phrase_y = data.phrase_y + 1
+            end
+        end
+    end
+
+    if data.phrase_y > 15 then
+        data.phrase_y = 0
+    end
+end
+
 global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     data.clipboard_len = 0
     data.clipboard_type = 0
     data.selection_start = 0
     data.selection_len = 0
     data.current_editor = Editor.SONG
+    data.octave = 4
     data.song_id = 0
     data.song_x = 0
     data.song_y = 0
@@ -191,10 +251,12 @@ global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM
 end
 
 global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    if rl.isKeyPressed(rl.keyboardKey.M) then
+    local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
+
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
         sm.queued_state = StateID.MAIN -- switch to main state next frame
     elseif rl.isKeyPressed(rl.keyboardKey.TAB) then
-        if rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT) then
+        if is_shift_down then
             data.current_editor = data.current_editor - 1
         else
             data.current_editor = data.current_editor + 1
@@ -218,14 +280,68 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
                 data.cursor_y = &data.phrase_y
         end
     else
-        if rl.isKeyPressed(rl.keyboardKey.UP) then
-            $data.cursor_y = $data.cursor_y - 1
+        if rl.isKeyPressed(rl.keyboardKey.SPACE) then
+            if vm.soundchip.audio_state.playing_flags ~= 0 then
+                vm.soundchip:stopAllTracks()
+            else
+                vm.soundchip:playSongRow(data.song_y)
+            end
+        elseif rl.isKeyPressed(rl.keyboardKey.UP) then
+            if is_shift_down then
+                switch data.current_editor do
+                    case Editor.CHAIN then
+                        data.chain_id = data.chain_id + 0x10
+                    case Editor.PHRASE then
+                        data.phrase_id = data.phrase_id + 0x10
+                end
+            else
+                $data.cursor_y = $data.cursor_y - 1
+            end
         elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-            $data.cursor_y = $data.cursor_y + 1
+            if is_shift_down then
+                switch data.current_editor do
+                    case Editor.CHAIN then
+                        data.chain_id = data.chain_id - 0x10
+                    case Editor.PHRASE then
+                        data.phrase_id = data.phrase_id - 0x10
+                end
+            else
+                $data.cursor_y = $data.cursor_y + 1
+            end
         elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
-            $data.cursor_x = $data.cursor_x - 1
+            if is_shift_down then
+                switch data.current_editor do
+                    case Editor.CHAIN then
+                        data.chain_id = data.chain_id - 1
+                    case Editor.PHRASE then
+                        data.phrase_id = data.phrase_id - 1
+                end
+            else
+                $data.cursor_x = $data.cursor_x - 1
+            end
         elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-            $data.cursor_x = $data.cursor_x + 1
+            if is_shift_down then
+                switch data.current_editor do
+                    case Editor.CHAIN then
+                        data.chain_id = data.chain_id + 1
+                    case Editor.PHRASE then
+                        data.phrase_id = data.phrase_id + 1
+                end
+            else
+                $data.cursor_x = $data.cursor_x + 1
+            end
+        elseif rl.isKeyPressed(rl.keyboardKey.MINUS) then
+            if data.octave > SOUNDCHIP_MIN_OCTAVE then
+                data.octave = data.octave - 1
+            end
+        elseif rl.isKeyPressed(rl.keyboardKey.EQUAL) then
+            if data.octave < SOUNDCHIP_MAX_OCTAVE - 1 then
+                data.octave = data.octave + 1
+            end
+        else
+            if vm.soundchip.audio_state.playing_flags == 0 and data.current_editor == Editor.PHRASE and data.phrase_x == 0 then
+                do_note_input(vm)
+            end
         end
     end
     
