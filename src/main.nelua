@@ -13,29 +13,29 @@ local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)
 local dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
 
 local function init(): void
-	vm = e3d.new_vm()
-	e3d.set_default_btnmap()
+	vm = e3d.newVM()
+	e3d.setDefaultBtnmap()
 
 	sm.states = {
 		{
-			state_boot_init,
-			state_boot_update,
-			state_boot_draw
+			stateBootInit,
+			stateBootUpdate,
+			stateBootDraw
 		},
 		{
-			state_main_init,
-			state_main_update,
-			state_main_draw
+			stateMainInit,
+			stateMainUpdate,
+			stateMainDraw
 		},
 		{
-			state_tracker_init,
-			state_tracker_update,
-			state_tracker_draw
+			stateTrackerInit,
+			stateTrackerUpdate,
+			stateTrackerDraw
 		},
 		{
-			state_run_init,
-			state_run_update,
-			state_run_draw
+			stateRunInit,
+			stateRunUpdate,
+			stateRunDraw
 		}
 	}
 
@@ -44,10 +44,10 @@ end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		sm:update_state(vm)
+		sm:updateState(vm)
 		
 		-- update audio stream
-		vm.soundchip:update_audio()
+		vm.soundchip:updateAudio()
 
 		-- update render settings
 		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
@@ -56,8 +56,8 @@ local function run(): void
 		end
 
 		rl.beginTextureMode(vm.gpu.gfx_rendertex)
-			sm:draw_state(vm)
-			vm.gpu:reset_matrix_stack()
+			sm:drawState(vm)
+			vm.gpu:resetMatrixStack()
 		rl.endTextureMode()
 
 		rl.beginDrawing()
@@ -65,7 +65,7 @@ local function run(): void
 			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 		rl.endDrawing()
 
-		sm:set_queued_state()
+		sm:setQueuedState()
 	end
 end
 

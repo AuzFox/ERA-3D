@@ -9,6 +9,7 @@ local function glClear(mask: cint): void <cimport> end
 global GPU_ALPHA_BLACK <comptime> = 0x00000000
 global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
 global GPU_BLACK       <comptime> = 0x000000FF
+global GPU_GRAY        <comptime> = 0x808080FF
 global GPU_WHITE       <comptime> = 0xFFFFFFFF
 global GPU_RED         <comptime> = 0xFF0000FF
 global GPU_GREEN       <comptime> = 0x00FF00FF
@@ -19,7 +20,14 @@ global GPU_VSCREEN_W <comptime> = 320
 global GPU_VSCREEN_H <comptime> = 240
 global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * 3)
 global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * 3)
-global GPU_CAMERAS_COUNT  <comptime> = 4
+global GPU_CAMERAS_COUNT <comptime> = 4
+
+global GPU_LINES <comptime> = 0
+global GPU_TRIANGLES <comptime> = 1
+global GPU_QUADS <comptime> = 2
+
+global GPU_PROJECTION <comptime> = 0
+global GPU_MODELVIEW <comptime> = 1
 
 global GPU_TMEM_WIDTH <comptime> = 1024
 global GPU_TMEM_HEIGHT <comptime> = 1024
@@ -157,6 +165,19 @@ function GPU:camera3D(id: uinteger): void
 end
 
 function GPU:beginMesh(mode: uint32): void
+	switch mode do
+		case GPU_LINES then
+			self.triangle_mode = false
+			mode = rlgl.LINES
+		case GPU_TRIANGLES then
+			self.triangle_mode = true
+			self.triangle_vert_index = 0
+			mode = rlgl.QUADS
+		case GPU_QUADS then
+			self.triangle_mode = false
+			mode = rlgl.QUADS
+	end
+
 	rl.beginShaderMode(self.gfx_shader)
 
 	rlgl.setTexture(self.gfx_texture.id)
@@ -170,7 +191,91 @@ function GPU:endMesh(): void
 	rl.endShaderMode()
 end
 
-function GPU:drawchar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
+function GPU:matrixMode(mode: uint32): void
+	switch mode do
+		case GPU_PROJECTION then
+			rlgl.matrixMode(rlgl.PROJECTION)
+			self.matrix_mode = rlgl.PROJECTION
+		case GPU_MODELVIEW then
+			rlgl.matrixMode(rlgl.MODELVIEW)
+			self.matrix_mode = rlgl.MODELVIEW
+	end
+end
+
+function GPU:vertex(v: rl.vector3): void
+	rlgl.vertex3f(v.x, v.y, v.z)
+	
+	if self.triangle_mode then
+		if self.triangle_vert_index == 0 then
+			-- send copy of first vertex to allow textured tris
+			rlgl.color4ub(
+				self.triangle_vert_color.r,
+				self.triangle_vert_color.g,
+				self.triangle_vert_color.b,
+				self.triangle_vert_color.a
+			)
+			rlgl.texCoord2f(
+				self.triangle_vert_uv.x,
+				self.triangle_vert_uv.y
+			)
+			rlgl.vertex3f(v.x, v.y, v.z)
+		end
+
+		self.triangle_vert_index = self.triangle_vert_index + 1
+		if self.triangle_vert_index >= 2 then
+			self.triangle_vert_index = 0
+		end
+	end
+end
+
+function GPU:vertex2D(v: rl.vector2): void
+	rlgl.vertex2f(v.x, v.y)
+	
+	if self.triangle_mode then
+		if self.triangle_vert_index == 0 then
+			-- send copy of first vertex to allow textured tris
+			rlgl.color4ub(
+				self.triangle_vert_color.r,
+				self.triangle_vert_color.g,
+				self.triangle_vert_color.b,
+				self.triangle_vert_color.a
+			)
+			rlgl.texCoord2f(
+				self.triangle_vert_uv.x,
+				self.triangle_vert_uv.y
+			)
+			rlgl.vertex2f(v.x, v.y)
+		end
+
+		self.triangle_vert_index = self.triangle_vert_index + 1
+		if self.triangle_vert_index >= 2 then
+			self.triangle_vert_index = 0
+		end
+	end
+end
+
+function GPU:vertUV(v: rl.vector2): void
+	rlgl.texCoord2f(v.x, v.y)
+
+	if self.triangle_mode and (self.triangle_vert_index == 0) then
+		self.triangle_vert_uv = v
+	end
+end
+
+function GPU:vertColor(col: uint32): void
+	local r: cuchar = (@cuchar)(col >> 24)
+	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
+	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
+	local a: cuchar = (@cuchar)(col & 0xFF)
+	
+	rlgl.color4ub(r, g, b, a)
+
+	if self.triangle_mode and (self.triangle_vert_index == 0) then
+		self.triangle_vert_color = {r, g, b, a}
+	end
+end
+
+function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 	local fx: float32 = (@float32)($x)
 	local fy: float32 = (@float32)(y)
 
@@ -228,7 +333,7 @@ function GPU:print2D(x: int32, y: int32, col: uint32, text: string): void
 			cur_x = x
 			y = y + 9
 		else
-			self:drawchar2D(c, &cur_x, y, ray_col)
+			self:drawChar2D(c, &cur_x, y, ray_col)
 		end
 
 		i = i + 1
@@ -257,7 +362,7 @@ function GPU:printHexNibble2D(x: int32, y: int32, col: uint32, val: uint8): void
 		nibble = 'A'_u8 + (nibble - 0xA)
 	end
 
-	self:drawchar2D(nibble, &cur_x, y, ray_col)
+	self:drawChar2D(nibble, &cur_x, y, ray_col)
 end
 
 -- printHexByte2D function for host program, doesn't do formatting
@@ -282,7 +387,7 @@ function GPU:printHexByte2D(x: int32, y: int32, col: uint32, val: uint8): void
 		msn = 'A'_u8 + (msn - 0xA)
 	end
 
-	self:drawchar2D(msn, &cur_x, y, ray_col)
+	self:drawChar2D(msn, &cur_x, y, ray_col)
 
 	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
 		-- we're off screen, no need to render
@@ -296,7 +401,7 @@ function GPU:printHexByte2D(x: int32, y: int32, col: uint32, val: uint8): void
 		lsn = 'A'_u8 + (lsn - 0xA)
 	end
 
-	self:drawchar2D(lsn, &cur_x, y, ray_col)
+	self:drawChar2D(lsn, &cur_x, y, ray_col)
 end
 
 function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
@@ -314,6 +419,45 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
+function GPU:drawModelEx(start: uint32, mode: uint32, n: uint32): void
+	--[[
+	if n == 0 then
+		return
+	end
+
+	self:beginMesh()
+		for i = 0, i < n do
+			-- get vertices
+			local tri_start: uint32 = start + i * 3
+			local v0: Vertex = self:getOMEMVertex(tri_start)
+			local v1: Vertex = self:getOMEMVertex(tri_start + 1)
+			local v2: Vertex = self:getOMEMVertex(tri_start + 2)
+
+			-- upload vertices
+			self:vertUV(v0.uv)
+			self:vertColor(v0.col)
+			self:vertex(v0.pos)
+
+			self:vertUV(v1.uv)
+			self:vertColor(v1.col)
+			self:vertex(v1.pos)
+
+			self:vertUV(v2.uv)
+			self:vertColor(v2.col)
+			self:vertex(v2.pos)
+
+			self:vertUV(v0.uv)
+			self:vertColor(v0.col)
+			self:vertex(v0.pos)
+		end
+	self:endMesh()
+	]]--
+end
+
+function GPU:drawModel(start: uint32, tris: uint32): void
+	self:drawModelEx(start, GPU_TRIANGLES, tris)
+end
+
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	self.tex_x = (@cint)(x)
 	self.tex_y = (@cint)(y)
@@ -326,7 +470,7 @@ function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function GPU:reset_matrix_stack(): void
+function GPU:resetMatrixStack(): void
 	rlgl.matrixMode(rlgl.PROJECTION)
 
 	while self.proj_matrix_count > 0 do
@@ -342,7 +486,7 @@ function GPU:reset_matrix_stack(): void
 	end
 end
 
-function GPU:enable_render_state(): void
+function GPU:enableRenderState(): void
 	switch self.cull_mode do
 		case 0 then
 			rlgl.enableBackfaceCulling()
@@ -366,7 +510,7 @@ function GPU:enable_render_state(): void
 	self.matrix_mode = rlgl.MODELVIEW
 end
 
-function GPU:disable_render_state(): void
+function GPU:disableRenderState(): void
 	rlgl.enableBackfaceCulling()
 	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
 	rlgl.disableWireMode()
@@ -374,7 +518,7 @@ function GPU:disable_render_state(): void
 	rlgl.viewport(0, 0, GPU_SCREEN_W, GPU_SCREEN_H)
 end
 
-function GPU:reset(): void
+function GPU:resetGPU(): void
 	for i = 0, < GPU_CAMERAS_COUNT do
 		self.cameras2D[i] = {
 			offset={0.0,0.0},
@@ -450,7 +594,7 @@ function GPU:init(): void
 	self.fog_end_loc = rl.getShaderLocation(self.gfx_shader, "fogEnd")
 	self.fog_color_loc = rl.getShaderLocation(self.gfx_shader, "fogColor")
 
-	self:reset()
+	self:resetGPU()
 end
 
 function GPU:cleanup(): void

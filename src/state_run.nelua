@@ -1,30 +1,30 @@
 require("statemachine")
 
-global function state_run_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function state_run_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateRunUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
         return sm.prev_state
     end
     
-    if not vm:call_hook(e3d.Hook.UPDATE) then
+    if not vm:callHook(e3d.Hook.UPDATE) then
         return sm.prev_state
     end
 
     return StateID.RUN
 end
 
-global function state_run_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateRunDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     local return_state: integer = StateID.RUN
 
     vm.gpu:camera3D(0) -- configure default camera
-    vm.gpu:enable_render_state()
-    if not vm:call_hook(e3d.Hook.DRAW) then
+    vm.gpu:enableRenderState()
+    if not vm:callHook(e3d.Hook.DRAW) then
         io.printf(vm.error)
         return_state = sm.prev_state
     end
-    vm.gpu:disable_render_state()
+    vm.gpu:disableRenderState()
 
     return return_state
 end

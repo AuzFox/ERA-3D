@@ -1,22 +1,22 @@
 require("e3d")
 
-function e3d.EVM:get_argi(i: uint16): int32 <forwarddecl> end
-function e3d.EVM:get_argu(i: uint16): uint32 <forwarddecl> end
-function e3d.EVM:get_argf(i: uint16): float32 <forwarddecl> end
-function e3d.EVM:get_argv2(i: uint16): rl.vector2 <forwarddecl> end
-function e3d.EVM:get_argv3(i: uint16): rl.vector3 <forwarddecl> end
-function e3d.EVM:get_argstr(i: uint16): e3d.EVMString <forwarddecl> end
-function e3d.EVM:pushi(val: int32): void <forwarddecl> end
-function e3d.EVM:pushu(val: uint32): void <forwarddecl> end
-function e3d.EVM:pushf(val: float32): void <forwarddecl> end
-function e3d.EVM:pushv2(val: rl.vector2): void <forwarddecl> end
-function e3d.EVM:pushv3(val: rl.vector3): void <forwarddecl> end
-function e3d.EVM:pushstr(val: e3d.EVMString): void <forwarddecl> end
+function e3d.EVM:getArgI(i: uint16): int32 <forwarddecl> end
+function e3d.EVM:getArgU(i: uint16): uint32 <forwarddecl> end
+function e3d.EVM:getArgF(i: uint16): float32 <forwarddecl> end
+function e3d.EVM:getArgV2(i: uint16): rl.vector2 <forwarddecl> end
+function e3d.EVM:getArgV3(i: uint16): rl.vector3 <forwarddecl> end
+function e3d.EVM:getArgStr(i: uint16): e3d.EVMString <forwarddecl> end
+function e3d.EVM:pushI(val: int32): void <forwarddecl> end
+function e3d.EVM:pushU(val: uint32): void <forwarddecl> end
+function e3d.EVM:pushF(val: float32): void <forwarddecl> end
+function e3d.EVM:pushV2(val: rl.vector2): void <forwarddecl> end
+function e3d.EVM:pushV3(val: rl.vector3): void <forwarddecl> end
+function e3d.EVM:pushStr(val: e3d.EVMString): void <forwarddecl> end
 
-function e3d.EVM:get_ram8(addr: uint32): uint8 <forwarddecl> end
-function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean <forwarddecl> end
-function e3d.EVM:get_ram32(addr: uint32): uint32 <forwarddecl> end
-function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
+function e3d.EVM:getRAM8(addr: uint32): uint8 <forwarddecl> end
+function e3d.EVM:setRAM8(addr: uint32, val: uint8): boolean <forwarddecl> end
+function e3d.EVM:getRAM32(addr: uint32): uint32 <forwarddecl> end
+function e3d.EVM:setRAM32(addr: uint32, val: uint32): boolean <forwarddecl> end
 
 --[[
 	API FUNCTIONS TO IMPLEMENT:
@@ -52,27 +52,27 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean <forwarddecl> end
 
 -- DEBUG API FUNCTIONS (TODO: remove)
 
-local function api_halt(vm: *e3d.EVM): boolean
+local function apiHalt(vm: *e3d.EVM): boolean
 	vm.error = "- PROGRAM HALTED -\n"
 	return false
 end
 
 -- API FUNCTIONS:
 
--- get_ram8() helper function for api_print2D()
-local function _get_ram8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
+-- getRAM8() helper function for apiPrint2D()
+local function getRAM8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
 		return false
 	end
 
-	$c = vm:get_ram8(addr)
+	$c = vm:getRAM8(addr)
 
 	return true
 end
 
--- get_ram32() helper function for api_print2D()
-local function _get_ram32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
+-- getRAM32() helper function for apiPrint2D()
+local function getRAM32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
 		return false
@@ -81,14 +81,14 @@ local function _get_ram32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
 		return false
 	end
 
-	$v = vm:get_ram32(addr)
+	$v = vm:getRAM32(addr)
 
 	return true
 end
 
 -- vargv() helper function.
 -- gets vargv() for the *api* function
-local function _vargv(vm: *e3d.EVM, offset: uint32): uint32
+local function vargv(vm: *e3d.EVM, offset: uint32): uint32
 	vm.cf.vargc = vm.cf.vargc - offset
 	
 	-- get adress vargp currently points to
@@ -100,14 +100,14 @@ local function _vargv(vm: *e3d.EVM, offset: uint32): uint32
 	return addr
 end
 
-local function api_print2D(vm: *e3d.EVM): boolean
+local function apiPrint2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void print2D(int x, int y, int color, string fmt, ...);
 
-	local x: int32 = vm:get_argi(0)
-	local y: int32 = vm:get_argi(1)
-	local col: uint32 = vm:get_argu(2)
-	local fmt: e3d.EVMString = vm:get_argstr(3)
+	local x: int32 = vm:getArgI(0)
+	local y: int32 = vm:getArgI(1)
+	local col: uint32 = vm:getArgU(2)
+	local fmt: e3d.EVMString = vm:getArgStr(3)
 
 	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
 		-- we're off screen, no need to render
@@ -144,10 +144,10 @@ local function api_print2D(vm: *e3d.EVM): boolean
 
 		addr = start_addr + i
 
-		if not _get_ram8(vm, addr, &c) then return false end
+		if not getRAM8(vm, addr, &c) then return false end
 		
 		if c == '%'_u8 then
-			if not _get_ram8(vm, addr + 1, &c) then return false end
+			if not getRAM8(vm, addr + 1, &c) then return false end
 
 			switch c do
 				case 'i'_u8, 'd'_u8 then
@@ -156,8 +156,8 @@ local function api_print2D(vm: *e3d.EVM): boolean
 						return false
 					end
 
-					arg_addr = _vargv(vm, 1)
-					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(vm, 1)
+					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.i)
@@ -169,7 +169,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -179,8 +179,8 @@ local function api_print2D(vm: *e3d.EVM): boolean
 						return false
 					end
 
-					arg_addr = _vargv(vm, 1)
-					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(vm, 1)
+					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.u)
@@ -192,7 +192,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -202,8 +202,8 @@ local function api_print2D(vm: *e3d.EVM): boolean
 						return false
 					end
 
-					arg_addr = _vargv(vm, 1)
-					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(vm, 1)
+					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08x", arg_val0.u)
@@ -215,7 +215,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -225,8 +225,8 @@ local function api_print2D(vm: *e3d.EVM): boolean
 						return false
 					end
 
-					arg_addr = _vargv(vm, 1)
-					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(vm, 1)
+					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08X", arg_val0.u)
@@ -238,7 +238,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -248,8 +248,8 @@ local function api_print2D(vm: *e3d.EVM): boolean
 						return false
 					end
 
-					arg_addr = _vargv(vm, 1)
-					if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(vm, 1)
+					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%.2f", arg_val0.f)
@@ -261,12 +261,12 @@ local function api_print2D(vm: *e3d.EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
 				case 'v'_u8 then
-					if not _get_ram8(vm, addr + 2, &c) then return false end
+					if not getRAM8(vm, addr + 2, &c) then return false end
 
 					switch c do
 						case '2'_u8 then
@@ -275,9 +275,9 @@ local function api_print2D(vm: *e3d.EVM): boolean
 								return false
 							end
 		
-							arg_addr = _vargv(vm, 2)
-							if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
-							if not _get_ram32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							arg_addr = vargv(vm, 2)
+							if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+							if not getRAM32(vm, arg_addr + 4, &arg_val1.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f)", arg_val0.f, arg_val1.f)
@@ -289,7 +289,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 									return true
 								end
 		
-								vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+								vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -299,10 +299,10 @@ local function api_print2D(vm: *e3d.EVM): boolean
 								return false
 							end
 		
-							arg_addr = _vargv(vm, 3)
-							if not _get_ram32(vm, arg_addr, &arg_val0.u) then return false end
-							if not _get_ram32(vm, arg_addr + 4, &arg_val1.u) then return false end
-							if not _get_ram32(vm, arg_addr + 8, &arg_val2.u) then return false end
+							arg_addr = vargv(vm, 3)
+							if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+							if not getRAM32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							if not getRAM32(vm, arg_addr + 8, &arg_val2.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f, %.2f)", arg_val0.f, arg_val1.f, arg_val2.f)
@@ -314,7 +314,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 									return true
 								end
 		
-								vm.gpu:drawchar2D(s[j + 1], &cur_x, y, ray_col)
+								vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -330,7 +330,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 			cur_x = x
 			y = y + 9
 		else
-			vm.gpu:drawchar2D(c, &cur_x, y, ray_col)
+			vm.gpu:drawChar2D(c, &cur_x, y, ray_col)
 		end
 
 		i = i + 1
@@ -339,7 +339,7 @@ local function api_print2D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_vargc(vm: *e3d.EVM): boolean
+local function apiVargc(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int vargc();
 
@@ -357,16 +357,16 @@ local function api_vargc(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	vm:pushu(frame.vargc * 4) -- return number of vararg bytes to allow use of sizeof()
+	vm:pushU(frame.vargc * 4) -- return number of vararg bytes to allow use of sizeof()
 
 	return true
 end
 
-local function api_vargv(vm: *e3d.EVM): boolean
+local function apiVargv(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void* vargv(int offset);
 
-	local offset: uint32 = vm:get_argu(0) /// 4 -- offset is given in bytes to allow easy use of sizeof()
+	local offset: uint32 = vm:getArgU(0) /// 4 -- offset is given in bytes to allow easy use of sizeof()
 
 	if vm.csp < 1 then
 		-- shouldn't happen, but just in case
@@ -398,7 +398,7 @@ local function api_vargv(vm: *e3d.EVM): boolean
 	local ap: uinteger = (vm.asp - vm.cf.argc) - frame.argc
 	
 	-- return adress vargp currently points to
-	vm:pushu(e3d.ARGS_START_ADDR + ((ap + frame.vargp) * 4))
+	vm:pushU(e3d.ARGS_START_ADDR + ((ap + frame.vargp) * 4))
 
 	-- offset vararg pointer
 	frame.vargp = frame.vargp + offset
@@ -406,9 +406,9 @@ local function api_vargv(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_pressed(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:get_argu(0)
-	local p: uint32 = vm:get_argu(1)
+local function apiPressed(vm: *e3d.EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+	local p: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b
@@ -416,17 +416,17 @@ local function api_pressed(vm: *e3d.EVM): boolean
 	local code: cint = e3d.btnmap[b]
 
 	if code == 0 then
-		vm:pushu(0)
+		vm:pushU(0)
 	else
-		vm:pushu(rl.isKeyPressed(code) and 1 or 0)
+		vm:pushU(rl.isKeyPressed(code) and 1 or 0)
 	end
 	
 	return true
 end
 
-local function api_released(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:get_argu(0)
-	local p: uint32 = vm:get_argu(1)
+local function apiReleased(vm: *e3d.EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+	local p: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b
@@ -434,17 +434,17 @@ local function api_released(vm: *e3d.EVM): boolean
 	local code: cint = e3d.btnmap[b]
 
 	if code == 0 then
-		vm:pushu(0)
+		vm:pushU(0)
 	else
-		vm:pushu(rl.isKeyReleased(code) and 1 or 0)
+		vm:pushU(rl.isKeyReleased(code) and 1 or 0)
 	end
 	
 	return true
 end
 
-local function api_held(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:get_argu(0)
-	local p: uint32 = vm:get_argu(1)
+local function apiHeld(vm: *e3d.EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+	local p: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b
@@ -452,53 +452,53 @@ local function api_held(vm: *e3d.EVM): boolean
 	local code: cint = e3d.btnmap[b]
 
 	if code == 0 then
-		vm:pushu(0)
+		vm:pushU(0)
 	else
-		vm:pushu(rl.isKeyDown(code) and 1 or 0)
+		vm:pushU(rl.isKeyDown(code) and 1 or 0)
 	end
 	
 	return true
 end
 
-local function api_mini(vm: *e3d.EVM): boolean
+local function apiMini(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int mini(int a, int b);
 	
-	local a: int32 = vm:get_argi(0)
-	local b: int32 = vm:get_argi(1)
+	local a: int32 = vm:getArgI(0)
+	local b: int32 = vm:getArgI(1)
 	
 	if a < b then
-		vm:pushi(a)
+		vm:pushI(a)
 	else
-		vm:pushi(b)
+		vm:pushI(b)
 	end
 	
 	return true
 end
 
-local function api_maxi(vm: *e3d.EVM): boolean
+local function apiMaxi(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int maxi(int a, int b);
 	
-	local a: int32 = vm:get_argi(0)
-	local b: int32 = vm:get_argi(1)
+	local a: int32 = vm:getArgI(0)
+	local b: int32 = vm:getArgI(1)
 	
 	if a < b then
-		vm:pushi(a)
+		vm:pushI(a)
 	else
-		vm:pushi(b)
+		vm:pushI(b)
 	end
 	
 	return true
 end
 
-local function api_midi(vm: *e3d.EVM): boolean
+local function apiMidi(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int midi(int a, int b, int c);
 
-	local a: int32 = vm:get_argi(0)
-	local b: int32 = vm:get_argi(1)
-	local c: int32 = vm:get_argi(2)
+	local a: int32 = vm:getArgI(0)
+	local b: int32 = vm:getArgI(1)
+	local c: int32 = vm:getArgI(2)
 
 	if b < a then
 		local t: int32 = a
@@ -516,21 +516,21 @@ local function api_midi(vm: *e3d.EVM): boolean
 		b = t
 	end
 	
-	vm:pushi(b)
+	vm:pushI(b)
 
 	return true
 end
 
-local function api_wrapi(vm: *e3d.EVM): boolean
+local function apiWrapi(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int wrapi(int x, int min, int max);
 
-	local x: int32 = vm:get_argi(0)
-	local min: int32 = vm:get_argi(1)
-	local max: int32 = vm:get_argi(2)
+	local x: int32 = vm:getArgI(0)
+	local min: int32 = vm:getArgI(1)
+	local max: int32 = vm:getArgI(2)
 	
 	if min == max then
-        vm:pushi(min)
+        vm:pushI(min)
 		return true
     elseif min > max then
         min, max = max, min
@@ -542,50 +542,50 @@ local function api_wrapi(vm: *e3d.EVM): boolean
     end
 
     local temp: float32 = max - min
-    vm:pushi(min + ((temp + ((x - min) %%% temp)) %%% temp))
+    vm:pushI(min + ((temp + ((x - min) %%% temp)) %%% temp))
 	
 	return true
 end
 
-local function api_minf(vm: *e3d.EVM): boolean
+local function apiMinf(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int minf(float a, float b);
 
-	local a: float32 = vm:get_argf(0)
-	local b: float32 = vm:get_argf(1)
+	local a: float32 = vm:getArgF(0)
+	local b: float32 = vm:getArgF(1)
 
 	if a < b then
-		vm:pushf(a)
+		vm:pushF(a)
 	else
-		vm:pushf(b)
+		vm:pushF(b)
 	end
 
 	return true
 end
 
-local function api_maxf(vm: *e3d.EVM): boolean
+local function apiMaxf(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int maxf(float a, float b);
 
-	local a: float32 = vm:get_argf(0)
-	local b: float32 = vm:get_argf(1)
+	local a: float32 = vm:getArgF(0)
+	local b: float32 = vm:getArgF(1)
 
 	if a > b then
-		vm:pushf(a)
+		vm:pushF(a)
 	else
-		vm:pushf(b)
+		vm:pushF(b)
 	end
 
 	return true
 end
 
-local function api_midf(vm: *e3d.EVM): boolean
+local function apiMidf(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int midf(float a, float b, float c);
 
-	local a: float32 = vm:get_argf(0)
-	local b: float32 = vm:get_argf(1)
-	local c: float32 = vm:get_argf(2)
+	local a: float32 = vm:getArgF(0)
+	local b: float32 = vm:getArgF(1)
+	local c: float32 = vm:getArgF(2)
 
 	if b < a then
 	    local t: float32 = a
@@ -603,21 +603,21 @@ local function api_midf(vm: *e3d.EVM): boolean
 	    b = t
 	end
 	
-	vm:pushf(b)
+	vm:pushF(b)
 
 	return true
 end
 
-local function api_wrapf(vm: *e3d.EVM): boolean
+local function apiWrapf(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float wrapf(float x, float min, float max);
 
-	local x: float32 = vm:get_argf(0)
-	local min: float32 = vm:get_argf(1)
-	local max: float32 = vm:get_argf(2)
+	local x: float32 = vm:getArgF(0)
+	local min: float32 = vm:getArgF(1)
+	local max: float32 = vm:getArgF(2)
 	
 	if min == max then
-        vm:pushf(min)
+        vm:pushF(min)
 		return true
     elseif min > max then
         min, max = max, min
@@ -629,127 +629,127 @@ local function api_wrapf(vm: *e3d.EVM): boolean
     end
 
     local temp: float32 = max - min
-    vm:pushf(min + ((temp + ((x - min) %%% temp)) %%% temp))
+    vm:pushF(min + ((temp + ((x - min) %%% temp)) %%% temp))
 	
 	return true
 end
 
-local function api_signi(vm: *e3d.EVM): boolean
-	local x: int32 = vm:get_argi(0)
+local function apiSigni(vm: *e3d.EVM): boolean
+	local x: int32 = vm:getArgI(0)
 
-	vm:pushi(math.sign(x))
-
-	return true
-end
-
-local function api_signf(vm: *e3d.EVM): boolean
-	local x: float32 = vm:get_argf(0)
-
-	vm:pushf(math.sign(x))
+	vm:pushI(math.sign(x))
 
 	return true
 end
 
-local function api_fract(vm: *e3d.EVM): boolean
-	local x: float32 = vm:get_argf(0)
+local function apisignf(vm: *e3d.EVM): boolean
+	local x: float32 = vm:getArgF(0)
 
-	vm:pushf(math.fract(x))
-
-	return true
-end
-
-local function api_deg(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
-
-	vm:pushf(math.deg(v))
+	vm:pushF(math.sign(x))
 
 	return true
 end
 
-local function api_rad(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
+local function apiFract(vm: *e3d.EVM): boolean
+	local x: float32 = vm:getArgF(0)
 
-	vm:pushf(math.rad(v))
-
-	return true
-end
-
-local function api_sin(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
-
-	vm:pushf(math.sin(v))
+	vm:pushF(math.fract(x))
 
 	return true
 end
 
-local function api_cos(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
+local function apiDeg(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
 
-	vm:pushf(math.cos(v))
-
-	return true
-end
-
-local function api_floor(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
-
-	vm:pushf(math.floor(v))
+	vm:pushF(math.deg(v))
 
 	return true
 end
 
-local function api_ceil(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
+local function apiRad(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
 
-	vm:pushf(math.ceil(v))
-
-	return true
-end
-
-local function api_round(vm: *e3d.EVM): boolean
-	local v: float32 = vm:get_argf(0)
-
-	vm:pushf(math.round(v))
+	vm:pushF(math.rad(v))
 
 	return true
 end
 
-local function api_randomize(vm: *e3d.EVM): boolean
+local function apiSin(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
+
+	vm:pushF(math.sin(v))
+
+	return true
+end
+
+local function apiCos(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
+
+	vm:pushF(math.cos(v))
+
+	return true
+end
+
+local function apiFloor(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
+
+	vm:pushF(math.floor(v))
+
+	return true
+end
+
+local function apiCeil(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
+
+	vm:pushF(math.ceil(v))
+
+	return true
+end
+
+local function apiRound(vm: *e3d.EVM): boolean
+	local v: float32 = vm:getArgF(0)
+
+	vm:pushF(math.round(v))
+
+	return true
+end
+
+local function apiRandomize(vm: *e3d.EVM): boolean
 	math.randomseed()
 
 	return true
 end
 
-local function api_randomizeEx(vm: *e3d.EVM): boolean
-	local seed: uint32 = vm:get_argu(0)
+local function apiRandomizeEx(vm: *e3d.EVM): boolean
+	local seed: uint32 = vm:getArgU(0)
 
 	math.randomseed(seed)
 
 	return true
 end
 
-local function api_randi(vm: *e3d.EVM): boolean
-	local min: int32 = vm:get_argi(0)
-	local max: int32 = vm:get_argi(1)
+local function apiRandi(vm: *e3d.EVM): boolean
+	local min: int32 = vm:getArgI(0)
+	local max: int32 = vm:getArgI(1)
 
 	if max < min then
 		min, max = max, min
 	end
 
-	vm:pushi(math.random(min, max))
+	vm:pushI(math.random(min, max))
 
 	return true
 end
 
-local function api_randiEx(vm: *e3d.EVM): boolean
-	vm:pushi(math.random(0)) -- get int will all random bits
+local function apiRandiEx(vm: *e3d.EVM): boolean
+	vm:pushI(math.random(0)) -- get int will all random bits
 
 	return true
 end
 
-local function api_randf(vm: *e3d.EVM): boolean
-	local min: float32 = vm:get_argf(0)
-	local max: float32 = vm:get_argf(1)
+local function apiRandf(vm: *e3d.EVM): boolean
+	local min: float32 = vm:getArgF(0)
+	local max: float32 = vm:getArgF(1)
 
 	if max < min then
 		min, max = max, min
@@ -757,50 +757,50 @@ local function api_randf(vm: *e3d.EVM): boolean
 
 	local x: float32 = math.random() -- gets a float in [0, 1)
 
-	vm:pushf(min + x * (max - min))
+	vm:pushF(min + x * (max - min))
 
 	return true
 end
 
-local function api_randfEx(vm: *e3d.EVM): boolean
-	vm:pushf(math.random())
+local function apiRandfEx(vm: *e3d.EVM): boolean
+	vm:pushF(math.random())
 
 	return true
 end
 
-local function api_time(vm: *e3d.EVM): boolean
-	vm:pushf((@float32)(rl.getTime() - vm.init_time))
+local function apiTime(vm: *e3d.EVM): boolean
+	vm:pushF((@float32)(rl.getTime() - vm.init_time))
 	
 	return true
 end
 
-local function api_vec2Len(vm: *e3d.EVM): boolean
+local function apiVec2Len(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2Len(vec2 v);
 
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 
-	vm:pushf(math.sqrt(v.x * v.x + v.y * v.y))
+	vm:pushF(math.sqrt(v.x * v.x + v.y * v.y))
 
 	return true
 end
 
-local function api_vec2LenSq(vm: *e3d.EVM): boolean
+local function apiVec2LenSq(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2LenSq(vec2 v);
 
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 
-	vm:pushf(v.x * v.x + v.y * v.y)
+	vm:pushF(v.x * v.x + v.y * v.y)
 
 	return true
 end
 
-local function api_vec2Norm(vm: *e3d.EVM): boolean
+local function apiVec2Norm(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Norm(vec2 v);
 
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 
 	local l: float32 = v.x * v.x + v.y * v.y
 
@@ -810,65 +810,65 @@ local function api_vec2Norm(vm: *e3d.EVM): boolean
 		v.y = v.y / l
 	end
 
-	vm:pushv2(v)
+	vm:pushV2(v)
 
 	return true
 end
 
-local function api_vec2Dot(vm: *e3d.EVM): boolean
+local function apiVec2Dot(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2Dot(vec2 a, vec2 b);
 	
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushf(a.x * b.x + a.y * b.y)
+	vm:pushF(a.x * b.x + a.y * b.y)
 
 	return true
 end
 
-local function api_vec2Cross(vm: *e3d.EVM): boolean
+local function apiVec2Cross(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2Cross(vec2 a, vec2 b);
 	
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushf(a.x * b.y - a.y * b.x)
+	vm:pushF(a.x * b.y - a.y * b.x)
 
 	return true
 end
 
-local function api_vec2Dist(vm: *e3d.EVM): boolean
+local function apiVec2Dist(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2Dist(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushf(math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)))
+	vm:pushF(math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)))
 	
 	return true
 end
 
-local function api_vec2DistSq(vm: *e3d.EVM): boolean
+local function apiVec2DistSq(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2DistSq(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 	
-	vm:pushf((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
+	vm:pushF((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
 	
 	return true
 end
 
-local function api_vec2Direction(vm: *e3d.EVM): boolean
+local function apiVec2Direction(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Direction(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 	local direction: rl.vector2 = b - a;
 
 	local l: float32 = direction.x * direction.x + direction.y * direction.y
@@ -879,150 +879,150 @@ local function api_vec2Direction(vm: *e3d.EVM): boolean
 		direction.y = direction.y / l
 	end
 
-	vm:pushv2(direction)
+	vm:pushV2(direction)
 
 	return true
 end
 
-local function api_vec2Angle(vm: *e3d.EVM): boolean
+local function apiVec2Angle(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2Angle(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushf(math.atan2(b.y - a.y, b.x - a.x))
+	vm:pushF(math.atan2(b.y - a.y, b.x - a.x))
 
 	return true
 end
 
-local function api_vec2LineAngle(vm: *e3d.EVM): boolean
+local function apiVec2LineAngle(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec2LineAngle(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushf(rl.vector2LineAngle(a, b))
+	vm:pushF(rl.vector2LineAngle(a, b))
 
 	return true
 end
 
-local function api_vec2Lerp(vm: *e3d.EVM): boolean
+local function apiVec2Lerp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Lerp(vec2 a, vec2 b, float amount);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
-	local amount: float32 = vm:get_argf(4)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
+	local amount: float32 = vm:getArgF(4)
 
 	a:lerp(b, amount)
 
-	vm:pushv2(a)
+	vm:pushV2(a)
 
 	return true
 end
 
-local function api_vec2Reflect(vm: *e3d.EVM): boolean
+local function apiVec2Reflect(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Reflect(vec2 a, vec2 b);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
 
 	a:reflect(b)
 	
-	vm:pushv2(a)
+	vm:pushV2(a)
 	
 	return true
 end
 
-local function api_vec2Rotate(vm: *e3d.EVM): boolean
+local function apiVec2Rotate(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Rotate(vec2 v, float angle);
 
-	local v: rl.vector2 = vm:get_argv2(0)
-	local angle: float32 = vm:get_argf(2)
+	local v: rl.vector2 = vm:getArgV2(0)
+	local angle: float32 = vm:getArgF(2)
 
 	v:rotate(angle)
 	
-	vm:pushv2(v)
+	vm:pushV2(v)
 
 	return true
 end
 
-local function api_vec2MoveToward(vm: *e3d.EVM): boolean
+local function apiVec2MoveToward(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2MoveToward(vec2 a, vec2 b, float delta);
 
-	local a: rl.vector2 = vm:get_argv2(0)
-	local b: rl.vector2 = vm:get_argv2(2)
-	local delta: float32 = vm:get_argf(4)
+	local a: rl.vector2 = vm:getArgV2(0)
+	local b: rl.vector2 = vm:getArgV2(2)
+	local delta: float32 = vm:getArgF(4)
 
 	local dest: rl.vector2 = b - a
 	local length: float32 = #dest
 
 	if length <= delta or length < 0.0001 then
-		vm:pushv2(b)
+		vm:pushV2(b)
 	else
 		local temp: rl.vector2 = {
 			dest.x / length * delta,
 			dest.y / length * delta
 		}
-		vm:pushv2(a + temp)
+		vm:pushV2(a + temp)
 	end
 
 	return true
 end
 
-local function api_vec2Invert(vm: *e3d.EVM): boolean
+local function apiVec2Invert(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec2Invert(vec2 v);
 	
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 
 	v:invert()
 
-	vm:pushv2(v)
+	vm:pushV2(v)
 
 	return true
 end
 
-local function api_vec3Len(vm: *e3d.EVM): boolean
+local function apiVec3Len(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3Len(vec3 v);
 	
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 
 	local x: float32 = v.x * v.x
 	local y: float32 = v.y * v.y
 	local z: float32 = v.z * v.z
 
-	vm:pushf(math.sqrt(x + y + z))
+	vm:pushF(math.sqrt(x + y + z))
 	
 	return true
 end
 
-local function api_vec3LenSq(vm: *e3d.EVM): boolean
+local function apiVec3LenSq(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3LenSq(vec3 v);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 
 	local x: float32 = v.x * v.x
 	local y: float32 = v.y * v.y
 	local z: float32 = v.z * v.z
 
-	vm:pushf(x + y + z)
+	vm:pushF(x + y + z)
 	
 	return true
 end
 
-local function api_vec3Norm(vm: *e3d.EVM): boolean
+local function apiVec3Norm(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Norm(vec3 v);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 
 	local x: float32 = v.x * v.x
 	local y: float32 = v.y * v.y
@@ -1036,29 +1036,29 @@ local function api_vec3Norm(vm: *e3d.EVM): boolean
 		v.z = v.z / l
 	end
 
-	vm:pushv3(v)
+	vm:pushV3(v)
 	
 	return true
 end
 
-local function api_vec3Dot(vm: *e3d.EVM): boolean
+local function apiVec3Dot(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3Dot(vec3 a, vec3 b);
 	
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 
-	vm:pushf(a.x * b.x + a.y * b.y + a.z * b.z)
+	vm:pushF(a.x * b.x + a.y * b.y + a.z * b.z)
 	
 	return true
 end
 
-local function api_vec3Cross(vm: *e3d.EVM): boolean
+local function apiVec3Cross(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Cross(vec3 a, vec3 b);
 	
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 
 	local v: rl.vector3 = {
 		(a.y * b.z) - (a.z * b.y),
@@ -1066,17 +1066,17 @@ local function api_vec3Cross(vm: *e3d.EVM): boolean
 		(a.x * b.y) - (a.y * b.x)
 	}
 
-	vm:pushv3(v)
+	vm:pushV3(v)
 	
 	return true
 end
 
-local function api_vec3Dist(vm: *e3d.EVM): boolean
+local function apiVec3Dist(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3Dist(vec3 a, vec3 b);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 	
 	local v: rl.vector3 = {b.x - a.x, b.y - a.y, b.z - a.z}
 
@@ -1084,17 +1084,17 @@ local function api_vec3Dist(vm: *e3d.EVM): boolean
 	local y: float32 = v.y * v.y
 	local z: float32 = v.z * v.z
 
-	vm:pushf(math.sqrt(x + y + z))
+	vm:pushF(math.sqrt(x + y + z))
 	
 	return true
 end
 
-local function api_vec3DistSq(vm: *e3d.EVM): boolean
+local function apiVec3DistSq(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3DistSq(vec3 a, vec3 b);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 	
 	local v: rl.vector3 = {b.x - a.x, b.y - a.y, b.z - a.z}
 
@@ -1102,17 +1102,17 @@ local function api_vec3DistSq(vm: *e3d.EVM): boolean
 	local y: float32 = v.y * v.y
 	local z: float32 = v.z * v.z
 
-	vm:pushf(x + y + z)
+	vm:pushF(x + y + z)
 	
 	return true
 end
 
-local function api_vec3Direction(vm: *e3d.EVM): boolean
+local function apiVec3Direction(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 vec3Direction(vec3 a, vec3 b);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 	local direction: rl.vector3 = b - a;
 
 	local x: float32 = direction.x * direction.x
@@ -1127,330 +1127,330 @@ local function api_vec3Direction(vm: *e3d.EVM): boolean
 		direction.z = direction.z / l
 	end
 
-	vm:pushv3(direction)
+	vm:pushV3(direction)
 
 	return true
 end
 
-local function api_vec3Angle(vm: *e3d.EVM): boolean
+local function apiVec3Angle(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float vec3Angle(vec3 a, vec3 b);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 
-	vm:pushf(a:angle(b))
+	vm:pushF(a:angle(b))
 
 	return true
 end
-local function api_vec3Lerp(vm: *e3d.EVM): boolean
+local function apiVec3Lerp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Lerp(vec3 a, vec3 b, float amount);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
-	local amount: float32 = vm:get_argf(6)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
+	local amount: float32 = vm:getArgF(6)
 
 	a:lerp(b, amount)
 	
-	vm:pushv3(a)
+	vm:pushV3(a)
 
 	return true
 end
-local function api_vec3Reflect(vm: *e3d.EVM): boolean
+local function apiVec3Reflect(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Reflect(vec3 a, vec3 b);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
 
 	a:reflect(b)
 	
-	vm:pushv3(a)
+	vm:pushV3(a)
 
 	return true
 end
-local function api_vec3Rotate(vm: *e3d.EVM): boolean
+local function apiVec3Rotate(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Rotate(vec3 v, vec3 axis, float angle);
 
-	local v: rl.vector3 = vm:get_argv3(0)
-	local axis: rl.vector3 = vm:get_argv3(3)
-	local angle: float32 = vm:get_argf(6)
+	local v: rl.vector3 = vm:getArgV3(0)
+	local axis: rl.vector3 = vm:getArgV3(3)
+	local angle: float32 = vm:getArgF(6)
 
 	v:rotateByAxisAngle(axis, angle)
 	
-	vm:pushv3(v)
+	vm:pushV3(v)
 
 	return true
 end
-local function api_vec3MoveToward(vm: *e3d.EVM): boolean
+local function apiVec3MoveToward(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3MoveToward(vec3 a, vec3 b, float delta);
 
-	local a: rl.vector3 = vm:get_argv3(0)
-	local b: rl.vector3 = vm:get_argv3(3)
-	local delta: float32 = vm:get_argf(6)
+	local a: rl.vector3 = vm:getArgV3(0)
+	local b: rl.vector3 = vm:getArgV3(3)
+	local delta: float32 = vm:getArgF(6)
 
 	local dest: rl.vector3 = b - a
 	local length: float32 = #dest
 
 	if length <= delta or length < 0.0001 then
-		vm:pushv3(b)
+		vm:pushV3(b)
 	else
 		local temp: rl.vector3 = {
 			dest.x / length * delta,
 			dest.y / length * delta,
 			dest.z / length * delta
 		}
-		vm:pushv3(a + temp)
+		vm:pushV3(a + temp)
 	end
 
 	return true
 end
-local function api_vec3Invert(vm: *e3d.EVM): boolean
+local function apiVec3Invert(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 vec3Invert(vec3 a);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 
 	v:invert()
 	
-	vm:pushv3(v)
+	vm:pushV3(v)
 
 	return true
 end
 
-local function api_camera2D(vm: *e3d.EVM): boolean
+local function apiCamera2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera2D(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	
 	vm.gpu:camera2D(id)
 
 	return true
 end
 
-local function api_getCam2DOrigin(vm: *e3d.EVM): boolean
+local function apiGetCam2DOrigin(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 getCam2DOrigin(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushv2(vm.gpu.cameras2D[id].offset)
+	vm:pushV2(vm.gpu.cameras2D[id].offset)
 
 	return true
 end
 
-local function api_setCam2DOrigin(vm: *e3d.EVM): boolean
+local function apiSetCam2DOrigin(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam2DOrigin(int id, vec2 origin);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local origin: rl.vector2 = vm:get_argv2(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local origin: rl.vector2 = vm:getArgV2(1)
 
 	vm.gpu.cameras2D[id].offset = origin
 
 	return true
 end
 
-local function api_getCam2DTarget(vm: *e3d.EVM): boolean
+local function apiGetCam2DTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec2 getCam2DTarget(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushv2(vm.gpu.cameras2D[id].target)
+	vm:pushV2(vm.gpu.cameras2D[id].target)
 
 	return true
 end
 
-local function api_setCam2DTarget(vm: *e3d.EVM): boolean
+local function apiSetCam2DTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam2DTarget(int id, vec2 target);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local target: rl.vector2 = vm:get_argv2(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local target: rl.vector2 = vm:getArgV2(1)
 
 	vm.gpu.cameras2D[id].target = target
 
 	return true
 end
 
-local function api_getCam2DAngle(vm: *e3d.EVM): boolean
+local function apiGetCam2DAngle(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getCam2DAngle(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushf(vm.gpu.cameras2D[id].rotation)
+	vm:pushF(vm.gpu.cameras2D[id].rotation)
 
 	return true
 end
 
-local function api_setCam2DAngle(vm: *e3d.EVM): boolean
+local function apiSetCam2DAngle(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam2DAngle(int id, float angle);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local angle: float32 = vm:get_argf(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local angle: float32 = vm:getArgF(1)
 
 	vm.gpu.cameras2D[id].rotation = angle
 
 	return true
 end
 
-local function api_getCam2DZoom(vm: *e3d.EVM): boolean
+local function apiGetCam2DZoom(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getCam2DZoom(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushf(vm.gpu.cameras2D[id].zoom)
+	vm:pushF(vm.gpu.cameras2D[id].zoom)
 
 	return true
 end
 
-local function api_setCam2DZoom(vm: *e3d.EVM): boolean
+local function apiSetCam2DZoom(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam2DZoom(int id, float zoom);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local zoom: float32 = vm:get_argf(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local zoom: float32 = vm:getArgF(1)
 
 	vm.gpu.cameras2D[id].zoom = zoom
 
 	return true
 end
 
-local function api_camera3D(vm: *e3d.EVM): boolean
+local function apiCamera3D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera3D(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	
 	vm.gpu:camera3D(id)
 
 	return true
 end
 
-local function api_getCam3DPos(vm: *e3d.EVM): boolean
+local function apiGetCam3DPos(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCam3DPos(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushv3(vm.gpu.cameras[id].position)
+	vm:pushV3(vm.gpu.cameras[id].position)
 
 	return true
 end
 
-local function api_setCam3DPos(vm: *e3d.EVM): boolean
+local function apiSetCam3DPos(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam3DPos(int id, vec3 pos);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local pos: rl.vector3 = vm:get_argv3(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local pos: rl.vector3 = vm:getArgV3(1)
 
 	vm.gpu.cameras[id].position = pos
 
 	return true
 end
 
-local function api_getCam3DTarget(vm: *e3d.EVM): boolean
+local function apiGetCam3DTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCam3DTarget(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushv3(vm.gpu.cameras[id].target)
+	vm:pushV3(vm.gpu.cameras[id].target)
 
 	return true
 end
 
-local function api_setCam3DTarget(vm: *e3d.EVM): boolean
+local function apiSetCam3DTarget(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam3DTarget(int id, vec3 target);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local target: rl.vector3 = vm:get_argv3(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local target: rl.vector3 = vm:getArgV3(1)
 
 	vm.gpu.cameras[id].target = target
 
 	return true
 end
 
-local function api_getCam3DUp(vm: *e3d.EVM): boolean
+local function apiGetCam3DUp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCam3DUp(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushv3(vm.gpu.cameras[id].up)
+	vm:pushV3(vm.gpu.cameras[id].up)
 
 	return true
 end
 
-local function api_setCam3DUp(vm: *e3d.EVM): boolean
+local function apiSetCam3DUp(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam3DUp(int id, vec3 up);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local up: rl.vector3 = vm:get_argv3(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local up: rl.vector3 = vm:getArgV3(1)
 
 	vm.gpu.cameras[id].up = up
 
 	return true
 end
 
-local function api_getCam3DFOV(vm: *e3d.EVM): boolean
+local function apiGetCam3DFOV(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getCam3DFOV(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushf(vm.gpu.cameras[id].fovy)
+	vm:pushF(vm.gpu.cameras[id].fovy)
 
 	return true
 end
 
-local function api_setCam3DFOV(vm: *e3d.EVM): boolean
+local function apiSetCam3DFOV(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam3DFOV(int id, float fov);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local fov: float32 = vm:get_argf(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local fov: float32 = vm:getArgF(1)
 
 	vm.gpu.cameras[id].fovy = fov
 
 	return true
 end
 
-local function api_getCam3DProj(vm: *e3d.EVM): boolean
+local function apiGetCam3DProj(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getCam3DProj(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
-	vm:pushi((@int32)(vm.gpu.cameras[id].projection))
+	vm:pushI((@int32)(vm.gpu.cameras[id].projection))
 
 	return true
 end
 
-local function api_setCam3DProj(vm: *e3d.EVM): boolean
+local function apiSetCam3DProj(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCam3DProj(int id, int mode);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
-	local proj: float32 = vm:get_argi(1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
+	local proj: float32 = vm:getArgI(1)
 
 	vm.gpu.cameras[id].projection = (@cint)(math.clamp(proj, 0, 1))
 
 	return true
 end
 
-local function _v3norm(v: rl.vector3): rl.vector3
+local function v3Norm(v: rl.vector3): rl.vector3
 	local x: float32 = v.x * v.x
 	local y: float32 = v.y * v.y
 	local z: float32 = v.z * v.z
@@ -1466,16 +1466,16 @@ local function _v3norm(v: rl.vector3): rl.vector3
 	return v
 end
 
-local function api_getCam3DRight(vm: *e3d.EVM): boolean
+local function apiGetCam3DRight(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCam3DRight(int id);
 
 	-- get camera
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
 
 	-- calculate forward vector
-	local forward: rl.vector3 = _v3norm({
+	local forward: rl.vector3 = v3Norm({
 			cam.target.x - cam.position.x,
 			cam.target.y - cam.position.y,
 			cam.target.z - cam.position.z
@@ -1483,10 +1483,10 @@ local function api_getCam3DRight(vm: *e3d.EVM): boolean
 	)
 
 	-- get normalized up vector
-    local up: rl.vector3 = _v3norm(cam.up)
+    local up: rl.vector3 = v3Norm(cam.up)
 
 	-- calculate cross of forward and up
-	vm:pushv3({
+	vm:pushV3({
 			(forward.y * up.z) - (forward.z * up.y),
 			(forward.z * up.x) - (forward.x * up.z),
 			(forward.x * up.y) - (forward.y * up.x)
@@ -1496,15 +1496,15 @@ local function api_getCam3DRight(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCam3DForward(vm: *e3d.EVM): boolean
+local function apiGetCam3DForward(vm: *e3d.EVM): boolean
 	-- signature:
 	-- vec3 getCam3DForward(int id);
 
-	local id: uinteger = math.clamp(vm:get_argu(0), 0, GPU_CAMERAS_COUNT - 1)
+	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	local cam: rl.camera = vm.gpu.cameras[id]
 
-	vm:pushv3(
-		_v3norm({
+	vm:pushV3(
+		v3Norm({
 				cam.target.x - cam.position.x,
 				cam.target.y - cam.position.y,
 				cam.target.z - cam.position.z
@@ -1515,20 +1515,20 @@ local function api_getCam3DForward(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getTextureMode(vm: *e3d.EVM): boolean
+local function apiGetTextureMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getTextureMode();
 
-	vm:pushi((@int32)(vm.gpu.tex_mode))
+	vm:pushI((@int32)(vm.gpu.tex_mode))
 
 	return true
 end
 
-local function api_setTextureMode(vm: *e3d.EVM): boolean
+local function apiSetTextureMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setTextureMode(int mode);
 
-	local mode: uint32 = vm:get_argu(0)
+	local mode: uint32 = vm:getArgU(0)
 
 	if mode > 2 then
 		vm.error = string.format("RUNTIME ERROR: attempt to set invalid texture mode `%d`", mode)
@@ -1542,20 +1542,20 @@ local function api_setTextureMode(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getCullMode(vm: *e3d.EVM): boolean
+local function apiGetCullMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getCullMode();
 
-	vm:pushi((@int32)(vm.gpu.cull_mode))
+	vm:pushI((@int32)(vm.gpu.cull_mode))
 
 	return true
 end
 
-local function api_setCullMode(vm: *e3d.EVM): boolean
+local function apiSetCullMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setCullMode(int mode);
 
-	local mode: uint32 = vm:get_argu(0)
+	local mode: uint32 = vm:getArgU(0)
 
 	rlgl.drawRenderBatchActive()
 
@@ -1578,20 +1578,20 @@ local function api_setCullMode(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getWireMode(vm: *e3d.EVM): boolean
+local function apiGetWireMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getWireMode();
 
-	vm:pushi(vm.gpu.wire_mode and 1 or 0)
+	vm:pushI(vm.gpu.wire_mode and 1 or 0)
 
 	return true
 end
 
-local function api_setWireMode(vm: *e3d.EVM): boolean
+local function apiSetWireMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setWireMode(int mode);
 	
-	local enable: boolean = vm:get_argu(0) ~= 0
+	local enable: boolean = vm:getArgU(0) ~= 0
 	
 	rlgl.drawRenderBatchActive()
 	
@@ -1606,20 +1606,20 @@ local function api_setWireMode(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getFogMode(vm: *e3d.EVM): boolean
+local function apiGetFogMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getFogMode();
 
-	vm:pushi((@int32)(vm.gpu.fog_mode))
+	vm:pushI((@int32)(vm.gpu.fog_mode))
 
 	return true
 end
 
-local function api_setFogMode(vm: *e3d.EVM): boolean
+local function apiSetFogMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setFogMode(int mode);
 
-	local mode: uint32 = vm:get_argu(0)
+	local mode: uint32 = vm:getArgU(0)
 
 	if mode ~= 0 then
 		mode = 1
@@ -1632,20 +1632,20 @@ local function api_setFogMode(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getFogStart(vm: *e3d.EVM): boolean
+local function apiGetFogStart(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getFogStart();
 
-	vm:pushf(vm.gpu.fog_start)
+	vm:pushF(vm.gpu.fog_start)
 
 	return true
 end
 
-local function api_setFogStart(vm: *e3d.EVM): boolean
+local function apiSetFogStart(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setFogStart(float start);
 
-	local start: float32 = vm:get_argf(0)
+	local start: float32 = vm:getArgF(0)
 
 	start = math.clamp(start, 0.0, 1000.0)
 	
@@ -1656,20 +1656,20 @@ local function api_setFogStart(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getFogEnd(vm: *e3d.EVM): boolean
+local function apiGetFogEnd(vm: *e3d.EVM): boolean
 	-- signature:
 	-- float getFogEnd();
 
-	vm:pushf(vm.gpu.fog_end)
+	vm:pushF(vm.gpu.fog_end)
 
 	return true
 end
 
-local function api_setFogEnd(vm: *e3d.EVM): boolean
+local function apiSetFogEnd(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setFogEnd(float end);
 	
-	local fend: float32 = vm:get_argf(0)
+	local fend: float32 = vm:getArgF(0)
 	
 	fend = math.clamp(fend, 0.0, 1000.0)
 	
@@ -1680,7 +1680,7 @@ local function api_setFogEnd(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_getFogColor(vm: *e3d.EVM): boolean
+local function apiGetFogColor(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getFogColor();
 	
@@ -1691,16 +1691,16 @@ local function api_getFogColor(vm: *e3d.EVM): boolean
 	local b: uint32 = (@uint32)(ray_col.b)
 	local a: uint32 = (@uint32)(ray_col.a)
 	
-	vm:pushu((r << 24) | (g << 16) | (b << 8) | a)
+	vm:pushU((r << 24) | (g << 16) | (b << 8) | a)
 
 	return true
 end
 
-local function api_setFogColor(vm: *e3d.EVM): boolean
+local function apiSetFogColor(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void setFogColor(float color);
 
-	local col: uint32 = vm:get_argu(0)
+	local col: uint32 = vm:getArgU(0)
 	local ray_col: rl.color = {
 		(@cuchar)(col >> 24),
 		(@cuchar)((col & 0xFF0000) >> 16),
@@ -1715,14 +1715,14 @@ local function api_setFogColor(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_texture(vm: *e3d.EVM): boolean
+local function apiTexture(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void texture(int x, int y, int w, int h);
 
-	local x: int32 = vm:get_argi(0)
-	local y: int32 = vm:get_argi(1)
-	local w: int32 = vm:get_argi(2)
-	local h: int32 = vm:get_argi(3)
+	local x: int32 = vm:getArgI(0)
+	local y: int32 = vm:getArgI(1)
+	local w: int32 = vm:getArgI(2)
+	local h: int32 = vm:getArgI(3)
 
 	w = math.clamp(w, 1, 256)
 	h = math.clamp(h, 1, 256)
@@ -1734,25 +1734,25 @@ local function api_texture(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_clear(vm: *e3d.EVM): boolean
+local function apiClear(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void clear(int col);
 
-	local col: uint32 = vm:get_argu(0)
+	local col: uint32 = vm:getArgU(0)
 
 	vm.gpu:clear(col)
 
 	return true
 end
 
-local function api_viewport(vm: *e3d.EVM): boolean
+local function apiViewport(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void viewport(int x, int y, int w, int h);
 
-	local x: cint = (@cint)(vm:get_argi(0))
-	local y: cint = (@cint)(vm:get_argi(1))
-	local w: cint = (@cint)(vm:get_argi(2))
-	local h: cint = (@cint)(vm:get_argi(3))
+	local x: cint = (@cint)(vm:getArgI(0))
+	local y: cint = (@cint)(vm:getArgI(1))
+	local w: cint = (@cint)(vm:getArgI(2))
+	local h: cint = (@cint)(vm:getArgI(3))
 
 	w = math.clamp(w, 1, GPU_VSCREEN_W)
 	h = math.clamp(h, 1, GPU_VSCREEN_H)
@@ -1770,16 +1770,16 @@ local function api_viewport(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_sprite2D(vm: *e3d.EVM): boolean
+local function apiSprite2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void sprite2D(int srcx, int srcy, int srcw, int srch, int destx, int desy);
 
-	local srcx: int32 = vm:get_argi(0)
-	local srcy: int32 = vm:get_argi(1)
-	local srcw: int32 = vm:get_argi(2)
-	local srch: int32 = vm:get_argi(3)
-	local destx: int32 = vm:get_argi(4)
-	local desty: int32 = vm:get_argi(5)
+	local srcx: int32 = vm:getArgI(0)
+	local srcy: int32 = vm:getArgI(1)
+	local srcw: int32 = vm:getArgI(2)
+	local srch: int32 = vm:getArgI(3)
+	local destx: int32 = vm:getArgI(4)
+	local desty: int32 = vm:getArgI(5)
 
 	srcw = math.clamp(srcw, 1, 256)
 	srch = math.clamp(srch, 1, 256)
@@ -1794,18 +1794,18 @@ local function api_sprite2D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_spriteEx2D(vm: *e3d.EVM): boolean
+local function apiSprite2DEx(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void spriteEx2D(int srcx, int srcy, int srcw, int srch, int destx, int desy, int destw, int desth);
+	-- void sprite2DEx(int srcx, int srcy, int srcw, int srch, int destx, int desy, int destw, int desth);
 
-	local srcx: int32 = vm:get_argi(0)
-	local srcy: int32 = vm:get_argi(1)
-	local srcw: int32 = vm:get_argi(2)
-	local srch: int32 = vm:get_argi(3)
-	local destx: int32 = vm:get_argi(4)
-	local desty: int32 = vm:get_argi(5)
-	local destw: int32 = vm:get_argi(6)
-	local desth: int32 = vm:get_argi(7)
+	local srcx: int32 = vm:getArgI(0)
+	local srcy: int32 = vm:getArgI(1)
+	local srcw: int32 = vm:getArgI(2)
+	local srch: int32 = vm:getArgI(3)
+	local destx: int32 = vm:getArgI(4)
+	local desty: int32 = vm:getArgI(5)
+	local destw: int32 = vm:getArgI(6)
+	local desth: int32 = vm:getArgI(7)
 
 	srcw = math.clamp(srcw, 1, 256)
 	srch = math.clamp(srch, 1, 256)
@@ -1820,26 +1820,15 @@ local function api_spriteEx2D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_beginMesh(vm: *e3d.EVM): boolean
+local function apiBeginMesh(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void beginMesh(int mode);
 
-	local mode: uint32 = vm:get_argu(0)
+	local mode: uint32 = vm:getArgU(0)
 
-	switch mode do
-		case 0 then
-			vm.gpu.triangle_mode = false
-			mode = rlgl.LINES
-		case 1 then
-			vm.gpu.triangle_mode = true
-			vm.gpu.triangle_vert_index = 0
-			mode = rlgl.QUADS
-		case 2 then
-			vm.gpu.triangle_mode = false
-			mode = rlgl.QUADS
-		else
-			vm.error = string.format("RUNTIME ERROR: attempt to set invalid primitive mode `%d`", mode)
-			return false
+	if mode > 2 then
+		vm.error = string.format("RUNTIME ERROR: attempt to set invalid primitive mode `%d`", mode)
+		return false
 	end
 
 	vm.gpu:beginMesh(mode)
@@ -1847,7 +1836,7 @@ local function api_beginMesh(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_endMesh(vm: *e3d.EVM): boolean
+local function apiEndMesh(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void endMesh();
 
@@ -1856,142 +1845,69 @@ local function api_endMesh(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_vertex(vm: *e3d.EVM): boolean
+local function apiVertex(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void vertex(vec3 v);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 
-	rlgl.vertex3f(v.x, v.y, v.z)
-	
-	if vm.gpu.triangle_mode then
-		if vm.gpu.triangle_vert_index == 0 then
-			vm.gpu.triangle_vert_pos = v
-		elseif vm.gpu.triangle_vert_index == 2 then
-			-- send copy of first vertex to allow textured tris
-			rlgl.color4ub(
-				vm.gpu.triangle_vert_color.r,
-				vm.gpu.triangle_vert_color.g,
-				vm.gpu.triangle_vert_color.b,
-				vm.gpu.triangle_vert_color.a
-			)
-			rlgl.texCoord2f(
-				vm.gpu.triangle_vert_uv.x,
-				vm.gpu.triangle_vert_uv.y
-			)
-			rlgl.vertex3f(
-				vm.gpu.triangle_vert_pos.x,
-				vm.gpu.triangle_vert_pos.y,
-				vm.gpu.triangle_vert_pos.z
-			)
-			
-			vm.gpu.triangle_vert_index = 0
-			return true
-		end
-
-		vm.gpu.triangle_vert_index = vm.gpu.triangle_vert_index + 1
-	end
+	vm.gpu:vertex(v)
 	
 	return true
 end
 
-local function api_vertex2D(vm: *e3d.EVM): boolean
+local function apiVertex2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void vertex2D(vec2 v);
 
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 
-	rlgl.vertex2f(v.x, v.y)
-	
-	if vm.gpu.triangle_mode then
-		if vm.gpu.triangle_vert_index == 0 then
-			vm.gpu.triangle_vert_pos.x = v.x
-			vm.gpu.triangle_vert_pos.y = v.y
-		elseif vm.gpu.triangle_vert_index == 2 then
-			-- send copy of first vertex to allow textured tris
-			rlgl.color4ub(
-				vm.gpu.triangle_vert_color.r,
-				vm.gpu.triangle_vert_color.g,
-				vm.gpu.triangle_vert_color.b,
-				vm.gpu.triangle_vert_color.a
-			)
-			rlgl.texCoord2f(
-				vm.gpu.triangle_vert_uv.x,
-				vm.gpu.triangle_vert_uv.y
-			)
-			rlgl.vertex2f(
-				vm.gpu.triangle_vert_pos.x,
-				vm.gpu.triangle_vert_pos.y
-			)
-			
-			vm.gpu.triangle_vert_index = 0
-			return true
-		end
-
-		vm.gpu.triangle_vert_index = vm.gpu.triangle_vert_index + 1
-	end
+	vm.gpu:vertex2D(v)
 	
 	return true
 end
 
-local function api_vertUV(vm: *e3d.EVM): boolean
+local function apiVertUV(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void vertUV(vec2 uv);
 
-	local v: rl.vector2 = vm:get_argv2(0)
+	local v: rl.vector2 = vm:getArgV2(0)
 	
-	rlgl.texCoord2f(v.x, v.y)
-
-	if vm.gpu.triangle_mode and (vm.gpu.triangle_vert_index == 0) then
-		vm.gpu.triangle_vert_uv = v
-	end
+	vm.gpu:vertUV(v)
 	
 	return true
 end
 
-local function api_vertColor(vm: *e3d.EVM): boolean
+local function apiVertColor(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void vertColor(int col);
 
-	local col: uint32 = vm:get_argu(0)
-	local r: cuchar = (@cuchar)(col >> 24)
-	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
-	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
-	local a: cuchar = (@cuchar)(col & 0xFF)
+	local col: uint32 = vm:getArgU(0)
 	
-	rlgl.color4ub(r, g, b, a)
-
-	if vm.gpu.triangle_mode and (vm.gpu.triangle_vert_index == 0) then
-		vm.gpu.triangle_vert_color = {r, g, b, a}
-	end
+	vm.gpu:vertColor(col)
 	
 	return true
 end
 
 -- void normal(vec3 norm);
 
-local function api_matrixMode(vm: *e3d.EVM): boolean
+local function apiMatrixMode(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void matrixMode(int mode);
 
-	local mode: uint32 = vm:get_argu(0)
+	local mode: uint32 = vm:getArgU(0)
 
-	switch mode do
-		case 0 then
-			rlgl.matrixMode(rlgl.PROJECTION)
-			vm.gpu.matrix_mode = rlgl.PROJECTION
-		case 1 then
-			rlgl.matrixMode(rlgl.MODELVIEW)
-			vm.gpu.matrix_mode = rlgl.MODELVIEW
-		else
-			vm.error = string.format("RUNTIME ERROR: attempt to set invalid matrix mode `%d`", mode)
-			return false
+	if mode > GPU_MODELVIEW then
+		vm.error = string.format("RUNTIME ERROR: attempt to set invalid primitive mode `%d`", mode)
+		return false
 	end
+
+	vm.gpu:matrixMode(mode)
 
 	return true
 end
 
-local function api_pushMatrix(vm: *e3d.EVM): boolean
+local function apiPushMatrix(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void pushMatrix();
 
@@ -2016,7 +1932,7 @@ local function api_pushMatrix(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_popMatrix(vm: *e3d.EVM): boolean
+local function apiPopMatrix(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void popMatrix();
 
@@ -2041,7 +1957,7 @@ local function api_popMatrix(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_identity(vm: *e3d.EVM): boolean
+local function apiIdentity(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void identity();
 
@@ -2050,22 +1966,22 @@ local function api_identity(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_translate(vm: *e3d.EVM): boolean
+local function apiTranslate(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void translate(vec3 pos);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 	
 	rlgl.translatef(v.x, v.y, v.z)
 	
 	return true
 end
 
-local function api_rotate(vm: *e3d.EVM): boolean
+local function apiRotate(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void rotate(vec3 rot);
 
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 	
 	rlgl.rotatef(v.z, 0, 0, 1)
 	rlgl.rotatef(v.y, 0, 1, 0)
@@ -2074,46 +1990,46 @@ local function api_rotate(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_scale(vm: *e3d.EVM): boolean
+local function apiScale(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void scale(vec3 sca);
 	
-	local v: rl.vector3 = vm:get_argv3(0)
+	local v: rl.vector3 = vm:getArgV3(0)
 	
 	rlgl.scalef(v.x, v.y, v.z)
 	
 	return true
 end
 
-local function api_peek8(vm: *e3d.EVM): boolean
+local function apiPeek8(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int peek8(int addr);
 
-	local addr: uint32 = vm:get_argu(0)
+	local addr: uint32 = vm:getArgU(0)
 
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
 		return false
 	end
 
-	vm:pushu(vm:get_ram8(addr))
+	vm:pushU(vm:getRAM8(addr))
 
 	return true
 end
 
-local function api_poke8(vm: *e3d.EVM): boolean
+local function apiPoke8(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void poke8(int addr, int val);
 
-	local addr: uint32 = vm:get_argu(0)
-	local val: uint8 = (@uint8)(vm:get_argu(1) & 0xFF)
+	local addr: uint32 = vm:getArgU(0)
+	local val: uint8 = (@uint8)(vm:getArgU(1) & 0xFF)
 
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid byte write address 0x%08X\n", addr)
 		return false
 	end
 
-	if not vm:set_ram8(addr, val) then
+	if not vm:setRAM8(addr, val) then
 		vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
 		return false
 	end
@@ -2121,11 +2037,11 @@ local function api_poke8(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_peek32(vm: *e3d.EVM): boolean
+local function apiPeek32(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int peek32(int addr);
 
-	local addr: uint32 = vm:get_argu(0)
+	local addr: uint32 = vm:getArgU(0)
 
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
@@ -2135,17 +2051,17 @@ local function api_peek32(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	vm:pushu(vm:get_ram32(addr))
+	vm:pushU(vm:getRAM32(addr))
 
 	return true
 end
 
-local function api_poke32(vm: *e3d.EVM): boolean
+local function apiPoke32(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void poke32(int addr, int val);
 
-	local addr: uint32 = vm:get_argu(0)
-	local val: uint32 = vm:get_argu(1)
+	local addr: uint32 = vm:getArgU(0)
+	local val: uint32 = vm:getArgU(1)
 
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", addr)
@@ -2155,7 +2071,7 @@ local function api_poke32(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	if not vm:set_ram32(addr, val) then
+	if not vm:setRAM32(addr, val) then
 		vm.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", addr)
 		return false
 	end
@@ -2163,13 +2079,13 @@ local function api_poke32(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_memcpy(vm: *e3d.EVM): boolean
+local function apiMemcpy(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void memcpy(void* src, void* dest, int nbytes);
 
-	local src: uint32 = vm:get_argu(0)
-	local dest: uint32 = vm:get_argu(1)
-	local nbytes: uint32 = vm:get_argu(2)
+	local src: uint32 = vm:getArgU(0)
+	local dest: uint32 = vm:getArgU(1)
+	local nbytes: uint32 = vm:getArgU(2)
 
 	if src > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid memcpy src address 0x%08X\n", src)
@@ -2199,9 +2115,9 @@ local function api_memcpy(vm: *e3d.EVM): boolean
 		dest = dest + (nbytes - 1)
 
 		for i = 0, < nbytes do
-			local byte: uint8 = vm:get_ram8(src)
+			local byte: uint8 = vm:getRAM8(src)
 
-			if not vm:set_ram8(dest, byte) then
+			if not vm:setRAM8(dest, byte) then
 				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 				return false
 			end
@@ -2212,9 +2128,9 @@ local function api_memcpy(vm: *e3d.EVM): boolean
 	else
 		-- copy from the beginning
 		for i = 0, < nbytes do
-			local byte: uint8 = vm:get_ram8(src)
+			local byte: uint8 = vm:getRAM8(src)
 
-			if not vm:set_ram8(dest, byte) then
+			if not vm:setRAM8(dest, byte) then
 				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 				return false
 			end
@@ -2227,13 +2143,13 @@ local function api_memcpy(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function api_memset(vm: *e3d.EVM): boolean
+local function apiMemset(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void memset(void* dest, int nbytes, int value);
 
-	local dest: uint32 = vm:get_argu(0)
-	local nbytes: uint32 = vm:get_argu(1)
-	local value: uint8 = vm:get_argu(2) & 0xFF
+	local dest: uint32 = vm:getArgU(0)
+	local nbytes: uint32 = vm:getArgU(1)
+	local value: uint8 = vm:getArgU(2) & 0xFF
 
 	if dest > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid memset dest address 0x%08X\n", dest)
@@ -2246,7 +2162,7 @@ local function api_memset(vm: *e3d.EVM): boolean
 	end
 
 	for i = 0, < nbytes do
-		if not vm:set_ram8(dest, value) then
+		if not vm:setRAM8(dest, value) then
 			vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 			return false
 		end
@@ -2257,7 +2173,7 @@ local function api_memset(vm: *e3d.EVM): boolean
 	return true;
 end
 
-function e3d.EVM:register_builtins(): void
+function e3d.EVM:registerBuiltins(): void
 	local keyword_ids: []e3d.Identifier = {
 		{name="void",     token=e3d.Token.VOID},
 		{name="int",      token=e3d.Token.INT},
@@ -2329,8 +2245,8 @@ function e3d.EVM:register_builtins(): void
 	v2y.index = 1
 	v2y.type_info = {e3d.EVMType.FLOAT}
 
-	sid:add_member(v2x)
-	sid:add_member(v2y)
+	sid:addMember(v2x)
+	sid:addMember(v2y)
 	sid.is_complete = true
 	self.struct_vec2 = sid
 
@@ -2353,9 +2269,9 @@ function e3d.EVM:register_builtins(): void
 	v3z.index = 2
 	v3z.type_info = {e3d.EVMType.FLOAT}
 
-	sid:add_member(v3x)
-	sid:add_member(v3y)
-	sid:add_member(v3z)
+	sid:addMember(v3x)
+	sid:addMember(v3y)
+	sid:addMember(v3z)
 	sid.is_complete = true
 	self.struct_vec3 = sid
 
@@ -2373,18 +2289,18 @@ function e3d.EVM:register_builtins(): void
 	string_data.index = 1
 	string_data.type_info = {e3d.EVMType.VOID + e3d.EVMType.POINTER}
 
-	sid:add_member(string_len)
-	sid:add_member(string_data)
+	sid:addMember(string_len)
+	sid:addMember(string_data)
 	sid.is_complete = true
 	self.struct_string = sid
 end
 
-function e3d.EVM:register_api(): void
+function e3d.EVM:registerAPI(): void
 	local api_ids: []e3d.Identifier = {
-		{name="halt", type_info={e3d.EVMType.VOID}, func=api_halt},
+		{name="halt", type_info={e3d.EVMType.VOID}, func=apiHalt},
 
-		{name="vargc", type_info={e3d.EVMType.INT},                                                             func=api_vargc},
-		{name="vargv", type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, argdata={{type_id=e3d.EVMType.INT}}, func=api_vargv},
+		{name="vargc", type_info={e3d.EVMType.INT},                                                             func=apiVargc},
+		{name="vargv", type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, argdata={{type_id=e3d.EVMType.INT}}, func=apiVargv},
 		
 		{
 			name="pressed",
@@ -2393,7 +2309,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_pressed
+			func=apiPressed
 		},
 		{
 			name="released",
@@ -2402,7 +2318,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_released
+			func=apiReleased
 		},
 		{
 			name="held",
@@ -2411,50 +2327,50 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_held
+			func=apiHeld
 		},
 		
-		{name="mini",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_mini},
-		{name="maxi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=api_maxi},
-		{name="midi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_midi},
-		{name="wrapi", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=api_wrapi},
+		{name="mini",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=apiMini},
+		{name="maxi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=apiMaxi},
+		{name="midi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=apiMidi},
+		{name="wrapi", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=apiWrapi},
 
-		{name="minf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_minf},
-		{name="maxf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=api_maxf},
-		{name="midf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_midf},
-		{name="wrapf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_wrapf},
+		{name="minf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=apiMinf},
+		{name="maxf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=apiMaxf},
+		{name="midf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiMidf},
+		{name="wrapf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiWrapf},
 		
-		{name="signi", type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}},   func=api_signi},
-		{name="signf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_signf},
-		{name="fract", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_fract},
+		{name="signi", type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}},   func=apiSigni},
+		{name="signf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apisignf},
+		{name="fract", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiFract},
 
-		{name="deg",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_deg},
-		{name="rad",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_rad},
-		{name="sin",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_sin},
-		{name="cos",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_cos},
-		{name="floor",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_floor},
-		{name="ceil",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_ceil},
-		{name="round",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_round},
+		{name="deg",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiDeg},
+		{name="rad",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiRad},
+		{name="sin",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSin},
+		{name="cos",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiCos},
+		{name="floor",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiFloor},
+		{name="ceil",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiCeil},
+		{name="round",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiRound},
 
-		{name="randomize",   type_info={e3d.EVMType.VOID},                                                                      func=api_randomize},
-		{name="randomizeEx", type_info={e3d.EVMType.VOID},  argdata={{type_id=e3d.EVMType.INT}},                                func=api_randomizeEx},
-		{name="randi",       type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},     func=api_randi},
-		{name="randiEx",     type_info={e3d.EVMType.INT},                                                                       func=api_randiEx},
-		{name="randf",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=api_randf},
-		{name="randfEx",     type_info={e3d.EVMType.FLOAT},                                                                     func=api_randfEx},
+		{name="randomize",   type_info={e3d.EVMType.VOID},                                                                      func=apiRandomize},
+		{name="randomizeEx", type_info={e3d.EVMType.VOID},  argdata={{type_id=e3d.EVMType.INT}},                                func=apiRandomizeEx},
+		{name="randi",       type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},     func=apiRandi},
+		{name="randiEx",     type_info={e3d.EVMType.INT},                                                                       func=apiRandiEx},
+		{name="randf",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiRandf},
+		{name="randfEx",     type_info={e3d.EVMType.FLOAT},                                                                     func=apiRandfEx},
 		
-		{name="time", type_info={e3d.EVMType.FLOAT}, func=api_time},
+		{name="time", type_info={e3d.EVMType.FLOAT}, func=apiTime},
 		
-		{name="vec2Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2Len},
-		{name="vec2LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2LenSq},
-		{name="vec2Norm",      type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}},                             func=api_vec2Norm},
-		{name="vec2Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2Dot},
-		{name="vec2Cross",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2Cross},
-		{name="vec2Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2Dist},
-		{name="vec2DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2DistSq},
-		{name="vec2Direction", type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2Direction},
-		{name="vec2Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2Angle},
-		{name="vec2LineAngle", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=api_vec2LineAngle},
+		{name="vec2Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2Len},
+		{name="vec2LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2LenSq},
+		{name="vec2Norm",      type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2Norm},
+		{name="vec2Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Dot},
+		{name="vec2Cross",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Cross},
+		{name="vec2Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Dist},
+		{name="vec2DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2DistSq},
+		{name="vec2Direction", type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Direction},
+		{name="vec2Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Angle},
+		{name="vec2LineAngle", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2LineAngle},
 		{
 			name="vec2Lerp",
 			type_info={e3d.EVMType.VEC2},
@@ -2463,10 +2379,10 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VEC2},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_vec2Lerp
+			func=apiVec2Lerp
 		},
-		{name="vec2Reflect", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}},  func=api_vec2Reflect},
-		{name="vec2Rotate",  type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.FLOAT}}, func=api_vec2Rotate},
+		{name="vec2Reflect", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}},  func=apiVec2Reflect},
+		{name="vec2Rotate",  type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.FLOAT}}, func=apiVec2Rotate},
 		{
 			name="vec2MoveToward",
 			type_info={e3d.EVMType.VEC2},
@@ -2475,19 +2391,19 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VEC2},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_vec2MoveToward
+			func=apiVec2MoveToward
 		},
-		{name="vec2Invert", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}}, func=api_vec2Invert},
+		{name="vec2Invert", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}}, func=apiVec2Invert},
 		
-		{name="vec3Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3Len},
-		{name="vec3LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3LenSq},
-		{name="vec3Norm",      type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}},                             func=api_vec3Norm},
-		{name="vec3Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3Dot},
-		{name="vec3Cross",     type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3Cross},
-		{name="vec3Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3Dist},
-		{name="vec3DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3DistSq},
-		{name="vec3Direction", type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3Direction},
-		{name="vec3Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=api_vec3Angle},
+		{name="vec3Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3Len},
+		{name="vec3LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3LenSq},
+		{name="vec3Norm",      type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3Norm},
+		{name="vec3Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Dot},
+		{name="vec3Cross",     type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Cross},
+		{name="vec3Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Dist},
+		{name="vec3DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3DistSq},
+		{name="vec3Direction", type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Direction},
+		{name="vec3Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Angle},
 		{
 			name="vec3Lerp",
 			type_info={e3d.EVMType.VEC3},
@@ -2496,9 +2412,9 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VEC3},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_vec3Lerp
+			func=apiVec3Lerp
 		},
-		{name="vec3Reflect", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}},  func=api_vec3Reflect},
+		{name="vec3Reflect", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}},  func=apiVec3Reflect},
 		{
 			name="vec3Rotate",
 			type_info={e3d.EVMType.VEC3},
@@ -2507,7 +2423,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VEC3},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_vec3Rotate
+			func=apiVec3Rotate
 		},
 		{
 			name="vec3MoveToward",
@@ -2517,16 +2433,16 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VEC3},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_vec3MoveToward
+			func=apiVec3MoveToward
 		},
-		{name="vec3Invert", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}}, func=api_vec3Invert},
+		{name="vec3Invert", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}}, func=apiVec3Invert},
 		
-		{name="camera2D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera2D},
+		{name="camera2D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=apiCamera2D},
 		{
 			name="getCam2DOrigin",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam2DOrigin
+			func=apiGetCam2DOrigin
 		},
 		{
 			name="setCam2DOrigin",
@@ -2535,13 +2451,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCam2DOrigin
+			func=apiSetCam2DOrigin
 		},
 		{
 			name="getCam2DTarget",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam2DTarget
+			func=apiGetCam2DTarget
 		},
 		{
 			name="setCam2DTarget",
@@ -2550,13 +2466,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCam2DTarget
+			func=apiSetCam2DTarget
 		},
 		{
 			name="getCam2DAngle",
 			type_info={e3d.EVMType.FLOAT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam2DAngle
+			func=apiGetCam2DAngle
 		},
 		{
 			name="setCam2DAngle",
@@ -2565,13 +2481,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_setCam2DAngle
+			func=apiSetCam2DAngle
 		},
 		{
 			name="getCam2DZoom",
 			type_info={e3d.EVMType.FLOAT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam2DZoom
+			func=apiGetCam2DZoom
 		},
 		{
 			name="setCam2DZoom",
@@ -2580,14 +2496,14 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_setCam2DZoom
+			func=apiSetCam2DZoom
 		},
-		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=api_camera3D},
+		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=apiCamera3D},
 		{
 			name="getCam3DPos",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DPos
+			func=apiGetCam3DPos
 		},
 		{
 			name="setCam3DPos",
@@ -2596,13 +2512,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCam3DPos
+			func=apiSetCam3DPos
 		},
 		{
 			name="getCam3DTarget",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DTarget
+			func=apiGetCam3DTarget
 		},
 		{
 			name="setCam3DTarget",
@@ -2611,13 +2527,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCam3DTarget
+			func=apiSetCam3DTarget
 		},
 		{
 			name="getCam3DUp",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DUp
+			func=apiGetCam3DUp
 		},
 		{
 			name="setCam3DUp",
@@ -2626,13 +2542,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VEC3}
 			},
-			func=api_setCam3DUp
+			func=apiSetCam3DUp
 		},
 		{
 			name="getCam3DFOV",
 			type_info={e3d.EVMType.FLOAT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DFOV
+			func=apiGetCam3DFOV
 		},
 		{
 			name="setCam3DFOV",
@@ -2641,13 +2557,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.FLOAT}
 			},
-			func=api_setCam3DFOV
+			func=apiSetCam3DFOV
 		},
 		{
 			name="getCam3DProj",
 			type_info={e3d.EVMType.INT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DProj
+			func=apiGetCam3DProj
 		},
 		{
 			name="setCam3DProj",
@@ -2656,19 +2572,19 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_setCam3DProj
+			func=apiSetCam3DProj
 		},
 		{
 			name="getCam3DRight",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DRight
+			func=apiGetCam3DRight
 		},
 		{
 			name="getCam3DForward",
 			type_info={e3d.EVMType.VEC3},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_getCam3DForward
+			func=apiGetCam3DForward
 		},
 		
 		{
@@ -2680,7 +2596,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_viewport
+			func=apiViewport
 		},
 		{
 			name="texture",
@@ -2691,36 +2607,36 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_texture
+			func=apiTexture
 		},
-		{name="getTextureMode",  type_info={e3d.EVMType.INT},                                         func=api_getTextureMode},
-		{name="setTextureMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setTextureMode},
-		{name="getCullMode",     type_info={e3d.EVMType.INT},                                         func=api_getCullMode},
-		{name="setCullMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setCullMode},
-		{name="getWireMode",     type_info={e3d.EVMType.INT},                                         func=api_getWireMode},
-		{name="setWireMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setWireMode},
-		{name="getFogMode",      type_info={e3d.EVMType.INT},                                         func=api_getFogMode},
-		{name="setFogMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogMode},
-		{name="getFogStart",     type_info={e3d.EVMType.FLOAT},                                       func=api_getFogStart},
-		{name="setFogStart",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogStart},
-		{name="getFogEnd",       type_info={e3d.EVMType.FLOAT},                                       func=api_getFogEnd},
-		{name="setFogEnd",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=api_setFogEnd},
-		{name="getFogColor",     type_info={e3d.EVMType.INT},                                         func=api_getFogColor},
-		{name="setFogColor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_setFogColor},
-		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_matrixMode},
-		{name="clear",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_clear},
-		{name="pushMatrix",      type_info={e3d.EVMType.VOID},                                        func=api_pushMatrix},
-		{name="popMatrix",       type_info={e3d.EVMType.VOID},                                        func=api_popMatrix},
-		{name="identity",        type_info={e3d.EVMType.VOID},                                        func=api_identity},
-		{name="translate",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_translate},
-		{name="rotate",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_rotate},
-		{name="scale",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_scale},
-		{name="vertex",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=api_vertex},
-		{name="vertex2D",        type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertex2D},
-		{name="vertUV",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=api_vertUV},
-		{name="vertColor",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_vertColor},
-		{name="beginMesh",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=api_beginMesh},
-		{name="endMesh",         type_info={e3d.EVMType.VOID},                                        func=api_endMesh},
+		{name="getTextureMode",  type_info={e3d.EVMType.INT},                                         func=apiGetTextureMode},
+		{name="setTextureMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetTextureMode},
+		{name="getCullMode",     type_info={e3d.EVMType.INT},                                         func=apiGetCullMode},
+		{name="setCullMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetCullMode},
+		{name="getWireMode",     type_info={e3d.EVMType.INT},                                         func=apiGetWireMode},
+		{name="setWireMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetWireMode},
+		{name="getFogMode",      type_info={e3d.EVMType.INT},                                         func=apiGetFogMode},
+		{name="setFogMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetFogMode},
+		{name="getFogStart",     type_info={e3d.EVMType.FLOAT},                                       func=apiGetFogStart},
+		{name="setFogStart",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSetFogStart},
+		{name="getFogEnd",       type_info={e3d.EVMType.FLOAT},                                       func=apiGetFogEnd},
+		{name="setFogEnd",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSetFogEnd},
+		{name="getFogColor",     type_info={e3d.EVMType.INT},                                         func=apiGetFogColor},
+		{name="setFogColor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetFogColor},
+		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiMatrixMode},
+		{name="clear",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiClear},
+		{name="pushMatrix",      type_info={e3d.EVMType.VOID},                                        func=apiPushMatrix},
+		{name="popMatrix",       type_info={e3d.EVMType.VOID},                                        func=apiPopMatrix},
+		{name="identity",        type_info={e3d.EVMType.VOID},                                        func=apiIdentity},
+		{name="translate",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiTranslate},
+		{name="rotate",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiRotate},
+		{name="scale",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiScale},
+		{name="vertex",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiVertex},
+		{name="vertex2D",        type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertex2D},
+		{name="vertUV",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertUV},
+		{name="vertColor",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiVertColor},
+		{name="beginMesh",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiBeginMesh},
+		{name="endMesh",         type_info={e3d.EVMType.VOID},                                        func=apiEndMesh},
 		{
 			name="print2D",
 			type_info={e3d.EVMType.VOID},
@@ -2732,7 +2648,7 @@ function e3d.EVM:register_api(): void
 			},
 			is_varargs=true,
 			varargs_index=4,
-			func=api_print2D
+			func=apiPrint2D
 		},
 		{
 			name="sprite2D",
@@ -2745,10 +2661,10 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_sprite2D
+			func=apiSprite2D
 		},
 		{
-			name="spriteEx2D",
+			name="sprite2DEx",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{type_id=e3d.EVMType.INT},
@@ -2760,14 +2676,14 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_spriteEx2D
+			func=apiSprite2DEx
 		},
 
 		{
 			name="peek8",
 			type_info={e3d.EVMType.INT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_peek8
+			func=apiPeek8
 		},
 		{
 			name="poke8",
@@ -2776,13 +2692,13 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_poke8
+			func=apiPoke8
 		},
 		{
 			name="peek32",
 			type_info={e3d.EVMType.INT},
 			argdata={{type_id=e3d.EVMType.INT}},
-			func=api_peek32
+			func=apiPeek32
 		},
 		{
 			name="poke32",
@@ -2791,7 +2707,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.INT},
 				{type_id=e3d.EVMType.INT}
 			},
-			func=api_poke32
+			func=apiPoke32
 		},
 		{
 			name="memcpy",
@@ -2801,7 +2717,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
 				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
 			},
-			func=api_memcpy
+			func=apiMemcpy
 		},
 		{
 			name="memset",
@@ -2811,7 +2727,7 @@ function e3d.EVM:register_api(): void
 				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT},
 				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
 			},
-			func=api_memset
+			func=apiMemset
 		},
 	}
 

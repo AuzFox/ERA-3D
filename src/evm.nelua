@@ -1,22 +1,22 @@
 require("api")
 
-function e3d.EVM:get_global(i: uint16): e3d.EVMValue
+function e3d.EVM:getGlobal(i: uint16): e3d.EVMValue
 	return self.globals[i]
 end
 
-function e3d.EVM:get_globali(i: uint16): int32
+function e3d.EVM:getGlobalI(i: uint16): int32
 	return self.globals[i].i
 end
 
-function e3d.EVM:get_globalu(i: uint16): uint32
+function e3d.EVM:getGlobalU(i: uint16): uint32
 	return self.globals[i].u
 end
 
-function e3d.EVM:get_globalf(i: uint16): float32
+function e3d.EVM:getGlobalF(i: uint16): float32
 	return self.globals[i].f
 end
 
-function e3d.EVM:get_globalv2(i: uint16): rl.vector2
+function e3d.EVM:getGlobalV2(i: uint16): rl.vector2
 	local v: rl.vector2
 
 	v.x = self.globals[i].f
@@ -25,7 +25,7 @@ function e3d.EVM:get_globalv2(i: uint16): rl.vector2
 	return v
 end
 
-function e3d.EVM:get_globalv3(i: uint16): rl.vector3
+function e3d.EVM:getGlobalV3(i: uint16): rl.vector3
 	local v: rl.vector3
 
 	v.x = self.globals[i].f
@@ -35,58 +35,58 @@ function e3d.EVM:get_globalv3(i: uint16): rl.vector3
 	return v
 end
 
-function e3d.EVM:set_global(i: uint16, val: e3d.EVMValue): void
+function e3d.EVM:setGlobal(i: uint16, val: e3d.EVMValue): void
 	self.globals[i] = val
 end
 
-function e3d.EVM:set_globali(i: uint16, val: int32): void
+function e3d.EVM:setGlobalI(i: uint16, val: int32): void
 	self.globals[i].i = val
 end
 
-function e3d.EVM:set_globalu(i: uint16, val: uint32): void
+function e3d.EVM:setGlobalU(i: uint16, val: uint32): void
 	self.globals[i].u = val
 end
 
-function e3d.EVM:set_globalf(i: uint16, val: float32): void
+function e3d.EVM:setGlobalF(i: uint16, val: float32): void
 	self.globals[i].f = val
 end
 
-function e3d.EVM:set_globalv2(i: uint16, val: rl.vector2): void
+function e3d.EVM:setGlobalV2(i: uint16, val: rl.vector2): void
 	self.globals[i].f = val.x
 	self.globals[i + 1].f = val.y
 end
 
-function e3d.EVM:set_globalv3(i: uint16, val: rl.vector3): void
+function e3d.EVM:setGlobalV3(i: uint16, val: rl.vector3): void
 	self.globals[i].f = val.x
 	self.globals[i + 1].f = val.y
 	self.globals[i + 2].f = val.z
 end
 
-function e3d.EVM:get_local(i: uint16): e3d.EVMValue
+function e3d.EVM:getLocal(i: uint16): e3d.EVMValue
 	return self.locals[self.cf.lbp + i]
 end
 
-function e3d.EVM:set_local(i: uint16, val: e3d.EVMValue): void
+function e3d.EVM:setLocal(i: uint16, val: e3d.EVMValue): void
 	self.locals[self.cf.lbp + i] = val
 end
 
-function e3d.EVM:get_arg(i: uint16): e3d.EVMValue
+function e3d.EVM:getArg(i: uint16): e3d.EVMValue
 	return self.args[self.ap + i]
 end
 
-function e3d.EVM:get_argi(i: uint16): int32
+function e3d.EVM:getArgI(i: uint16): int32
 	return self.args[self.ap + i].i
 end
 
-function e3d.EVM:get_argu(i: uint16): uint32
+function e3d.EVM:getArgU(i: uint16): uint32
 	return self.args[self.ap + i].u
 end
 
-function e3d.EVM:get_argf(i: uint16): float32
+function e3d.EVM:getArgF(i: uint16): float32
 	return self.args[self.ap + i].f
 end
 
-function e3d.EVM:get_argv2(i: uint16): rl.vector2
+function e3d.EVM:getArgV2(i: uint16): rl.vector2
 	local v: rl.vector2
 
 	v.x = self.args[self.ap + i].f
@@ -95,7 +95,7 @@ function e3d.EVM:get_argv2(i: uint16): rl.vector2
 	return v
 end
 
-function e3d.EVM:get_argv3(i: uint16): rl.vector3
+function e3d.EVM:getArgV3(i: uint16): rl.vector3
 	local v: rl.vector3
 
 	v.x = self.args[self.ap + i].f
@@ -105,7 +105,7 @@ function e3d.EVM:get_argv3(i: uint16): rl.vector3
 	return v
 end
 
-function e3d.EVM:get_argstr(i: uint16): e3d.EVMString
+function e3d.EVM:getArgStr(i: uint16): e3d.EVMString
 	local s: e3d.EVMString
 
 	s.len = self.args[self.ap + i].u
@@ -114,34 +114,34 @@ function e3d.EVM:get_argstr(i: uint16): e3d.EVMString
 	return s
 end
 
-function e3d.EVM:set_arg(i: uint16, val: e3d.EVMValue): void
+function e3d.EVM:setArg(i: uint16, val: e3d.EVMValue): void
 	self.args[self.ap + i] = val
 end
 
-function e3d.EVM:set_argi(i: uint16, val: int32): void
+function e3d.EVM:setArgI(i: uint16, val: int32): void
 	self.args[self.ap + i].i = val
 end
 
-function e3d.EVM:set_argu(i: uint16, val: uint32): void
+function e3d.EVM:setArgU(i: uint16, val: uint32): void
 	self.args[self.ap + i].u = val
 end
 
-function e3d.EVM:set_argf(i: uint16, val: float32): void
+function e3d.EVM:setArgF(i: uint16, val: float32): void
 	self.args[self.ap + i].f = val
 end
 
-function e3d.EVM:set_argv2(i: uint16, val: rl.vector2): void
+function e3d.EVM:setArgV2(i: uint16, val: rl.vector2): void
 	self.args[self.ap + i    ].f = val.x
 	self.args[self.ap + i + 1].f = val.y
 end
 
-function e3d.EVM:set_argv3(i: uint16, val: rl.vector3): void
+function e3d.EVM:setArgV3(i: uint16, val: rl.vector3): void
 	self.args[self.ap + i    ].f = val.x
 	self.args[self.ap + i + 1].f = val.y
 	self.args[self.ap + i + 2].f = val.z
 end
 
-function e3d.EVM:set_argstr(i: uint16, val: e3d.EVMString): void
+function e3d.EVM:setArgStr(i: uint16, val: e3d.EVMString): void
 	self.args[self.ap + i    ].u = val.len
 	self.args[self.ap + i + 1].u = val.data
 end
@@ -151,35 +151,35 @@ function e3d.EVM:push(val: e3d.EVMValue): void
 	self.osp = self.osp + 1
 end
 
-function e3d.EVM:pushi(val: int32): void
+function e3d.EVM:pushI(val: int32): void
 	self.opstack[self.osp] = {i=val}
 	self.osp = self.osp + 1
 end
 
-function e3d.EVM:pushu(val: uint32): void
+function e3d.EVM:pushU(val: uint32): void
 	self.opstack[self.osp] = {u=val}
 	self.osp = self.osp + 1
 end
 
-function e3d.EVM:pushf(val: float32): void
+function e3d.EVM:pushF(val: float32): void
 	self.opstack[self.osp] = {f=val}
 	self.osp = self.osp + 1
 end
 
-function e3d.EVM:pushv2(val: rl.vector2): void
+function e3d.EVM:pushV2(val: rl.vector2): void
 	self.opstack[self.osp    ] = {f=val.x}
 	self.opstack[self.osp + 1] = {f=val.y}
 	self.osp = self.osp + 2
 end
 
-function e3d.EVM:pushv3(val: rl.vector3): void
+function e3d.EVM:pushV3(val: rl.vector3): void
 	self.opstack[self.osp    ] = {f=val.x}
 	self.opstack[self.osp + 1] = {f=val.y}
 	self.opstack[self.osp + 2] = {f=val.z}
 	self.osp = self.osp + 3
 end
 
-function e3d.EVM:pushstr(val: e3d.EVMString): void
+function e3d.EVM:pushStr(val: e3d.EVMString): void
 	self.opstack[self.osp    ] = {u=val.len}
 	self.opstack[self.osp + 1] = {u=val.data}
 	self.osp = self.osp + 2
@@ -190,22 +190,22 @@ function e3d.EVM:pop(): e3d.EVMValue
 	return self.opstack[self.osp]
 end
 
-function e3d.EVM:popi(): int32
+function e3d.EVM:popI(): int32
 	self.osp = self.osp - 1
 	return self.opstack[self.osp].i
 end
 
-function e3d.EVM:popu(): uint32
+function e3d.EVM:popU(): uint32
 	self.osp = self.osp - 1
 	return self.opstack[self.osp].u
 end
 
-function e3d.EVM:popf(): float32
+function e3d.EVM:popF(): float32
 	self.osp = self.osp - 1
 	return self.opstack[self.osp].f
 end
 
-function e3d.EVM:popv2(): rl.vector2
+function e3d.EVM:popV2(): rl.vector2
 	self.osp = self.osp - 2
 	return {
 		self.opstack[self.osp    ].f,
@@ -213,7 +213,7 @@ function e3d.EVM:popv2(): rl.vector2
 	}
 end
 
-function e3d.EVM:popv3(): rl.vector3
+function e3d.EVM:popV3(): rl.vector3
 	self.osp = self.osp - 3
 	return {
 		self.opstack[self.osp    ].f,
@@ -222,7 +222,7 @@ function e3d.EVM:popv3(): rl.vector3
 	}
 end
 
-function e3d.EVM:popstr(): e3d.EVMString
+function e3d.EVM:popStr(): e3d.EVMString
 	self.osp = self.osp - 2
 	return {
 		self.opstack[self.osp    ].u,
@@ -230,7 +230,7 @@ function e3d.EVM:popstr(): e3d.EVMString
 	}
 end
 
-function e3d.EVM:reset_vm(reset_all: boolean): void
+function e3d.EVM:resetVM(reset_all: boolean): void
 	-- TODO: free all vm program memory, clear ram?
 
 	self.cf = {}
@@ -242,8 +242,8 @@ function e3d.EVM:reset_vm(reset_all: boolean): void
 	self.init_time = rl.getTime()
 
 	if reset_all then
-		self.soundchip:reset()
-		self.gpu:reset()
+		self.soundchip:resetSoundchip()
+		self.gpu:resetGPU()
 	end
 
 	math.randomseed()
@@ -253,11 +253,11 @@ function e3d.EVM:discard(n: uint16): void
 	self.osp = self.osp - n
 end
 
-local function get_evmvalue_byte(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32): uint8
+local function getEVMValueBtye(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32): uint8
 	return (@uint8)((array[(addr - segment_start) /// 4].u >> (8 * (3 - (addr & 0b11)))) & 0xFF)
 end
 
-local function set_evmvalue_byte(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32, val: uint8): void
+local function setEVMValueByte(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32, val: uint8): void
 	local shift: uinteger = 8 * (3 - (addr & 0b11))
 	local v: *e3d.EVMValue = &array[(addr - segment_start) /// 4]
 
@@ -265,19 +265,19 @@ local function set_evmvalue_byte(array: *[0]e3d.EVMValue, segment_start: uint32,
 end
 
 -- get one byte from the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:get_ram8(addr: uint32): uint8
+function e3d.EVM:getRAM8(addr: uint32): uint8
 	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		return self.heap[addr]
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
-		return get_evmvalue_byte(&self.globals, e3d.GLOBALS_START_ADDR, addr)
+		return getEVMValueBtye(&self.globals, e3d.GLOBALS_START_ADDR, addr)
 	elseif addr < e3d.ARGS_START_ADDR then
 		-- locals
-		return get_evmvalue_byte(&self.locals, e3d.LOCALS_START_ADDR, addr)
+		return getEVMValueBtye(&self.locals, e3d.LOCALS_START_ADDR, addr)
 	elseif addr < e3d.TMEM_START_ADDR then
 		-- args
-		return get_evmvalue_byte(&self.args, e3d.ARGS_START_ADDR, addr)
+		return getEVMValueBtye(&self.args, e3d.ARGS_START_ADDR, addr)
 	elseif addr < e3d.OMEM_START_ADDR then
 		-- tmem
 		local col: *rl.color = &self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
@@ -303,9 +303,14 @@ function e3d.EVM:get_ram8(addr: uint32): uint8
 		local frame: uint16 = self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2]
 
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
-	elseif addr < e3d.UNUSED_START_ADDR then
+	elseif addr < e3d.AMEM_START_ADDR then
 		-- smem
 		return self.soundchip.smem[addr - e3d.SMEM_START_ADDR]
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- amem
+		local frame: uint16 = self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2]
+
+		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
 	elseif addr < e3d.ROM_START_ADDR then
 		-- unused
 		return 0
@@ -316,19 +321,19 @@ function e3d.EVM:get_ram8(addr: uint32): uint8
 end
 
 -- set one byte in the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
+function e3d.EVM:setRAM8(addr: uint32, val: uint8): boolean
 	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		self.heap[addr] = val
 	elseif addr < e3d.LOCALS_START_ADDR then
 		-- globals
-		set_evmvalue_byte(&self.globals, e3d.GLOBALS_START_ADDR, addr, val)
+		setEVMValueByte(&self.globals, e3d.GLOBALS_START_ADDR, addr, val)
 	elseif addr < e3d.ARGS_START_ADDR then
 		-- locals
-		set_evmvalue_byte(&self.locals, e3d.LOCALS_START_ADDR, addr, val)
+		setEVMValueByte(&self.locals, e3d.LOCALS_START_ADDR, addr, val)
 	elseif addr < e3d.TMEM_START_ADDR then
 		-- args
-		set_evmvalue_byte(&self.args, e3d.ARGS_START_ADDR, addr, val)
+		setEVMValueByte(&self.args, e3d.ARGS_START_ADDR, addr, val)
 	elseif addr < e3d.OMEM_START_ADDR then
 		-- tmem
 		local col: *rl.color = &self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
@@ -353,9 +358,15 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 		local shift: uinteger = 8 * (addr & 1)
 
 		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
-	elseif addr < e3d.UNUSED_START_ADDR then
+	elseif addr < e3d.AMEM_START_ADDR then
 		-- smem
 		self.soundchip.smem[addr - e3d.SMEM_START_ADDR] = val
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- amem
+		local frame: *uint16 = (@*uint16)(&self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2])
+		local shift: uinteger = 8 * (addr & 1)
+
+		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
 	elseif addr < e3d.ROM_START_ADDR then
 		-- unused
 		return true
@@ -368,7 +379,7 @@ function e3d.EVM:set_ram8(addr: uint32, val: uint8): boolean
 end
 
 -- get one word from the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:get_ram32(addr: uint32): uint32
+function e3d.EVM:getRAM32(addr: uint32): uint32
 	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		return ((@uint32)(self.heap[addr]) << 24) | ((@uint32)(self.heap[addr + 1]) << 16) | ((@uint32)(self.heap[addr + 2]) << 8) | (@uint32)(self.heap[addr + 3])
@@ -396,10 +407,17 @@ function e3d.EVM:get_ram32(addr: uint32): uint32
 		local frame1: uint32 = (@uint32)(self.soundchip.wmem[index + 1])
 
 		return (frame0 << 16) | frame1
-	elseif addr < e3d.UNUSED_START_ADDR then
+	elseif addr < e3d.AMEM_START_ADDR then
 		-- smem
 		addr = addr - e3d.SMEM_START_ADDR
 		return ((@uint32)(self.soundchip.smem[addr]) << 24) | ((@uint32)(self.soundchip.smem[addr + 1]) << 16) | ((@uint32)(self.soundchip.smem[addr + 2]) << 8) | (@uint32)(self.soundchip.smem[addr + 3])
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- amem
+		local index: uinteger = (addr - e3d.AMEM_START_ADDR) /// 2
+		local frame0: uint32 = (@uint32)(self.soundchip.amem[index])
+		local frame1: uint32 = (@uint32)(self.soundchip.amem[index + 1])
+
+		return (frame0 << 16) | frame1
 	elseif addr < e3d.ROM_START_ADDR then
 		-- unused
 		return 0
@@ -411,7 +429,7 @@ function e3d.EVM:get_ram32(addr: uint32): uint32
 end
 
 -- set one word in the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean
+function e3d.EVM:setRAM32(addr: uint32, val: uint32): boolean
 	if addr < e3d.GLOBALS_START_ADDR then
 		-- heap
 		self.heap[addr] = val >> 24
@@ -451,13 +469,20 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean
 		addr = (addr - e3d.WMEM_START_ADDR) /// 2
 		self.soundchip.wmem[addr] = frame0
 		self.soundchip.wmem[addr + 1] = frame1
-	elseif addr < e3d.UNUSED_START_ADDR then
+	elseif addr < e3d.AMEM_START_ADDR then
 		-- smem
 		addr = (addr - e3d.SMEM_START_ADDR) /// 4
 		self.soundchip.smem[addr] = val >> 24
 		self.soundchip.smem[addr + 1] = (val & 0xFF0000) >> 16
 		self.soundchip.smem[addr + 2] = (val & 0x00FF00) >> 8
 		self.soundchip.smem[addr + 3] = val & 0xFF
+	elseif addr < e3d.UNUSED_START_ADDR then
+		-- amem
+		local frame0: uint16 = val >> 16
+		local frame1: uint16 = val & 0xFFFF
+		addr = (addr - e3d.AMEM_START_ADDR) /// 2
+		self.soundchip.amem[addr] = frame0
+		self.soundchip.amem[addr + 1] = frame1
 	elseif addr < e3d.ROM_START_ADDR then
 		-- unused
 		return true
@@ -469,13 +494,13 @@ function e3d.EVM:set_ram32(addr: uint32, val: uint32): boolean
 	return true
 end
 
-function e3d.EVM:get_globals(start: uint16, n: uint16): void
+function e3d.EVM:getGlobals(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.globals[start + i])
 	end
 end
 
-function e3d.EVM:set_globals(start: uint16, n: uint16): void
+function e3d.EVM:setGlobals(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -484,13 +509,13 @@ function e3d.EVM:set_globals(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:get_locals(start: uint16, n: uint16): void
+function e3d.EVM:getLocals(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.locals[self.cf.lbp + start + i])
 	end
 end
 
-function e3d.EVM:set_locals(start: uint16, n: uint16): void
+function e3d.EVM:setLocals(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -499,13 +524,13 @@ function e3d.EVM:set_locals(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:get_args(start: uint16, n: uint16): void
+function e3d.EVM:getArgs(start: uint16, n: uint16): void
 	for i = 0, < n do
 		self:push(self.args[self.ap + start + i])
 	end
 end
 
-function e3d.EVM:set_args(start: uint16, n: uint16): void
+function e3d.EVM:setArgs(start: uint16, n: uint16): void
 	-- values are popped in reverse order
 	local end_index: uint16 = start + n - 1
 	
@@ -514,7 +539,7 @@ function e3d.EVM:set_args(start: uint16, n: uint16): void
 	end
 end
 
-function e3d.EVM:push_args(n: uint16): void
+function e3d.EVM:pushArgs(n: uint16): void
 	for i = 0, < n do
 		self.args[self.asp + i] = self.opstack[(self.osp - n) + i]
 	end
@@ -522,7 +547,7 @@ function e3d.EVM:push_args(n: uint16): void
 	self.osp = self.osp - n
 end
 
-function e3d.EVM:push_callframe(argc: uint16): void
+function e3d.EVM:pushCallframe(argc: uint16): void
 	self.callstack[self.csp] = self.cf
 	self.csp = self.csp + 1
 	
@@ -532,7 +557,7 @@ function e3d.EVM:push_callframe(argc: uint16): void
 	self.ap = self.asp - argc
 end
 
-function e3d.EVM:pop_callframe(): void
+function e3d.EVM:popCallframe(): void
 	self.lsp = self.cf.lbp
 	self.asp = self.asp - self.cf.argc
 	
@@ -542,15 +567,15 @@ function e3d.EVM:pop_callframe(): void
 	self.ap = self.asp - self.cf.argc
 end
 
-function e3d.EVM:get_address_of_global(index: uint16): uint32
+function e3d.EVM:getAddressOfGlobal(index: uint16): uint32
 	return e3d.GLOBALS_START_ADDR + (index * 4)
 end
 
-function e3d.EVM:get_address_of_local(index: uint16): uint32
+function e3d.EVM:getAddressOfLocal(index: uint16): uint32
 	return e3d.LOCALS_START_ADDR + ((self.cf.lbp + index) * 4)
 end
 
-function e3d.EVM:get_address_of_arg(index: uint16): uint32
+function e3d.EVM:getAddressOfArg(index: uint16): uint32
 	return e3d.ARGS_START_ADDR + ((self.ap + index) * 4)
 end
 
@@ -582,13 +607,13 @@ function e3d.EVM:next32(): uint32
 	return v
 end
 
-function e3d.EVM:nextf(): float32
+function e3d.EVM:nextF(): float32
 	local v: e3d.EVMValue = {u=self:next32()}
 
 	return v.f
 end
 
-function e3d.EVM:dump_bytecode(): void
+function e3d.EVM:dumpBytecode(): void
 	local prev_cf: e3d.CallFrame = self.cf
 	self.cf = {}
 	
@@ -685,7 +710,7 @@ function e3d.EVM:dump_bytecode(): void
 			case e3d.Opcode.PUSH_INT then
 				io.printf("PUSH_INT %d\n", (@int32)(self:next32()))
 			case e3d.Opcode.PUSH_FLOAT then
-				io.printf("PUSH_FLOAT %f\n", self:nextf())
+				io.printf("PUSH_FLOAT %f\n", self:nextF())
 			case e3d.Opcode.PUSH_VEC2_ZERO then
 				io.printf("PUSH_VEC2_ZERO\n")
 			case e3d.Opcode.PUSH_VEC3_ZERO then
@@ -862,18 +887,18 @@ function e3d.EVM:run(cycles: uinteger): boolean
 		switch op do
 			case e3d.Opcode.GET_G then
 				index = self:next16()
-				self:push(self:get_global(index))
+				self:push(self:getGlobal(index))
 			case e3d.Opcode.GET_GX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:get_globals(index, n)
+				self:getGlobals(index, n)
 			case e3d.Opcode.SET_G then
 				index = self:next16()
-				self:set_global(index, self:pop())
+				self:setGlobal(index, self:pop())
 			case e3d.Opcode.SET_GX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:set_globals(index, n)
+				self:setGlobals(index, n)
 			case e3d.Opcode.NEW_L then
 				self.lsp = self.lsp + self:next16()
 
@@ -885,35 +910,35 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self.lsp = self.lsp - self:next16()
 			case e3d.Opcode.GET_L then
 				index = self:next16()
-				self:push(self:get_local(index))
+				self:push(self:getLocal(index))
 			case e3d.Opcode.GET_LX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:get_locals(index, n)
+				self:getLocals(index, n)
 			case e3d.Opcode.SET_L then
 				index = self:next16()
-				self:set_local(index, self:pop())
+				self:setLocal(index, self:pop())
 			case e3d.Opcode.SET_LX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:set_locals(index, n)
+				self:setLocals(index, n)
 			case e3d.Opcode.GET_A then
 				index = self:next16()
-				self:push(self:get_arg(index))
+				self:push(self:getArg(index))
 			case e3d.Opcode.GET_AX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:get_args(index, n)
+				self:getArgs(index, n)
 			case e3d.Opcode.SET_A then
 				index = self:next16()
-				self:set_arg(index, self:pop())
+				self:setArg(index, self:pop())
 			case e3d.Opcode.SET_AX then
 				index = self:next16()
 				local n: uint16 = self:next16()
-				self:set_args(index, n)
+				self:setArgs(index, n)
 			case e3d.Opcode.GET_M then
 				index = self:next16() -- offset in words
-				local ptr: int32 = self:popi()
+				local ptr: int32 = self:popI()
 				local v: uint32
 
 				if ptr > e3d.RAM_MAX_ADDR then
@@ -924,11 +949,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 				
-				self:pushu(self:get_ram32((@uint32)(ptr + (@int32)(index) * 4)))
+				self:pushU(self:getRAM32((@uint32)(ptr + (@int32)(index) * 4)))
 			case e3d.Opcode.GET_MX then
 				index = self:next16() -- offset in words
 				local size: uint16 = self:next16()
-				local ptr: int32 = self:popi()
+				local ptr: int32 = self:popI()
 
 				if ptr > e3d.RAM_MAX_ADDR then
 					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
@@ -947,12 +972,12 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 					end
 					
-					self:pushu(self:get_ram32(addr))
+					self:pushU(self:getRAM32(addr))
 				end
 			case e3d.Opcode.SET_M then
 				index = self:next16() -- offset in words
-				local v: uint32 = self:popu()
-				local ptr: int32 = self:popi()
+				local v: uint32 = self:popU()
+				local ptr: int32 = self:popI()
 
 				if ptr > e3d.RAM_MAX_ADDR then
 					self.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", ptr)
@@ -962,7 +987,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 				
-				if not self:set_ram32((@uint32)(ptr + (@int32)(index) * 4), v) then
+				if not self:setRAM32((@uint32)(ptr + (@int32)(index) * 4), v) then
 					self.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", ptr)
 					return false
 				end
@@ -994,13 +1019,13 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 					end
 					
-					self:set_ram32(mem_addr, self.opstack[struct_word_index].u)
+					self:setRAM32(mem_addr, self.opstack[struct_word_index].u)
 				end
 
 				self.osp = (self.osp - 1) - size -- pop ptr and struct from stack
 			case e3d.Opcode.GET_S then
-				local i: uint32 = self:popu()
-				local s: e3d.EVMString = self:popstr()
+				local i: uint32 = self:popU()
+				local s: e3d.EVMString = self:popStr()
 
 				local addr: uint32 = s.data + i
 
@@ -1009,11 +1034,11 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 			
-				self:pushu(self:get_ram8(addr))
+				self:pushU(self:getRAM8(addr))
 			case e3d.Opcode.SET_S then
-				local c: uint8 = (@uint8)(self:popu() & 0xFF)
-				local i: uint32 = self:popu()
-				local s: e3d.EVMString = self:popstr()
+				local c: uint8 = (@uint8)(self:popU() & 0xFF)
+				local i: uint32 = self:popU()
+				local s: e3d.EVMString = self:popStr()
 
 				local addr: uint32 = s.data + i
 
@@ -1022,233 +1047,233 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 			
-				if not self:set_ram8(addr, c) then
+				if not self:setRAM8(addr, c) then
 					self.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
 					return false
 				end
 			case e3d.Opcode.ADDROF_G then
 				index = self:next16()
-				self:pushu(self:get_address_of_global(index))
+				self:pushU(self:getAddressOfGlobal(index))
 			case e3d.Opcode.ADDROF_L then
 				index = self:next16()
-				self:pushu(self:get_address_of_local(index))
+				self:pushU(self:getAddressOfLocal(index))
 			case e3d.Opcode.ADDROF_A then
 				index = self:next16()
-				self:pushu(self:get_address_of_arg(index))
+				self:pushU(self:getAddressOfArg(index))
 			case e3d.Opcode.PUSH_ZERO then
-				self:pushu(0)
+				self:pushU(0)
 			case e3d.Opcode.PUSH_ZEROF then
-				self:pushf(0.0)
+				self:pushF(0.0)
 			case e3d.Opcode.PUSH_ONE then
-				self:pushu(1)
+				self:pushU(1)
 			case e3d.Opcode.PUSH_ONEF then
-				self:pushf(1.0)
+				self:pushF(1.0)
 			case e3d.Opcode.PUSH_CHAR then
-				self:pushu((@uint32)(self:next8()))
+				self:pushU((@uint32)(self:next8()))
 			case e3d.Opcode.PUSH_INT then
-				self:pushi((@int32)(self:next32()))
+				self:pushI((@int32)(self:next32()))
 			case e3d.Opcode.PUSH_FLOAT then
-				self:pushf(self:nextf())
+				self:pushF(self:nextF())
 			case e3d.Opcode.PUSH_VEC2_ZERO then
-				self:pushv2({0,0})
+				self:pushV2({0,0})
 			case e3d.Opcode.PUSH_VEC3_ZERO then
-				self:pushv3({0,0,0})
+				self:pushV3({0,0,0})
 			case e3d.Opcode.PUSH_STRING then
 				index = self:next16()
 				local addr: uint32 = self:next32()
-				self:pushstr({index, addr})
+				self:pushStr({index, addr})
 			case e3d.Opcode.DISCARD then
 				self:discard(self:next16())
 			case e3d.Opcode.NOT then
-				self:pushu(~self:popu())
+				self:pushU(~self:popU())
 			case e3d.Opcode.OR then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a | b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a | b)
 			case e3d.Opcode.XOR then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a ~ b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a ~ b)
 			case e3d.Opcode.AND then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a & b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a & b)
 			case e3d.Opcode.LSHIFT then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a << b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a << b)
 			case e3d.Opcode.RSHIFT then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a >> b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a >> b)
 			case e3d.Opcode.ARSHIFT then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a >>> b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a >>> b)
 			case e3d.Opcode.NEG then
-				self:pushi(-self:popi())
+				self:pushI(-self:popI())
 			case e3d.Opcode.NEGF then
-				self:pushf(-self:popf())
+				self:pushF(-self:popF())
 			case e3d.Opcode.NEGV then
 				index = (@uint16)(self:next8())
 				if index == 0 then
-					local v: rl.vector2 = self:popv2()
-					self:pushv2({-v.x,-v.y})
+					local v: rl.vector2 = self:popV2()
+					self:pushV2({-v.x,-v.y})
 				else
-					local v: rl.vector3 = self:popv3()
-					self:pushv3({-v.x,-v.y,-v.z})
+					local v: rl.vector3 = self:popV3()
+					self:pushV3({-v.x,-v.y,-v.z})
 				end
 			case e3d.Opcode.ADD then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a + b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a + b)
 			case e3d.Opcode.ADDF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushf(a + b)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushF(a + b)
 			case e3d.Opcode.ADDV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 + vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 							a.x + b.x,
 							a.y + b.y})
 					case 1 then -- vec3 + vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 							a.x + b.x,
 							a.y + b.y,
 							a.z + b.z})
 				end
 			case e3d.Opcode.ADDP then
 				index = self:next16() -- size of type pointed to (in words)
-				local v: int32 = self:popi()
-				local p: int32 = self:popi()
-				self:pushi(p + (v * (index * 4)))
+				local v: int32 = self:popI()
+				local p: int32 = self:popI()
+				self:pushI(p + (v * (index * 4)))
 			case e3d.Opcode.SUB then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a - b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a - b)
 			case e3d.Opcode.SUBF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushf(a - b)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushF(a - b)
 			case e3d.Opcode.SUBV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 - vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 							a.x - b.x,
 							a.y - b.y})
 					case 1 then -- vec3 - vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 							a.x - b.x,
 							a.y - b.y,
 							a.z - b.z})
 				end
 			case e3d.Opcode.SUBP then
 				index = self:next16() -- size of type pointed to (in words)
-				local v: int32 = self:popi()
-				local p: int32 = self:popi()
-				self:pushi(p - (v * (index * 4)))
+				local v: int32 = self:popI()
+				local p: int32 = self:popI()
+				self:pushI(p - (v * (index * 4)))
 			case e3d.Opcode.MUL then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a * b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a * b)
 			case e3d.Opcode.MULF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushf(a * b)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushF(a * b)
 			case e3d.Opcode.MULV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case e3d.MulVMode.INT_V2 then
-						local a: rl.vector2 = self:popv2()
-						local b: int32 = self:popi()
-						self:pushv2({
+						local a: rl.vector2 = self:popV2()
+						local b: int32 = self:popI()
+						self:pushV2({
 								a.x * (@float32)(b),
 								a.y * (@float32)(b)
 							}
 						)
 					case e3d.MulVMode.INT_V3 then
-						local a: rl.vector3 = self:popv3()
-						local b: int32 = self:popi()
-						self:pushv3({
+						local a: rl.vector3 = self:popV3()
+						local b: int32 = self:popI()
+						self:pushV3({
 								a.x * (@float32)(b),
 								a.y * (@float32)(b),
 								a.z * (@float32)(b)
 							}
 						)
 					case e3d.MulVMode.FLOAT_V2 then
-						local a: rl.vector2 = self:popv2()
-						local b: float32 = self:popf()
-						self:pushv2({
+						local a: rl.vector2 = self:popV2()
+						local b: float32 = self:popF()
+						self:pushV2({
 								a.x * b,
 								a.y * b
 							}
 						)
 					case e3d.MulVMode.FLOAT_V3 then
-						local a: rl.vector3 = self:popv3()
-						local b: float32 = self:popf()
-						self:pushv3({
+						local a: rl.vector3 = self:popV3()
+						local b: float32 = self:popF()
+						self:pushV3({
 								a.x * b,
 								a.y * b,
 								a.z * b
 							}
 						)
 					case e3d.MulVMode.V2_INT then
-						local b: int32 = self:popi()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: int32 = self:popI()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x * (@float32)(b),
 								a.y * (@float32)(b)
 							}
 						)
 					case e3d.MulVMode.V2_FLOAT then
-						local b: float32 = self:popf()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: float32 = self:popF()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x * b,
 								a.y * b
 							}
 						)
 					case e3d.MulVMode.V2_V2 then
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x * b.x,
 								a.y * b.y
 							}
 						)
 					case e3d.MulVMode.V3_INT then
-						local b: int32 = self:popi()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: int32 = self:popI()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x * (@float32)(b),
 								a.y * (@float32)(b),
 								a.z * (@float32)(b)
 							}
 						)
 					case e3d.MulVMode.V3_FLOAT then
-						local b: float32 = self:popf()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: float32 = self:popF()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x * b,
 								a.y * b,
 								a.z * b
 							}
 						)
 					case e3d.MulVMode.V3_V3 then
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x * b.x,
 								a.y * b.y,
 								a.z * b.z
@@ -1256,66 +1281,66 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						)
 				end
 			case e3d.Opcode.DIV then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a /// b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a /// b)
 			case e3d.Opcode.DIVU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a /// b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a /// b)
 			case e3d.Opcode.DIVF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushf(a / b)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushF(a / b)
 			case e3d.Opcode.DIVV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case e3d.DivVMode.V2_INT then
-						local b: int32 = self:popi()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: int32 = self:popI()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x / (@float32)(b),
 								a.y / (@float32)(b)
 							}
 						)
 					case e3d.DivVMode.V2_FLOAT then
-						local b: float32 = self:popf()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: float32 = self:popF()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x / b,
 								a.y / b
 							}
 						)
 					case e3d.DivVMode.V2_V2 then
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushv2({
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushV2({
 								a.x / b.x,
 								a.y / b.y
 							}
 						)
 					case e3d.DivVMode.V3_INT then
-						local b: int32 = self:popi()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: int32 = self:popI()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x / (@float32)(b),
 								a.y / (@float32)(b),
 								a.z / (@float32)(b)
 							}
 						)
 					case e3d.DivVMode.V3_FLOAT then
-						local b: float32 = self:popf()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: float32 = self:popF()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x / b,
 								a.y / b,
 								a.z / b
 							}
 						)
 					case e3d.DivVMode.V3_V3 then
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushv3({
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushV3({
 								a.x / b.x,
 								a.y / b.y,
 								a.z / b.z
@@ -1323,54 +1348,54 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						)
 				end
 			case e3d.Opcode.MOD then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushi(a %%% b)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushI(a %%% b)
 			case e3d.Opcode.MODU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu(a %%% b)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU(a %%% b)
 			case e3d.Opcode.MODF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushf(math.fmod(a, b))
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushF(math.fmod(a, b))
 			case e3d.Opcode.LNOT then
-				local v: uint32 = self:popu()
-				self:pushu(v == 0 and 1 or 0)
+				local v: uint32 = self:popU()
+				self:pushU(v == 0 and 1 or 0)
 			case e3d.Opcode.LNOTP then
-				local v: uint32 = self:popu()
-				self:pushu(v > e3d.RAM_MAX_ADDR and 1 or 0)
+				local v: uint32 = self:popU()
+				self:pushU(v > e3d.RAM_MAX_ADDR and 1 or 0)
 			case e3d.Opcode.EQ then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a == b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a == b) and 1 or 0)
 			case e3d.Opcode.EQF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a == b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a == b) and 1 or 0)
 			case e3d.Opcode.EQV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 / vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushu((a.x == b.x and a.y == b.y) and 1 or 0)
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushU((a.x == b.x and a.y == b.y) and 1 or 0)
 					case 1 then -- vec3 / vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushu((a.x == b.x and a.y == b.y and a.z == b.z) and 1 or 0)
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushU((a.x == b.x and a.y == b.y and a.z == b.z) and 1 or 0)
 				end
 			case e3d.Opcode.EQS then
-				local b: e3d.EVMString = self:popstr()
-				local a: e3d.EVMString = self:popstr()
+				local b: e3d.EVMString = self:popStr()
+				local a: e3d.EVMString = self:popStr()
 
 				if a.len ~= b.len then
 					-- strings have different lengths, cannot be equal
-					self:pushu(0)
+					self:pushU(0)
 				else
 					if a.data == b.data then
 						-- strings have same length and data address, equal
-						self:pushu(1)
+						self:pushU(1)
 					else
 						-- strings have same length but different data addresses,
 						-- we must compare characters
@@ -1387,14 +1412,14 @@ function e3d.EVM:run(cycles: uinteger): boolean
 								return false
 							end
 						
-							ac = self:get_ram8(a_addr)
+							ac = self:getRAM8(a_addr)
 
 							if b_addr > e3d.RAM_MAX_ADDR then
 								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
 								return false
 							end
 						
-							bc = self:get_ram8(b_addr)
+							bc = self:getRAM8(b_addr)
 
 							if ac ~= bc then
 								result = 0
@@ -1405,40 +1430,40 @@ function e3d.EVM:run(cycles: uinteger): boolean
 							b_addr = b_addr + 1
 						end
 
-						self:pushu(result)
+						self:pushU(result)
 					end
 				end
 			case e3d.Opcode.NE then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a ~= b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a ~= b) and 1 or 0)
 			case e3d.Opcode.NEF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a ~= b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a ~= b) and 1 or 0)
 			case e3d.Opcode.NEV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 / vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
-						self:pushu((a.x ~= b.x and a.y ~= b.y) and 1 or 0)
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
+						self:pushU((a.x ~= b.x and a.y ~= b.y) and 1 or 0)
 					case 1 then -- vec3 / vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
-						self:pushu((a.x ~= b.x and a.y ~= b.y and a.z ~= b.z) and 1 or 0)
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
+						self:pushU((a.x ~= b.x and a.y ~= b.y and a.z ~= b.z) and 1 or 0)
 				end
 			case e3d.Opcode.NES then
-				local b: e3d.EVMString = self:popstr()
-				local a: e3d.EVMString = self:popstr()
+				local b: e3d.EVMString = self:popStr()
+				local a: e3d.EVMString = self:popStr()
 
 				if a.len ~= b.len then
 					-- strings have different lengths, cannot be equal
-					self:pushu(1)
+					self:pushU(1)
 				else
 					if a.data == b.data then
 						-- strings have same length and data address, equal
-						self:pushu(0)
+						self:pushU(0)
 					else
 						-- strings have same length but different data addresses,
 						-- we must compare characters
@@ -1455,14 +1480,14 @@ function e3d.EVM:run(cycles: uinteger): boolean
 								return false
 							end
 						
-							ac = self:get_ram8(a_addr)
+							ac = self:getRAM8(a_addr)
 
 							if b_addr > e3d.RAM_MAX_ADDR then
 								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
 								return false
 							end
 						
-							bc = self:get_ram8(b_addr)
+							bc = self:getRAM8(b_addr)
 
 							if ac ~= bc then
 								result = 1
@@ -1473,151 +1498,151 @@ function e3d.EVM:run(cycles: uinteger): boolean
 							b_addr = b_addr + 1
 						end
 
-						self:pushu(result)
+						self:pushU(result)
 					end
 				end
 			case e3d.Opcode.LTI then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushu((a < b) and 1 or 0)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushU((a < b) and 1 or 0)
 			case e3d.Opcode.LTU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a < b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a < b) and 1 or 0)
 			case e3d.Opcode.LTF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a < b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a < b) and 1 or 0)
 			case e3d.Opcode.LTV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 < vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
 						if a.x == b.x then
-							self:pushu((a.y < b.y) and 1 or 0)
+							self:pushU((a.y < b.y) and 1 or 0)
 						else
-							self:pushu((a.x < b.x) and 1 or 0)
+							self:pushU((a.x < b.x) and 1 or 0)
 						end
 					case 1 then -- vec3 < vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
 						if a.x == b.x then
 							if a.y == b.y then
-								self:pushu((a.z < b.z) and 1 or 0)
+								self:pushU((a.z < b.z) and 1 or 0)
 							else
-								self:pushu((a.y < b.y) and 1 or 0)
+								self:pushU((a.y < b.y) and 1 or 0)
 							end
 						else
-							self:pushu((a.x < b.x) and 1 or 0)
+							self:pushU((a.x < b.x) and 1 or 0)
 						end
 				end
 			case e3d.Opcode.GTI then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushu((a > b) and 1 or 0)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushU((a > b) and 1 or 0)
 			case e3d.Opcode.GTU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a > b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a > b) and 1 or 0)
 			case e3d.Opcode.GTF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a > b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a > b) and 1 or 0)
 			case e3d.Opcode.GTV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 > vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
 						if a.x == b.x then
-							self:pushu((a.y > b.y) and 1 or 0)
+							self:pushU((a.y > b.y) and 1 or 0)
 						else
-							self:pushu((a.x > b.x) and 1 or 0)
+							self:pushU((a.x > b.x) and 1 or 0)
 						end
 					case 1 then -- vec3 > vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
 						if a.x == b.x then
 							if a.y == b.y then
-								self:pushu((a.z > b.z) and 1 or 0)
+								self:pushU((a.z > b.z) and 1 or 0)
 							else
-								self:pushu((a.y > b.y) and 1 or 0)
+								self:pushU((a.y > b.y) and 1 or 0)
 							end
 						else
-							self:pushu((a.x > b.x) and 1 or 0)
+							self:pushU((a.x > b.x) and 1 or 0)
 						end
 				end
 			case e3d.Opcode.LEI then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushu((a <= b) and 1 or 0)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushU((a <= b) and 1 or 0)
 			case e3d.Opcode.LEU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a <= b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a <= b) and 1 or 0)
 			case e3d.Opcode.LEF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a <= b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a <= b) and 1 or 0)
 			case e3d.Opcode.LEV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 <= vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
 						if a.x == b.x then
-							self:pushu((a.y <= b.y) and 1 or 0)
+							self:pushU((a.y <= b.y) and 1 or 0)
 						else
-							self:pushu((a.x < b.x) and 1 or 0)
+							self:pushU((a.x < b.x) and 1 or 0)
 						end
 					case 1 then -- vec3 <= vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
 						if a.x == b.x then
 							if a.y == b.y then
-								self:pushu((a.z <= b.z) and 1 or 0)
+								self:pushU((a.z <= b.z) and 1 or 0)
 							else
-								self:pushu((a.y < b.y) and 1 or 0)
+								self:pushU((a.y < b.y) and 1 or 0)
 							end
 						else
-							self:pushu((a.x < b.x) and 1 or 0)
+							self:pushU((a.x < b.x) and 1 or 0)
 						end
 				end
 			case e3d.Opcode.GEI then
-				local b: int32 = self:popi()
-				local a: int32 = self:popi()
-				self:pushu((a >= b) and 1 or 0)
+				local b: int32 = self:popI()
+				local a: int32 = self:popI()
+				self:pushU((a >= b) and 1 or 0)
 			case e3d.Opcode.GEU then
-				local b: uint32 = self:popu()
-				local a: uint32 = self:popu()
-				self:pushu((a >= b) and 1 or 0)
+				local b: uint32 = self:popU()
+				local a: uint32 = self:popU()
+				self:pushU((a >= b) and 1 or 0)
 			case e3d.Opcode.GEF then
-				local b: float32 = self:popf()
-				local a: float32 = self:popf()
-				self:pushu((a >= b) and 1 or 0)
+				local b: float32 = self:popF()
+				local a: float32 = self:popF()
+				self:pushU((a >= b) and 1 or 0)
 			case e3d.Opcode.GEV then
 				index = (@uint16)(self:next8())
 				switch index do
 					case 0 then -- vec2 >= vec2
-						local b: rl.vector2 = self:popv2()
-						local a: rl.vector2 = self:popv2()
+						local b: rl.vector2 = self:popV2()
+						local a: rl.vector2 = self:popV2()
 						if a.x == b.x then
-							self:pushu((a.y >= b.y) and 1 or 0)
+							self:pushU((a.y >= b.y) and 1 or 0)
 						else
-							self:pushu((a.x > b.x) and 1 or 0)
+							self:pushU((a.x > b.x) and 1 or 0)
 						end
 					case 1 then -- vec3 >= vec3
-						local b: rl.vector3 = self:popv3()
-						local a: rl.vector3 = self:popv3()
+						local b: rl.vector3 = self:popV3()
+						local a: rl.vector3 = self:popV3()
 						if a.x == b.x then
 							if a.y == b.y then
-								self:pushu((a.z >= b.z) and 1 or 0)
+								self:pushU((a.z >= b.z) and 1 or 0)
 							else
-								self:pushu((a.y > b.y) and 1 or 0)
+								self:pushU((a.y > b.y) and 1 or 0)
 							end
 						else
-							self:pushu((a.x > b.x) and 1 or 0)
+							self:pushU((a.x > b.x) and 1 or 0)
 						end
 				end
 			case e3d.Opcode.JUMP then
@@ -1625,7 +1650,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self.cf.pc = index
 			case e3d.Opcode.JUMP_Z then
 				index = self:next16()
-				local v: uint32 = self:popu()
+				local v: uint32 = self:popU()
 
 				if v == 0 then
 					self.cf.pc = index
@@ -1656,7 +1681,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				end
 			case e3d.Opcode.JUMP_NULL then
 				index = self:next16()
-				local v: uint32 = self:popu()
+				local v: uint32 = self:popU()
 
 				if v > e3d.RAM_MAX_ADDR then
 					self.cf.pc = index
@@ -1699,13 +1724,13 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 
-				self:push_args(argc)
-				self:push_callframe(argc)
+				self:pushArgs(argc)
+				self:pushCallframe(argc)
 				self.cf.pc = index
 			case e3d.Opcode.CALL_PTR then
-				local addr: uint32 = self:popu()
+				local addr: uint32 = self:popU()
 				if addr < e3d.BYTECODE_SIZE then
-					self:push_callframe(0)
+					self:pushCallframe(0)
 					self.cf.pc = addr
 				else
 					self.error = string.format("RUNTIME ERROR: invalid call address 0x%08X\n", addr)
@@ -1716,7 +1741,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				if self.csp == 1 then
 					return true
 				else
-					self:pop_callframe()
+					self:popCallframe()
 				end
 			case e3d.Opcode.VARGP then
 				index = self:next16()
@@ -1724,13 +1749,13 @@ function e3d.EVM:run(cycles: uinteger): boolean
 				self.cf.vargc = self.cf.argc - index
 				self.cf.vargf = true
 			case e3d.Opcode.FTOI then
-				self:pushi((@int32)(self:popf()))
+				self:pushI((@int32)(self:popF()))
 			case e3d.Opcode.ITOF then
-				self:pushf((@float32)(self:popi()))
+				self:pushF((@float32)(self:popI()))
 			case e3d.Opcode.ITOB then
-				self:pushu(self:popu() ~= 0 and 1 or 0)
+				self:pushU(self:popU() ~= 0 and 1 or 0)
 			case e3d.Opcode.PTOB then
-				self:pushu(self:popu() <= e3d.RAM_MAX_ADDR and 1 or 0)
+				self:pushU(self:popU() <= e3d.RAM_MAX_ADDR and 1 or 0)
 			case e3d.Opcode.API then
 				index = self:next16()
 				local argc: uint16 = self:next16()
@@ -1746,13 +1771,13 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 					end
 
-					self:push_args(argc)
-					self:push_callframe(argc)
+					self:pushArgs(argc)
+					self:pushCallframe(argc)
 					if not func(self) then
-						self:pop_callframe()
+						self:popCallframe()
 						return false
 					end
-					self:pop_callframe()
+					self:popCallframe()
 				else
 					self.error = string.format("RUNTIME ERROR: attempt to call unregistered API function at index %d\n", index)
 					return false
@@ -1774,21 +1799,21 @@ function e3d.EVM:run(cycles: uinteger): boolean
 	return true
 end
 
-function e3d.EVM:call_hook(hook: integer): boolean
+function e3d.EVM:callHook(hook: integer): boolean
 	if self.hook_flags[hook] then
 		self.current_hook = hook
 		self.cf.pc = self.hook_addresses[hook]
 
 		local argc: uint16 = 0
 		if self.current_hook == e3d.Hook.UPDATE then
-			self:pushf(rl.getFrameTime())
-			self:push_args(1)
+			self:pushF(rl.getFrameTime())
+			self:pushArgs(1)
 			argc = 1
 		end
 
-		self:push_callframe(argc)
+		self:pushCallframe(argc)
 		local result: boolean = self:run(0)
-		self:pop_callframe()
+		self:popCallframe()
 
 		if self.current_hook == e3d.Hook.DRAW then
 			rlgl.drawRenderBatchActive()
@@ -1804,14 +1829,14 @@ function e3d.EVM:__gc(): void
 	self.gpu:cleanup()
 end
 
-function e3d.new_vm(): *e3d.EVM
+function e3d.newVM(): *e3d.EVM
 	local vm: *e3d.EVM = new(@e3d.EVM)
 
-	vm:register_api()
-	vm:register_builtins()
+	vm:registerAPI()
+	vm:registerBuiltins()
 	
 	vm.gpu:init()
 	vm.soundchip:init()
-	vm:reset_vm(false)
+	vm:resetVM(false)
 	return vm
 end

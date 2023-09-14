@@ -21,28 +21,26 @@ global e3d = @record{}
 -----------------------------
 
 --[[ VM RAM logical memory map (WIP)
-	TODO: revise to allow for audio and model data(?)
-
 	note: 1 vm word = 4 bytes
 
 	heap:      8 MiB
-	globals: 256 KiB             (65536 vm words)
-	locals:  256 KiB             (65536 vm words)
-	args:    256 KiB             (65536 vm words)
-	tmem:      4 MiB             (1024*1024 pixels (32BPP))
-	omem:      3 MiB + 384 KiB   (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-	wmem:     15 MiB             (~2min 58s of audio wave data (22050hz, 16bit, stereo))
-	smem:     64 KiB             (sfx/music tracker data)
+	globals: 256 KiB           (65536 vm words)
+	locals:  256 KiB           (65536 vm words)
+	args:    256 KiB           (65536 vm words)
+	tmem:      4 MiB           (1024*1024 pixels (32BPP))
+	omem:      3 MiB + 384 KiB (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+	wmem:     15 MiB           (~2min 58s of audio wave data (22050hz, 16bit, stereo))
+	smem:    256 KiB           (sfx/music tracker data)
 		song data:         2 KiB         (256 * 8 bytes)
-		chain data:        8 KiB         (256 * 16 * 2 bytes (phrase, transpose))
-		phrase data:      32 KiB         (256 * 16 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
+		pattern data:    128 KiB         (256 * 64 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
 		instrument data:   2 KiB + 512 B (256 * 10 bytes (sample start (24bit), sample end(24bit), attack, decay, sustain, release))
 		groove data:     256 B           (16 * 16 bytes)
 		audio state:       1 B           (1 byte (track playing flags))
-		track state:      88 B           (8 * 11 bytes (bpm, volume, pan, song id+pos, chain id+pos, phrase id+pos, groove id+pos))
-		unused:                          (the rest of the 64 KiB)
-	unused:   768 KiB
-	rom:       64 KiB            (65536 bytes)
+		track state:      72 B           (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
+		unused:                          (the rest of the 256 KiB)
+	amem:     8 KiB (audio output buffer (2048 16bit stereo audio samples))
+	unused: 568 KiB
+	rom:     64 KiB (65536 bytes)
 	
 	TOTAL: 32 MiB
 
@@ -54,7 +52,8 @@ global e3d = @record{}
 	0x00CC0000 - 0x0101FFFF: omem
 	0x01020000 - 0x01F1FFFF: wmem
 	0x01F20000 - 0x01F2FFFF: smem
-	0x01F30000 - 0x01FEFFFF: unused
+	0x01F30000 - 0x01F31FFF: amem
+	0x01F32000 - 0x01FEFFFF: unused
 	0x01FF0000 - 0x01FFFFFF: rom
 ]]
 
@@ -79,7 +78,8 @@ global e3d.TMEM_START_ADDR    <comptime> = e3d.ARGS_START_ADDR + (e3d.ARGS_SIZE 
 global e3d.OMEM_START_ADDR    <comptime> = e3d.TMEM_START_ADDR + (GPU_TMEM_SIZE * 4)
 global e3d.WMEM_START_ADDR    <comptime> = e3d.OMEM_START_ADDR + GPU_OMEM_SIZE
 global e3d.SMEM_START_ADDR    <comptime> = e3d.WMEM_START_ADDR + (SOUNDCHIP_WMEM_SIZE * 2)
-global e3d.UNUSED_START_ADDR  <comptime> = e3d.SMEM_START_ADDR + SOUNDCHIP_SMEM_SIZE
+global e3d.AMEM_START_ADDR    <comptime> = e3d.SMEM_START_ADDR + SOUNDCHIP_SMEM_SIZE
+global e3d.UNUSED_START_ADDR  <comptime> = e3d.AMEM_START_ADDR + (SOUNDCHIP_AMEM_SIZE * 2)
 global e3d.ROM_START_ADDR     <comptime> = (e3d.RAM_MAX_ADDR + 1) - e3d.ROM_SIZE
 
 global e3d.NULL <comptime> = 0xFFFFFFFF
@@ -543,7 +543,7 @@ global e3d._token_names: []string = {
 --                                   --
 ---------------------------------------
 
-function e3d.set_default_btnmap(): void
+function e3d.setDefaultBtnmap(): void
 	e3d.btnmap[e3d.ControllerButtons.UP]       = rl.keyboardKey.UP
 	e3d.btnmap[e3d.ControllerButtons.DOWN]     = rl.keyboardKey.DOWN
 	e3d.btnmap[e3d.ControllerButtons.LEFT]     = rl.keyboardKey.LEFT
@@ -560,15 +560,15 @@ function e3d.set_default_btnmap(): void
 	e3d.btnmap[e3d.ControllerButtons.START]    = rl.keyboardKey.ENTER
 end
 
-function e3d.get_btn_keycode(btn: integer): cint
+function e3d.getBtnKeycode(btn: integer): cint
 	return e3d.btnmap[btn]
 end
 
-function e3d.set_btn_keycode(btn: integer, keycode: cint): void
+function e3d.setBtnKeycode(btn: integer, keycode: cint): void
 	e3d.btnmap[btn] = keycode
 end
 
-function e3d.get_type_name(info: e3d.TypeInfo): string
+function e3d.getTypeName(info: e3d.TypeInfo): string
 	local sb: stringbuilder
 	local full_type: uinteger = info.type_id
 	local base_type: uinteger = info.type_id & (e3d.EVMType.POINTER - 1)
@@ -587,7 +587,7 @@ function e3d.get_type_name(info: e3d.TypeInfo): string
 	return sb:__tostring()
 end
 
-function e3d.get_token_string(token: uinteger): string
+function e3d.getTokenString(token: uinteger): string
 	if token == 0 then
 		return "EOF"
 	elseif token < e3d.Token.INT_LITERAL then
@@ -597,7 +597,7 @@ function e3d.get_token_string(token: uinteger): string
 	end
 end
 
-function e3d.size_of_type(info: e3d.TypeInfo): uint16
+function e3d.sizeOfType(info: e3d.TypeInfo): uint16
 	-- returns size in words
 	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRING) then
 		return info.structref.size
@@ -606,7 +606,7 @@ function e3d.size_of_type(info: e3d.TypeInfo): uint16
 	return 1
 end
 
-function e3d.size_pointed_to(info: e3d.TypeInfo): uint16
+function e3d.sizePointedTo(info: e3d.TypeInfo): uint16
 	-- returns size in words
 	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
 	

@@ -1,11 +1,18 @@
 require("statemachine")
 
+--[[
+    TODO:
+
+    - draw audio levels
+    - draw playheads
+    - implement sample playback
+]]
+
 local PIANO_KEYS_COUNT <comptime> = SOUNDCHIP_OCTAVE_SIZE * 2
 
 local Editor = @enum {
     SONG = 0,
-    CHAIN,
-    PHRASE,
+    PATTERN,
     COUNT
 }
 
@@ -20,12 +27,9 @@ local TrackerData = @record {
     song_id: uint8,
     song_x: integer,
     song_y: integer,
-    chain_id: uint8,
-    chain_x: integer,
-    chain_y: integer,
-    phrase_id: uint8,
-    phrase_x: integer,
-    phrase_y: integer,
+    pattern_id: uint8,
+    pattern_x: integer,
+    pattern_y: integer,
     cursor_x: *integer,
     cursor_y: *integer
 }
@@ -77,7 +81,23 @@ local piano_keys: [PIANO_KEYS_COUNT]cint = {
 
 local data: TrackerData
 
-local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+local function drawLevels(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+    local l: BKFrame = 0
+    local r: BKFrame = 0
+
+    for i = 0, < SOUNDCHIP_FRAMES_PER_UPDATE do
+        local idx: uinteger = i * 2
+        local ltemp: BKFrame = math.abs(vm.soundchip.amem[idx])
+        local rtemp: BKFrame = math.abs(vm.soundchip.amem[idx + 1])
+
+        if ltemp > l then l = ltemp end
+        if rtemp > r then r = rtemp end
+    end
+
+    print("left", l, "right", r)
+end
+
+local function drawSong(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     local cursor_color: uint32
     local text_color: uint32
 
@@ -85,8 +105,8 @@ local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
         cursor_color = GPU_RED
         text_color = GPU_WHITE
     else
-        cursor_color = 0x808080FF
-        text_color = 0x808080FF
+        cursor_color = GPU_GRAY
+        text_color = GPU_GRAY
     end
 
     vm.gpu:drawRect2D(18 + (data.song_x * 12), 9 + (data.song_y * 9), 12, 9, cursor_color)
@@ -110,42 +130,7 @@ local function draw_song(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     end
 end
 
-local function draw_chain(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    local cursor_color: uint32
-    local text_color: uint32
-
-    if data.current_editor == Editor.CHAIN then
-        cursor_color = GPU_RED
-        text_color = GPU_WHITE
-    else
-        cursor_color = 0x808080FF
-        text_color = 0x808080FF
-    end
-
-    vm.gpu:drawRect2D(132 + (data.chain_x * 12), 9 + (data.chain_y * 9), 12, 9, cursor_color)
-
-    vm.gpu:printHexByte2D(120, 0, text_color, data.chain_id)
-
-    local chain: *[0]uint8 = vm.soundchip:get_chain(data.chain_id)
-    for i = 0, < 16 do
-        local y: int32 = 9 + i * 9
-        local byte_index: uinteger = 2 * i
-        local phrase_val: uint8 = chain[byte_index]
-        local transpose_val: uint8 = chain[byte_index + 1]
-
-        vm.gpu:printHexNibble2D(120, y, text_color, (@uint8)(i))
-
-        if phrase_val == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(132, y, text_color, "..")
-        else
-            vm.gpu:printHexByte2D(132, y, text_color, phrase_val)
-        end
-
-        vm.gpu:printHexByte2D(144, y, text_color, transpose_val)
-    end
-end
-
-local function get_note_text(note: uint8): string
+local function getNoteText(note: uint8): string
     if note == SOUNDCHIP_NOTE_MUTE then
         return "OFF"
     elseif note == SOUNDCHIP_NOTE_RELEASE then
@@ -157,29 +142,29 @@ local function get_note_text(note: uint8): string
     end
 end
 
-local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+local function drawPatterns(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     local cursor_color: uint32
     local text_color: uint32
 
-    if data.current_editor == Editor.PHRASE then
+    if data.current_editor == Editor.PATTERN then
         cursor_color = GPU_RED
         text_color = GPU_WHITE
     else
-        cursor_color = 0x808080FF
-        text_color = 0x808080FF
+        cursor_color = GPU_GRAY
+        text_color = GPU_GRAY
     end
 
-    if data.phrase_x == 0 then
-        vm.gpu:drawRect2D(174, 9 + (data.phrase_y * 9), 18, 9, cursor_color)
+    if data.pattern_x == 0 then
+        vm.gpu:drawRect2D(174, 9 + (data.pattern_y * 9), 18, 9, cursor_color)
     else
-        vm.gpu:drawRect2D(192 + ((data.phrase_x - 1) * 12), 9 + (data.phrase_y * 9), 12, 9, cursor_color)
+        vm.gpu:drawRect2D(192 + ((data.pattern_x - 1) * 12), 9 + (data.pattern_y * 9), 12, 9, cursor_color)
     end
 
-    vm.gpu:printHexByte2D(162, 0, text_color, data.phrase_id)
+    vm.gpu:printHexByte2D(162, 0, text_color, data.pattern_id)
 
     for i = 0, < 16 do
         local y: int32 = 9 + i * 9
-        local row: *[0]uint8 = vm.soundchip:get_phrase_row(data.phrase_id, i)
+        local row: *[0]uint8 = vm.soundchip:getPatternRow(data.pattern_id, i)
 
         -- note, vol, pan, instr, fx0, arg0, fx1, arg1
         local note_val: uint8 = row[0]
@@ -189,7 +174,7 @@ local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
         if note_val == SOUNDCHIP_EMPTY_VALUE then
             vm.gpu:print2D(174, y, text_color, "...")
         else
-            vm.gpu:print2D(174, y, text_color, get_note_text(note_val))
+            vm.gpu:print2D(174, y, text_color, getNoteText(note_val))
         end
 
         for i = 1, < 8 do
@@ -204,33 +189,39 @@ local function draw_phrase(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     end
 end
 
-local function do_note_input(vm: *e3d.EVM): void
-    local row: *[0]uint8 = vm.soundchip:get_phrase_row(data.phrase_id, data.phrase_y)
+local function doNoteInput(vm: *e3d.EVM): void
+    local row: *[0]uint8 = vm.soundchip:getPatternRow(data.pattern_id, data.pattern_y)
 
     if rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
         row[0] = SOUNDCHIP_EMPTY_VALUE
-        data.phrase_y = data.phrase_y + 1
+        data.pattern_y = data.pattern_y + 1
     elseif rl.isKeyPressed(rl.keyboardKey.COMMA) then
         row[0] = SOUNDCHIP_NOTE_RELEASE
-        data.phrase_y = data.phrase_y + 1
+        data.pattern_y = data.pattern_y + 1
     elseif rl.isKeyPressed(rl.keyboardKey.PERIOD) then
         row[0] = SOUNDCHIP_NOTE_MUTE
-        data.phrase_y = data.phrase_y + 1
+        data.pattern_y = data.pattern_y + 1
     else
         for i = 0, < PIANO_KEYS_COUNT do
             if rl.isKeyPressed(piano_keys[i]) then
-                row[0] = (@uint8)(i + data.octave * SOUNDCHIP_OCTAVE_SIZE)
-                data.phrase_y = data.phrase_y + 1
+                if vm.soundchip.audio_state.playing_flags == 0 then
+                    local note: uint8 = (@uint8)(i + data.octave * SOUNDCHIP_OCTAVE_SIZE)
+                    row[0] = note
+                    data.pattern_y = data.pattern_y + 1
+                    vm.soundchip:playPreviewNote(note)
+                end
+            elseif rl.isKeyReleased(piano_keys[i]) then
+                vm.soundchip:stopPreviewNote()
             end
         end
     end
 
-    if data.phrase_y > 15 then
-        data.phrase_y = 0
+    if data.pattern_y > 15 then
+        data.pattern_y = 0
     end
 end
 
-global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateTrackerInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     data.clipboard_len = 0
     data.clipboard_type = 0
     data.selection_start = 0
@@ -240,17 +231,14 @@ global function state_tracker_init(this: *State, sm: *StateMachine, vm: *e3d.EVM
     data.song_id = 0
     data.song_x = 0
     data.song_y = 0
-    data.chain_id = 0
-    data.chain_x = 0
-    data.chain_y = 0
-    data.phrase_id = 0
-    data.phrase_x = 0
-    data.phrase_y = 0
+    data.pattern_id = 0
+    data.pattern_x = 0
+    data.pattern_y = 0
     data.cursor_x = &data.song_x
     data.cursor_y = &data.song_y
 end
 
-global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
 
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
@@ -272,12 +260,9 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
             case Editor.SONG then
                 data.cursor_x = &data.song_x
                 data.cursor_y = &data.song_y
-            case Editor.CHAIN then
-                data.cursor_x = &data.chain_x
-                data.cursor_y = &data.chain_y
-            case Editor.PHRASE then
-                data.cursor_x = &data.phrase_x
-                data.cursor_y = &data.phrase_y
+            case Editor.PATTERN then
+                data.cursor_x = &data.pattern_x
+                data.cursor_y = &data.pattern_y
         end
     else
         if rl.isKeyPressed(rl.keyboardKey.SPACE) then
@@ -289,10 +274,8 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
         elseif rl.isKeyPressed(rl.keyboardKey.UP) then
             if is_shift_down then
                 switch data.current_editor do
-                    case Editor.CHAIN then
-                        data.chain_id = data.chain_id + 0x10
-                    case Editor.PHRASE then
-                        data.phrase_id = data.phrase_id + 0x10
+                    case Editor.PATTERN then
+                        data.pattern_id = data.pattern_id + 0x10
                 end
             else
                 $data.cursor_y = $data.cursor_y - 1
@@ -300,10 +283,8 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
         elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
             if is_shift_down then
                 switch data.current_editor do
-                    case Editor.CHAIN then
-                        data.chain_id = data.chain_id - 0x10
-                    case Editor.PHRASE then
-                        data.phrase_id = data.phrase_id - 0x10
+                    case Editor.PATTERN then
+                        data.pattern_id = data.pattern_id - 0x10
                 end
             else
                 $data.cursor_y = $data.cursor_y + 1
@@ -311,10 +292,8 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
         elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
             if is_shift_down then
                 switch data.current_editor do
-                    case Editor.CHAIN then
-                        data.chain_id = data.chain_id - 1
-                    case Editor.PHRASE then
-                        data.phrase_id = data.phrase_id - 1
+                    case Editor.PATTERN then
+                        data.pattern_id = data.pattern_id - 1
                 end
             else
                 $data.cursor_x = $data.cursor_x - 1
@@ -322,10 +301,8 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
         elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
             if is_shift_down then
                 switch data.current_editor do
-                    case Editor.CHAIN then
-                        data.chain_id = data.chain_id + 1
-                    case Editor.PHRASE then
-                        data.phrase_id = data.phrase_id + 1
+                    case Editor.PATTERN then
+                        data.pattern_id = data.pattern_id + 1
                 end
             else
                 $data.cursor_x = $data.cursor_x + 1
@@ -339,8 +316,8 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
                 data.octave = data.octave + 1
             end
         else
-            if vm.soundchip.audio_state.playing_flags == 0 and data.current_editor == Editor.PHRASE and data.phrase_x == 0 then
-                do_note_input(vm)
+            if data.current_editor == Editor.PATTERN and data.pattern_x == 0 then
+                doNoteInput(vm)
             end
         end
     end
@@ -348,14 +325,14 @@ global function state_tracker_update(this: *State, sm: *StateMachine, vm: *e3d.E
     return StateID.TRACKER
 end
 
-global function state_tracker_draw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    vm.gpu:clear(0x000000FF)
+global function stateTrackerDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    vm.gpu:clear(GPU_BLACK)
     
     vm.gpu:camera2D(0)
 
-    draw_song(this, sm, vm)
-    draw_chain(this, sm, vm)
-    draw_phrase(this, sm, vm)
+    drawLevels(this, sm, vm)
+    drawSong(this, sm, vm)
+    drawPatterns(this, sm, vm)
 
     return StateID.TRACKER
 end

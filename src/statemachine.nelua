@@ -29,11 +29,11 @@ StateMachine = @record {
     prev_state: integer
 }
 
-function StateMachine:init_state(vm: *e3d.EVM): void
+function StateMachine:initState(vm: *e3d.EVM): void
     self.state_ptr.init(self.state_ptr, self, vm)
 end
 
-function StateMachine:update_state(vm: *e3d.EVM): void
+function StateMachine:updateState(vm: *e3d.EVM): void
     local new_state: integer = self.state_ptr.update(self.state_ptr, self, vm)
     if new_state ~= self.state_id then
         if self.state_id ~= StateID.RUN then
@@ -45,7 +45,7 @@ function StateMachine:update_state(vm: *e3d.EVM): void
     end
 end
 
-function StateMachine:draw_state(vm: *e3d.EVM): void
+function StateMachine:drawState(vm: *e3d.EVM): void
     local new_state: integer = self.state_ptr.draw(self.state_ptr, self, vm)
     if new_state ~= self.state_id then
         if self.state_id ~= StateID.RUN then
@@ -69,7 +69,7 @@ function StateMachine:init(vm: *e3d.EVM): void
     self.prev_state = self.state_id
 end
 
-function StateMachine:set_queued_state(): void
+function StateMachine:setQueuedState(): void
     if self.queued_state ~= -1 then
         self.state_id = self.queued_state
         self.state_ptr = &self.states[self.state_id]

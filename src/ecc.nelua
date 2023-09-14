@@ -1,17 +1,17 @@
 require("e3d")
 
-function e3d.Struct:add_member(member: *e3d.Identifier): void
+function e3d.Struct:addMember(member: *e3d.Identifier): void
 	self.members:push(member)
 	self.member_map[member.name] = #self.members
 
-	self.size = self.size + e3d.size_of_type(member.type_info)
+	self.size = self.size + e3d.sizeOfType(member.type_info)
 end
 
-function e3d.Struct:has_member(name: string): boolean
+function e3d.Struct:hasMember(name: string): boolean
 	return self.member_map:has(name)
 end
 
-function e3d.Struct:get_member(name: string): (boolean, *e3d.Identifier)
+function e3d.Struct:getMember(name: string): (boolean, *e3d.Identifier)
 	local has: boolean
 	local index: uinteger
 
@@ -21,35 +21,35 @@ function e3d.Struct:get_member(name: string): (boolean, *e3d.Identifier)
 	return false, nilptr
 end
 
-function e3d.EVM:push_scope(): void
+function e3d.EVM:pushScope(): void
 	self.sym_tables:push(new(@hashmap(string, *e3d.Identifier)))
 	self.scope_sizes:push(0)
 end
 
-function e3d.EVM:pop_scope(): void
+function e3d.EVM:popScope(): void
 	self.sym_tables:pop()
 	self.scope_sizes:pop()
 end
 
-function e3d.EVM:add_scoped_symbol(name: string, id: *e3d.Identifier): void
+function e3d.EVM:addScopedSymbol(name: string, id: *e3d.Identifier): void
 	self.sym_tables[#self.sym_tables][name] = id
 end
 
-function e3d.EVM:get_scope_locals_size(): uinteger
+function e3d.EVM:getScopeLocalsSize(): uinteger
 	return self.scope_sizes[#self.scope_sizes]
 end
 
-function e3d.EVM:inc_scope_locals_size(size: uinteger): void
-	local total: uinteger = self:get_scope_locals_size()
+function e3d.EVM:incScopeLocalsSize(size: uinteger): void
+	local total: uinteger = self:getScopeLocalsSize()
 	total = total + size
 	self.scope_sizes[#self.scope_sizes] = total
 end
 
-function e3d.EVM:push_loop(start: uint16): void
+function e3d.EVM:pushLoop(start: uint16): void
 	self.loop_info_stack:push((@e3d.LoopInfo){loop_start = start})
 end
 
-function e3d.EVM:pop_loop(): void
+function e3d.EVM:popLoop(): void
 	local info: e3d.LoopInfo = self.loop_info_stack:pop()
 
 	-- patch break jumps
@@ -85,41 +85,41 @@ function e3d.EVM:pop_loop(): void
 	end
 end
 
-function e3d.EVM:get_current_loop_info(): e3d.LoopInfo
+function e3d.EVM:getCurrentLoopInfo(): e3d.LoopInfo
 	return self.loop_info_stack[#self.loop_info_stack]
 end
 
-function e3d.EVM:loop_has_step(): boolean
+function e3d.EVM:loopHasStep(): boolean
 	return self.loop_info_stack[#self.loop_info_stack].has_step
 end
 
-function e3d.EVM:get_loop_start(): uint16
+function e3d.EVM:getLoopStart(): uint16
 	return self.loop_info_stack[#self.loop_info_stack].loop_start
 end
 
-function e3d.EVM:get_loop_step(): uint16
+function e3d.EVM:getLoopStep(): uint16
 	return self.loop_info_stack[#self.loop_info_stack].loop_step
 end
 
-function e3d.EVM:get_loop_end(): uint16
+function e3d.EVM:getLoopEnd(): uint16
 	return self.loop_info_stack[#self.loop_info_stack].loop_end
 end
 
-function e3d.EVM:set_loop_has_step(): void
+function e3d.EVM:setLoopHasStep(): void
 	self.loop_info_stack[#self.loop_info_stack].has_step = true
 end
 
-function e3d.EVM:set_loop_step(index: uint16): void
+function e3d.EVM:setLoopStep(index: uint16): void
 	local info: e3d.LoopInfo = self.loop_info_stack:pop()
 	info.loop_step = index
 	self.loop_info_stack:push(info)
 end
 
-function e3d.EVM:set_loop_end(index: uint16): void
+function e3d.EVM:setLoopEnd(index: uint16): void
 	self.loop_info_stack[#self.loop_info_stack].loop_end = index
 end
 
-function e3d.EVM:add_break(index: uint16): void
+function e3d.EVM:addBreak(index: uint16): void
 	self.loop_break_stack:push(index)
 
 	local info: e3d.LoopInfo = self.loop_info_stack:pop()
@@ -127,7 +127,7 @@ function e3d.EVM:add_break(index: uint16): void
 	self.loop_info_stack:push(info)
 end
 
-function e3d.EVM:add_jump_to_step(index: uint16): void
+function e3d.EVM:addJumpToStep(index: uint16): void
 	self.loop_step_stack:push(index)
 
 	local info: e3d.LoopInfo = self.loop_info_stack:pop()
@@ -135,7 +135,7 @@ function e3d.EVM:add_jump_to_step(index: uint16): void
 	self.loop_info_stack:push(info)
 end
 
-function e3d.EVM:add_del_l(index: uint16): void
+function e3d.EVM:addDelL(index: uint16): void
 	self.loop_del_l_stack:push(index)
 
 	local info: e3d.LoopInfo = self.loop_info_stack:pop()
@@ -143,7 +143,7 @@ function e3d.EVM:add_del_l(index: uint16): void
 	self.loop_info_stack:push(info)
 end
 
-function e3d.EVM:lookup_id(name: string): boolean
+function e3d.EVM:lookupID(name: string): boolean
 	self.has_id, self.current_id = self.keywords:has_and_get(name)
 	if self.has_id then return true end
 
@@ -166,7 +166,7 @@ function e3d.EVM:lookup_id(name: string): boolean
 	return false
 end
 
-function e3d.EVM:reset_compiler(): void
+function e3d.EVM:resetCompiler(): void
 	self.token = 0
 	self.token_val = 0
 	self.token_valf = 0
@@ -191,7 +191,7 @@ function e3d.EVM:reset_compiler(): void
 	self.loop_del_l_stack:clear()
 end
 
-function e3d.EVM:emitop(val: uint8): void
+function e3d.EVM:emitOp(val: uint8): void
 	self.bytecode[self.bytecode_len] = val
 
 	self.bytecode_len = self.bytecode_len + 1
@@ -220,13 +220,13 @@ function e3d.EVM:emit32(val: uint32): void
 	self.bytecode_len = self.bytecode_len + 4
 end
 
-function e3d.EVM:emitf(val: float32): void
+function e3d.EVM:emitF(val: float32): void
 	local v: e3d.EVMValue = {f=val}
 
 	self:emit32(v.u)
 end
 
-local function getchar(vm: *e3d.EVM): byte
+local function getChar(vm: *e3d.EVM): byte
 	if vm.src_index <= #vm.src then
 		vm.token = vm.src[vm.src_index]
 	else
@@ -240,7 +240,7 @@ local function next(vm: *e3d.EVM): void
 	vm.prev_src_index = vm.src_index
 	vm.prev_token = vm.token
 
-	while getchar(vm) ~= 0 do
+	while getChar(vm) ~= 0 do
 		vm.src_index = vm.src_index + 1
 
 		if vm.token == '\n'_u8 then
@@ -251,7 +251,7 @@ local function next(vm: *e3d.EVM): void
 			vm.sb:writebyte(vm.token)
 
 			while true do
-				getchar(vm)
+				getChar(vm)
 				if (vm.token >= 'a'_u8 and vm.token <= 'z'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'Z'_u8) or (vm.token >= '0'_u8 and vm.token <= '9'_u8) or (vm.token == '_'_u8) then
 					vm.src_index = vm.src_index + 1
 					vm.sb:writebyte(vm.token)
@@ -268,7 +268,7 @@ local function next(vm: *e3d.EVM): void
 				return
 			end
 			
-			vm:lookup_id(vm.current_id_name)
+			vm:lookupID(vm.current_id_name)
 
 			if vm.has_id then
 				vm.token = vm.current_id.token
@@ -285,11 +285,11 @@ local function next(vm: *e3d.EVM): void
 			local isfloat: boolean = false
 			-- number
 			vm.token_val = vm.token - '0'_u8
-			if vm.token_val == 0 and getchar(vm) == 'x'_u8 then
+			if vm.token_val == 0 and getChar(vm) == 'x'_u8 then
 				-- hex
 				vm.src_index = vm.src_index + 1
 				while true do
-					getchar(vm)
+					getChar(vm)
 					if (vm.token >= '0'_u8 and vm.token <= '9'_u8) or (vm.token >= 'a'_u8 and vm.token <= 'f'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'F'_u8) then
 						vm.token_val = vm.token_val * 16 + (vm.token & 15)
 						if vm.token >= 'A'_u8 then
@@ -302,11 +302,11 @@ local function next(vm: *e3d.EVM): void
 						break
 					end
 				end
-			elseif vm.token_val == 0 and getchar(vm) == 'b'_u8 then
+			elseif vm.token_val == 0 and getChar(vm) == 'b'_u8 then
 				-- binary
 				vm.src_index = vm.src_index + 1
 				while true do
-					getchar(vm)
+					getChar(vm)
 					if vm.token == '0'_u8 or vm.token == '1'_u8 then
 						vm.token_val = (vm.token_val * 2) + (vm.token - '0'_u8)
 						vm.src_index = vm.src_index + 1
@@ -320,7 +320,7 @@ local function next(vm: *e3d.EVM): void
 				-- decimal
 				local fract: float32 = 1.0
 				while true do
-					getchar(vm)
+					getChar(vm)
 					if vm.token >= '0'_u8 and vm.token <= '9'_u8 then
 						if isfloat then
 							fract = fract / 10.0
@@ -364,12 +364,12 @@ local function next(vm: *e3d.EVM): void
 			-- TODO: reuse strings instead of repeating them in ROM
 
 			while true do
-				getchar(vm)
+				getChar(vm)
 				if vm.token ~= 0 and vm.token ~= start then
 					vm.token_val = vm.token
 					vm.src_index = vm.src_index + 1
 					if vm.token == '\\'_u8 then -- escape code
-						getchar(vm)
+						getChar(vm)
 						vm.src_index = vm.src_index + 1
 						switch vm.token do
 							case '\\'_u8 then -- \\
@@ -427,12 +427,12 @@ local function next(vm: *e3d.EVM): void
 
 			return
 		elseif vm.token == '/'_u8 then
-			local nxt: uinteger = getchar(vm)
+			local nxt: uinteger = getChar(vm)
 			switch nxt do
 				case '/'_u8 then -- single line comment
 					vm.src_index = vm.src_index + 1
 					while true do
-						getchar(vm)
+						getChar(vm)
 						if vm.token ~= 0 and vm.token ~= '\n'_u8 then
 							vm.src_index = vm.src_index + 1
 						else
@@ -443,12 +443,12 @@ local function next(vm: *e3d.EVM): void
 					vm.mlcomment_level = 1
 					vm.src_index = vm.src_index + 1
 					while true do
-						getchar(vm)
+						getChar(vm)
 						if vm.token == 0 then
 							break
 						elseif vm.token == '*'_u8 then
 							vm.src_index = vm.src_index + 1
-							getchar(vm)
+							getChar(vm)
 							if vm.token == '/'_u8 then
 								vm.src_index = vm.src_index + 1
 								vm.mlcomment_level = vm.mlcomment_level - 1
@@ -460,7 +460,7 @@ local function next(vm: *e3d.EVM): void
 							end
 						elseif vm.token == '/'_u8 then
 							vm.src_index = vm.src_index + 1
-							getchar(vm)
+							getChar(vm)
 							if vm.token == '*'_u8 then
 								vm.src_index = vm.src_index + 1
 								vm.mlcomment_level = vm.mlcomment_level + 1
@@ -479,7 +479,7 @@ local function next(vm: *e3d.EVM): void
 					return
 			end
 		elseif vm.token == '='_u8 then
-			if getchar(vm) == '='_u8 then
+			if getChar(vm) == '='_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = e3d.Token.EQ
 			else
@@ -491,7 +491,7 @@ local function next(vm: *e3d.EVM): void
 			vm.token = e3d.Token.ADD
 			return
 		elseif vm.token == '-'_u8 then
-			if getchar(vm) == '>'_u8 then
+			if getChar(vm) == '>'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = e3d.Token.ARROW
 			else
@@ -503,7 +503,7 @@ local function next(vm: *e3d.EVM): void
 			vm.token = e3d.Token.MUL
 			return
 		elseif vm.token == '!'_u8 then
-			if getchar(vm) == '='_u8 then
+			if getChar(vm) == '='_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = e3d.Token.NE
 			else
@@ -512,7 +512,7 @@ local function next(vm: *e3d.EVM): void
 			
 			return
 		elseif vm.token == '<'_u8 then
-			local nxt: uinteger = getchar(vm)
+			local nxt: uinteger = getChar(vm)
 			switch nxt do
 				case '='_u8 then
 					vm.src_index = vm.src_index + 1
@@ -526,14 +526,14 @@ local function next(vm: *e3d.EVM): void
 			
 			return
 		elseif vm.token == '>'_u8 then
-			local nxt: uinteger = getchar(vm)
+			local nxt: uinteger = getChar(vm)
 			switch nxt do
 				case '='_u8 then
 					vm.src_index = vm.src_index + 1
 					vm.token = e3d.Token.GE
 				case '>'_u8 then
 					vm.src_index = vm.src_index + 1
-					if getchar(vm) == '>'_u8 then
+					if getChar(vm) == '>'_u8 then
 						vm.src_index = vm.src_index + 1
 						vm.token = e3d.Token.ARSHIFT
 					else
@@ -545,7 +545,7 @@ local function next(vm: *e3d.EVM): void
 			
 			return
 		elseif vm.token == '|'_u8 then
-			if getchar(vm) == '|'_u8 then
+			if getChar(vm) == '|'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = e3d.Token.LOR
 			else
@@ -554,7 +554,7 @@ local function next(vm: *e3d.EVM): void
 			
 			return
 		elseif vm.token == '&'_u8 then
-			if getchar(vm) == '&'_u8 then
+			if getChar(vm) == '&'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = e3d.Token.LAND
 			else
@@ -578,9 +578,9 @@ local function next(vm: *e3d.EVM): void
 			vm.token = e3d.Token.COND
 			return
 		elseif vm.token == '.'_u8 then
-			if getchar(vm) == '.'_u8 then
+			if getChar(vm) == '.'_u8 then
 				vm.src_index = vm.src_index + 1
-				if getchar(vm) == '.'_u8 then
+				if getChar(vm) == '.'_u8 then
 					vm.src_index = vm.src_index + 1
 					vm.token = e3d.Token.VARARGS
 				else
@@ -606,15 +606,15 @@ local function match(vm: *e3d.EVM, tk: uinteger): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `%s`, got `%s`\n",
 			vm.line,
-			e3d.get_token_string(tk),
-			e3d.get_token_string(vm.token)
+			e3d.getTokenString(tk),
+			e3d.getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
 	end
 end
 
-local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info: e3d.TypeInfo, allow_ptrs: boolean): void
+local function operatorTypeCheck(vm: *e3d.EVM, operator: uinteger, target_info: e3d.TypeInfo, allow_ptrs: boolean): void
 	local target_type: uinteger = target_info.type_id
 
 	if vm.expr_type.type_id == e3d.EVMType.VOID then
@@ -627,12 +627,12 @@ local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info
 		
 		if target_type == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 			can_convert = true
-			vm:emitop(e3d.Opcode.FTOI)
+			vm:emitOp(e3d.Opcode.FTOI)
 		elseif target_type == e3d.EVMType.INT and (vm.expr_type.type_id == e3d.EVMType.VEC2 or vm.expr_type.type_id == e3d.EVMType.VEC3) then
 			can_convert = operator == e3d.Token.MUL
 		elseif target_type == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 			can_convert = true
-			vm:emitop(e3d.Opcode.ITOF)
+			vm:emitOp(e3d.Opcode.ITOF)
 		elseif target_type == e3d.EVMType.FLOAT and (vm.expr_type.type_id == e3d.EVMType.VEC2 or vm.expr_type.type_id == e3d.EVMType.VEC3) then
 			can_convert = operator == e3d.Token.MUL
 		elseif target_type == e3d.EVMType.VEC2 and (vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id == e3d.EVMType.FLOAT) then
@@ -653,9 +653,9 @@ local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.get_token_string(operator),
-				e3d.get_type_name(target_info),
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTokenString(operator),
+				e3d.getTypeName(target_info),
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -664,9 +664,9 @@ local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 			vm.line,
-			e3d.get_token_string(operator),
-			e3d.get_type_name(target_info),
-			e3d.get_type_name(vm.expr_type)
+			e3d.getTokenString(operator),
+			e3d.getTypeName(target_info),
+			e3d.getTypeName(vm.expr_type)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -675,9 +675,9 @@ local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.get_token_string(operator),
-				e3d.get_type_name(target_info),
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTokenString(operator),
+				e3d.getTypeName(target_info),
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -687,9 +687,9 @@ local function operator_type_check(vm: *e3d.EVM, operator: uinteger, target_info
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.get_token_string(operator),
-				e3d.get_type_name(target_info),
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTokenString(operator),
+				e3d.getTypeName(target_info),
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -713,14 +713,14 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		match(vm, e3d.Token.INT_LITERAL)
 
 		if vm.token_val == 0 then
-			vm:emitop(e3d.Opcode.PUSH_ZERO)
+			vm:emitOp(e3d.Opcode.PUSH_ZERO)
 		elseif vm.token_val == 1 then
-			vm:emitop(e3d.Opcode.PUSH_ONE)
+			vm:emitOp(e3d.Opcode.PUSH_ONE)
 		elseif vm.token_val < 256 then -- simple optimization, turn small int literals into chars
-			vm:emitop(e3d.Opcode.PUSH_CHAR)
+			vm:emitOp(e3d.Opcode.PUSH_CHAR)
 			vm:emit8((@uint8)(vm.token_val & 0xFF))
 		else
-			vm:emitop(e3d.Opcode.PUSH_INT)
+			vm:emitOp(e3d.Opcode.PUSH_INT)
 			vm:emit32(vm.token_val)
 		end
 		
@@ -729,19 +729,19 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		match(vm, e3d.Token.FLOAT_LITERAL)
 
 		if vm.token_valf == 0.0 then
-			vm:emitop(e3d.Opcode.PUSH_ZEROF)
+			vm:emitOp(e3d.Opcode.PUSH_ZEROF)
 		elseif vm.token_valf == 1.0 then
-			vm:emitop(e3d.Opcode.PUSH_ONEF)
+			vm:emitOp(e3d.Opcode.PUSH_ONEF)
 		else
-			vm:emitop(e3d.Opcode.PUSH_FLOAT)
-			vm:emitf(vm.token_valf)
+			vm:emitOp(e3d.Opcode.PUSH_FLOAT)
+			vm:emitF(vm.token_valf)
 		end
 		
 		vm.expr_type = {e3d.EVMType.FLOAT}
 	elseif vm.token == e3d.Token.STRING_LITERAL then
 		match(vm, e3d.Token.STRING_LITERAL)
 
-		vm:emitop(e3d.Opcode.PUSH_STRING)
+		vm:emitOp(e3d.Opcode.PUSH_STRING)
 		vm:emit16(vm.string_len)
 		vm:emit32(vm.token_val)
 		
@@ -782,7 +782,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -801,13 +801,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 		match(vm, ')'_u8)
 
-		local size: uinteger = e3d.size_of_type(target_info) * 4
+		local size: uinteger = e3d.sizeOfType(target_info) * 4
 
 		if size < 256 then
-			vm:emitop(e3d.Opcode.PUSH_CHAR)
+			vm:emitOp(e3d.Opcode.PUSH_CHAR)
 			vm:emit8(size)
 		else
-			vm:emitop(e3d.Opcode.PUSH_INT)
+			vm:emitOp(e3d.Opcode.PUSH_INT)
 			vm:emit32(size)
 		end
 		
@@ -895,12 +895,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 							
 							if target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 								can_convert = true
-								vm:emitop(e3d.Opcode.FTOI)
+								vm:emitOp(e3d.Opcode.FTOI)
 							elseif target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 								can_convert = true
 							elseif target_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 								can_convert = true
-								vm:emitop(e3d.Opcode.ITOF)
+								vm:emitOp(e3d.Opcode.ITOF)
 							elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 								can_convert = true
 							elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -913,8 +913,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 									vm.line,
 									argc + 1,
 									id.name,
-									e3d.get_type_name(target_info),
-									e3d.get_type_name(vm.expr_type)
+									e3d.getTypeName(target_info),
+									e3d.getTypeName(vm.expr_type)
 								)
 								vm.compile_err = true
 								coroutine.yield()
@@ -929,7 +929,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					end
 
 					if constructor_index == -1 then
-						size = size + e3d.size_of_type(vm.expr_type)
+						size = size + e3d.sizeOfType(vm.expr_type)
 					end
 
 					argc = argc + 1
@@ -955,14 +955,14 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			-- emit code
 			if id.class == e3d.Class.API then
 				if constructor_index ~= -1 then
-					vm:emitop(constructor_opcodes[constructor_index])
+					vm:emitOp(constructor_opcodes[constructor_index])
 				else
-					vm:emitop(e3d.Opcode.API)
+					vm:emitOp(e3d.Opcode.API)
 					vm:emit16(id.index)
 					vm:emit16(size)
 				end
 			elseif id.class == e3d.Class.FUNCTION then
-				vm:emitop(e3d.Opcode.CALL)
+				vm:emitOp(e3d.Opcode.CALL)
 				vm:emit16(id.index)
 				vm:emit16(size)
 			end
@@ -972,28 +972,28 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			switch id.type_info.type_id do
 				case e3d.EVMType.INT then
 					if id.const_val == 0 then
-						vm:emitop(e3d.Opcode.PUSH_ZERO)
+						vm:emitOp(e3d.Opcode.PUSH_ZERO)
 					elseif id.const_val == 1 then
-						vm:emitop(e3d.Opcode.PUSH_ONE)
+						vm:emitOp(e3d.Opcode.PUSH_ONE)
 					elseif id.const_val < 256 then -- simple optimization, turn small enum values into chars
-						vm:emitop(e3d.Opcode.PUSH_CHAR)
+						vm:emitOp(e3d.Opcode.PUSH_CHAR)
 						vm:emit8((@uint8)(id.const_val & 0xFF))
 					else
-						vm:emitop(e3d.Opcode.PUSH_INT)
+						vm:emitOp(e3d.Opcode.PUSH_INT)
 						vm:emit32(id.const_val)
 					end
 				case e3d.EVMType.FLOAT then
 					if id.const_valf == 0.0 then
-						vm:emitop(e3d.Opcode.PUSH_ZEROF)
+						vm:emitOp(e3d.Opcode.PUSH_ZEROF)
 					elseif id.const_valf == 1.0 then
-						vm:emitop(e3d.Opcode.PUSH_ONEF)
+						vm:emitOp(e3d.Opcode.PUSH_ONEF)
 					else
-						vm:emitop(e3d.Opcode.PUSH_FLOAT)
-						vm:emitf(id.const_valf)
+						vm:emitOp(e3d.Opcode.PUSH_FLOAT)
+						vm:emitF(id.const_valf)
 					end
 				else
 					if id.type_info.type_id >= e3d.EVMType.POINTER then
-						vm:emitop(e3d.Opcode.PUSH_INT)
+						vm:emitOp(e3d.Opcode.PUSH_INT)
 						vm:emit32(id.const_val)
 					end
 			end
@@ -1005,40 +1005,40 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				if id.is_array then
 					switch id.class do
 						case e3d.Class.GLOBAL then
-							vm:emitop(e3d.Opcode.ADDROF_G)
+							vm:emitOp(e3d.Opcode.ADDROF_G)
 						case e3d.Class.ARG then
-							vm:emitop(e3d.Opcode.ADDROF_A)
+							vm:emitOp(e3d.Opcode.ADDROF_A)
 						case e3d.Class.LOCAL then
-							vm:emitop(e3d.Opcode.ADDROF_L)
+							vm:emitOp(e3d.Opcode.ADDROF_L)
 					end
 
 					vm:emit16(id.index)
 				else
 					if id.class == e3d.Class.GLOBAL then
 						if id.type_info.type_id >= e3d.EVMType.VEC2 and id.type_info.type_id <= e3d.EVMType.STRING then
-							vm:emitop(e3d.Opcode.GET_GX)
+							vm:emitOp(e3d.Opcode.GET_GX)
 							vm:emit16(id.index)
 							vm:emit16(id.type_info.structref.size)
 						else
-							vm:emitop(e3d.Opcode.GET_G)
+							vm:emitOp(e3d.Opcode.GET_G)
 							vm:emit16(id.index)
 						end
 					elseif id.class == e3d.Class.ARG then
 						if id.type_info.type_id >= e3d.EVMType.VEC2 and id.type_info.type_id <= e3d.EVMType.STRING then
-							vm:emitop(e3d.Opcode.GET_AX)
+							vm:emitOp(e3d.Opcode.GET_AX)
 							vm:emit16(id.index)
 							vm:emit16(id.type_info.structref.size)
 						else
-							vm:emitop(e3d.Opcode.GET_A)
+							vm:emitOp(e3d.Opcode.GET_A)
 							vm:emit16(id.index)
 						end
 					elseif id.class == e3d.Class.LOCAL then
 						if id.type_info.type_id >= e3d.EVMType.VEC2 and id.type_info.type_id <= e3d.EVMType.STRING then
-							vm:emitop(e3d.Opcode.GET_LX)
+							vm:emitOp(e3d.Opcode.GET_LX)
 							vm:emit16(id.index)
 							vm:emit16(id.type_info.structref.size)
 						else
-							vm:emitop(e3d.Opcode.GET_L)
+							vm:emitOp(e3d.Opcode.GET_L)
 							vm:emit16(id.index)
 						end
 					end
@@ -1123,12 +1123,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 							
 							if target_member_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 								can_convert = true
-								vm:emitop(e3d.Opcode.FTOI)
+								vm:emitOp(e3d.Opcode.FTOI)
 							elseif target_member_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 								can_convert = true
 							elseif target_member_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 								can_convert = true
-								vm:emitop(e3d.Opcode.ITOF)
+								vm:emitOp(e3d.Opcode.ITOF)
 							elseif target_member_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 								can_convert = true
 							elseif target_member_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -1141,8 +1141,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 									vm.line,
 									memberc + 1,
 									target_struct.name,
-									e3d.get_type_name(target_member_info),
-									e3d.get_type_name(vm.expr_type)
+									e3d.getTypeName(target_member_info),
+									e3d.getTypeName(vm.expr_type)
 								)
 								vm.compile_err = true
 								coroutine.yield()
@@ -1172,7 +1172,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: invalid type `%s` for struct initializer\n",
 						vm.line,
-						e3d.get_type_name(target_info)
+						e3d.getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1190,7 +1190,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot cast expression of type `void` to `%s`\n",
 						vm.line,
-						e3d.get_type_name(target_info)
+						e3d.getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1200,12 +1200,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					
 					if target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 						can_convert = true
-						vm:emitop(e3d.Opcode.FTOI)
+						vm:emitOp(e3d.Opcode.FTOI)
 					elseif target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 						can_convert = true
 					elseif target_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 						can_convert = true
-						vm:emitop(e3d.Opcode.ITOF)
+						vm:emitOp(e3d.Opcode.ITOF)
 					elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 						can_convert = true
 					elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -1216,8 +1216,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: cannot cast expression of type `%s` to `%s`\n",
 							vm.line,
-							e3d.get_type_name(vm.expr_type),
-							e3d.get_type_name(target_info)
+							e3d.getTypeName(vm.expr_type),
+							e3d.getTypeName(target_info)
 						)
 						vm.compile_err = true
 						coroutine.yield()
@@ -1247,18 +1247,18 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot dereference expression of type `%s`\n",
 				vm.line,
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
 		end
 
 		if (vm.expr_type.type_id >= e3d.EVMType.VEC2) and (vm.expr_type.type_id <= e3d.EVMType.STRING) then
-			vm:emitop(e3d.Opcode.GET_MX)
+			vm:emitOp(e3d.Opcode.GET_MX)
 			vm:emit16(0)
 			vm:emit16(vm.expr_type.structref.size)
 		else
-			vm:emitop(e3d.Opcode.GET_M)
+			vm:emitOp(e3d.Opcode.GET_M)
 			vm:emit16(0)
 		end
 	elseif vm.token == e3d.Token.AND then
@@ -1307,13 +1307,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 		switch op do
 			case e3d.Opcode.GET_G, e3d.Opcode.GET_GX then
-				vm:emitop(e3d.Opcode.ADDROF_G)
+				vm:emitOp(e3d.Opcode.ADDROF_G)
 				vm:emit16(index)
 			case e3d.Opcode.GET_L, e3d.Opcode.GET_LX then
-				vm:emitop(e3d.Opcode.ADDROF_L)
+				vm:emitOp(e3d.Opcode.ADDROF_L)
 				vm:emit16(index)
 			case e3d.Opcode.GET_A, e3d.Opcode.GET_AX then
-				vm:emitop(e3d.Opcode.ADDROF_A)
+				vm:emitOp(e3d.Opcode.ADDROF_A)
 				vm:emit16(index)
 			case e3d.Opcode.GET_M, e3d.Opcode.GET_MX then
 				if index > 0 then
@@ -1321,16 +1321,16 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 					-- optimize offset bytecode
 					if index == 1 then
-						vm:emitop(e3d.Opcode.PUSH_ONE)
+						vm:emitOp(e3d.Opcode.PUSH_ONE)
 					elseif index < 256 then
-						vm:emitop(e3d.Opcode.PUSH_CHAR)
+						vm:emitOp(e3d.Opcode.PUSH_CHAR)
 						vm:emit8((@uint8)(index & 0xFF))
 					else
-						vm:emitop(e3d.Opcode.PUSH_INT)
+						vm:emitOp(e3d.Opcode.PUSH_INT)
 						vm:emit32(index)
 					end
 					
-					vm:emitop(e3d.Opcode.ADDP)
+					vm:emitOp(e3d.Opcode.ADDP)
 					vm:emit16(1)
 				end
 		end
@@ -1348,14 +1348,14 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		end
 		
 		if vm.expr_type.type_id == e3d.EVMType.INT then
-			vm:emitop(e3d.Opcode.LNOT)
+			vm:emitOp(e3d.Opcode.LNOT)
 		elseif vm.expr_type.type_id >= e3d.EVMType.POINTER then
-			vm:emitop(e3d.Opcode.LNOTP)
+			vm:emitOp(e3d.Opcode.LNOTP)
 		else
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `!` on type `%s`\n",
 				vm.line,
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -1374,11 +1374,11 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		end
 		
 		if vm.expr_type.type_id == e3d.EVMType.INT then
-			vm:emitop(e3d.Opcode.NOT)
+			vm:emitOp(e3d.Opcode.NOT)
 		else
 			vm.error = string.format("COMPILE ERROR: line %d: cannot use operator `~` on type `%s`\n",
 				vm.line,
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -1390,16 +1390,16 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 		if vm.token == e3d.Token.INT_LITERAL then
 			if vm.token_val == 0 then
-				vm:emitop(e3d.Opcode.PUSH_ZERO)
+				vm:emitOp(e3d.Opcode.PUSH_ZERO)
 			elseif vm.token_val == 1 then
-				vm:emitop(e3d.Opcode.PUSH_ONE)
-				vm:emitop(e3d.Opcode.NEG)
+				vm:emitOp(e3d.Opcode.PUSH_ONE)
+				vm:emitOp(e3d.Opcode.NEG)
 			elseif vm.token_val < 256 then -- simple optimization, turn small int literals into chars
-				vm:emitop(e3d.Opcode.PUSH_CHAR)
+				vm:emitOp(e3d.Opcode.PUSH_CHAR)
 				vm:emit8((@uint8)(vm.token_val & 0xFF))
-				vm:emitop(e3d.Opcode.NEG)
+				vm:emitOp(e3d.Opcode.NEG)
 			else
-				vm:emitop(e3d.Opcode.PUSH_INT)
+				vm:emitOp(e3d.Opcode.PUSH_INT)
 				vm:emit32(-(@int32)(vm.token_val))
 			end
 			
@@ -1407,14 +1407,14 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.expr_type = {e3d.EVMType.INT}
 		elseif vm.token == e3d.Token.FLOAT_LITERAL then
 			if vm.token_valf == 0.0 then
-				vm:emitop(e3d.Opcode.PUSH_ZEROF)
-				vm:emitop(e3d.Opcode.NEGF)
+				vm:emitOp(e3d.Opcode.PUSH_ZEROF)
+				vm:emitOp(e3d.Opcode.NEGF)
 			elseif vm.token_valf == 1.0 then
-				vm:emitop(e3d.Opcode.PUSH_ONEF)
-				vm:emitop(e3d.Opcode.NEGF)
+				vm:emitOp(e3d.Opcode.PUSH_ONEF)
+				vm:emitOp(e3d.Opcode.NEGF)
 			else
-				vm:emitop(e3d.Opcode.PUSH_FLOAT)
-				vm:emitf(-vm.token_valf)
+				vm:emitOp(e3d.Opcode.PUSH_FLOAT)
+				vm:emitF(-vm.token_valf)
 			end
 
 			match(vm, e3d.Token.FLOAT_LITERAL)
@@ -1429,12 +1429,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					coroutine.yield()
 				case e3d.EVMType.INT then
 					vm.expr_type = {e3d.EVMType.INT}
-					vm:emitop(e3d.Opcode.NEG)
+					vm:emitOp(e3d.Opcode.NEG)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.NEGF)
+					vm:emitOp(e3d.Opcode.NEGF)
 					vm.expr_type = {e3d.EVMType.FLOAT}
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.NEGV)
+					vm:emitOp(e3d.Opcode.NEGV)
 					vm:emit8(vm.expr_type.type_id == e3d.EVMType.VEC3 and 1 or 0)
 				else
 					vm.error = string.format("COMPILE ERROR: line %d: cannot negate expression of type `%s`\n", vm.line, vm.expr_type.structref.name)
@@ -1446,7 +1446,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: unexpected token `%s`\n",
 			vm.line,
-			e3d.get_token_string(vm.token)
+			e3d.getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -1523,7 +1523,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp)
+					e3d.getTypeName(temp)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1533,12 +1533,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				
 				if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 					can_convert = true
-					vm:emitop(e3d.Opcode.FTOI)
+					vm:emitOp(e3d.Opcode.FTOI)
 				elseif temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 					can_convert = true
 				elseif temp.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 					can_convert = true
-					vm:emitop(e3d.Opcode.ITOF)
+					vm:emitOp(e3d.Opcode.ITOF)
 				elseif temp.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 					can_convert = true
 				elseif temp.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -1549,8 +1549,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 						vm.line,
-						e3d.get_type_name(vm.expr_type),
-						e3d.get_type_name(temp)
+						e3d.getTypeName(vm.expr_type),
+						e3d.getTypeName(temp)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1558,37 +1558,37 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 				switch class do
 					case e3d.Class.GLOBAL then
-						vm:emitop(e3d.Opcode.SET_G)
+						vm:emitOp(e3d.Opcode.SET_G)
 						vm:emit16(index)
 					case e3d.Class.LOCAL then
-						vm:emitop(e3d.Opcode.SET_L)
+						vm:emitOp(e3d.Opcode.SET_L)
 						vm:emit16(index)
 					case e3d.Class.ARG then
-						vm:emitop(e3d.Opcode.SET_A)
+						vm:emitOp(e3d.Opcode.SET_A)
 						vm:emit16(index)
 					case e3d.Class.MEMORY then
-						vm:emitop(e3d.Opcode.SET_M)
+						vm:emitOp(e3d.Opcode.SET_M)
 						vm:emit16(index)
 					case e3d.Class.STRING then
-						vm:emitop(e3d.Opcode.SET_S)
+						vm:emitOp(e3d.Opcode.SET_S)
 				end
 			else
 				if temp.type_id == e3d.EVMType.VEC2 or temp.type_id == e3d.EVMType.VEC3 then
 					switch class do
 						case e3d.Class.GLOBAL then
-							vm:emitop(e3d.Opcode.SET_GX)
+							vm:emitOp(e3d.Opcode.SET_GX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.LOCAL then
-							vm:emitop(e3d.Opcode.SET_LX)
+							vm:emitOp(e3d.Opcode.SET_LX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.ARG then
-							vm:emitop(e3d.Opcode.SET_AX)
+							vm:emitOp(e3d.Opcode.SET_AX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.MEMORY then
-							vm:emitop(e3d.Opcode.SET_MX)
+							vm:emitOp(e3d.Opcode.SET_MX)
 							vm:emit16(index)
 							vm:emit16(size)
 					end
@@ -1601,38 +1601,38 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					
 					switch class do
 						case e3d.Class.GLOBAL then
-							vm:emitop(e3d.Opcode.SET_GX)
+							vm:emitOp(e3d.Opcode.SET_GX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.LOCAL then
-							vm:emitop(e3d.Opcode.SET_LX)
+							vm:emitOp(e3d.Opcode.SET_LX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.ARG then
-							vm:emitop(e3d.Opcode.SET_AX)
+							vm:emitOp(e3d.Opcode.SET_AX)
 							vm:emit16(index)
 							vm:emit16(size)
 						case e3d.Class.MEMORY then
-							vm:emitop(e3d.Opcode.SET_MX)
+							vm:emitOp(e3d.Opcode.SET_MX)
 							vm:emit16(index)
 							vm:emit16(size)
 					end
 				else
 					switch class do
 						case e3d.Class.GLOBAL then
-							vm:emitop(e3d.Opcode.SET_G)
+							vm:emitOp(e3d.Opcode.SET_G)
 							vm:emit16(index)
 						case e3d.Class.LOCAL then
-							vm:emitop(e3d.Opcode.SET_L)
+							vm:emitOp(e3d.Opcode.SET_L)
 							vm:emit16(index)
 						case e3d.Class.ARG then
-							vm:emitop(e3d.Opcode.SET_A)
+							vm:emitOp(e3d.Opcode.SET_A)
 							vm:emit16(index)
 						case e3d.Class.MEMORY then
-							vm:emitop(e3d.Opcode.SET_M)
+							vm:emitOp(e3d.Opcode.SET_M)
 							vm:emit16(index)
 						case e3d.Class.STRING then
-							vm:emitop(e3d.Opcode.SET_S)
+							vm:emitOp(e3d.Opcode.SET_S)
 					end
 				end
 			end
@@ -1655,7 +1655,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
 				-- short circuit evaluation
-				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_NZD or e3d.Opcode.JUMP_NNULLD)
+				vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_NZD or e3d.Opcode.JUMP_NNULLD)
 				
 				addr = vm.bytecode_len
 				
@@ -1664,7 +1664,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid lvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1673,12 +1673,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			expression(vm, e3d.Token.LAND)
 			
 			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
-				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
+				vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid rvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1704,7 +1704,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
 				-- short circuit evaluation
-				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_ZD or e3d.Opcode.JUMP_NULLD)
+				vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_ZD or e3d.Opcode.JUMP_NULLD)
 				
 				addr = vm.bytecode_len
 				
@@ -1713,7 +1713,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid lvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1722,12 +1722,12 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			expression(vm, e3d.Token.OR)
 			
 			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
-				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
+				vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.ITOB or e3d.Opcode.PTOB)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid rvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1750,13 +1750,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.OR)
+				vm:emitOp(e3d.Opcode.OR)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `|` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1775,13 +1775,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.XOR)
+				vm:emitOp(e3d.Opcode.XOR)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `^` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1800,13 +1800,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.AND)
+				vm:emitOp(e3d.Opcode.AND)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `&` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1818,18 +1818,18 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.NE)
 
-			operator_type_check(vm, e3d.Token.EQ, temp, true)
+			operatorTypeCheck(vm, e3d.Token.EQ, temp, true)
 			
 			switch temp.type_id do
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.EQF)
+					vm:emitOp(e3d.Opcode.EQF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.EQV)
+					vm:emitOp(e3d.Opcode.EQV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 				case e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.EQS)
+					vm:emitOp(e3d.Opcode.EQS)
 				else
-					vm:emitop(e3d.Opcode.EQ)
+					vm:emitOp(e3d.Opcode.EQ)
 			end
 			
 			vm.expr_type = {e3d.EVMType.INT}
@@ -1838,18 +1838,18 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.LT)
 
-			operator_type_check(vm, e3d.Token.NE, temp, true)
+			operatorTypeCheck(vm, e3d.Token.NE, temp, true)
 			
 			switch temp.type_id do
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.NEF)
+					vm:emitOp(e3d.Opcode.NEF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.NEV)
+					vm:emitOp(e3d.Opcode.NEV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 				case e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.NES)
+					vm:emitOp(e3d.Opcode.NES)
 				else
-					vm:emitop(e3d.Opcode.NE)
+					vm:emitOp(e3d.Opcode.NE)
 			end
 			
 			vm.expr_type = {e3d.EVMType.INT}
@@ -1858,15 +1858,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.LSHIFT)
 
-			operator_type_check(vm, e3d.Token.LT, temp, false)
+			operatorTypeCheck(vm, e3d.Token.LT, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.LTI)
+					vm:emitOp(e3d.Opcode.LTI)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.LTF)
+					vm:emitOp(e3d.Opcode.LTF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.LTV)
+					vm:emitOp(e3d.Opcode.LTV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 			end
 
@@ -1876,15 +1876,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.LSHIFT)
 
-			operator_type_check(vm, e3d.Token.GT, temp, false)
+			operatorTypeCheck(vm, e3d.Token.GT, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.GTI)
+					vm:emitOp(e3d.Opcode.GTI)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.GTF)
+					vm:emitOp(e3d.Opcode.GTF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.GTV)
+					vm:emitOp(e3d.Opcode.GTV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 			end
 
@@ -1894,15 +1894,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.LSHIFT)
 
-			operator_type_check(vm, e3d.Token.LE, temp, false)
+			operatorTypeCheck(vm, e3d.Token.LE, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.LEI)
+					vm:emitOp(e3d.Opcode.LEI)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.LEF)
+					vm:emitOp(e3d.Opcode.LEF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.LEV)
+					vm:emitOp(e3d.Opcode.LEV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 			end
 
@@ -1912,15 +1912,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.LSHIFT)
 
-			operator_type_check(vm, e3d.Token.GE, temp, false)
+			operatorTypeCheck(vm, e3d.Token.GE, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.GEI)
+					vm:emitOp(e3d.Opcode.GEI)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.GEF)
+					vm:emitOp(e3d.Opcode.GEF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.GEV)
+					vm:emitOp(e3d.Opcode.GEV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 			end
 
@@ -1937,13 +1937,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.LSHIFT)
+				vm:emitOp(e3d.Opcode.LSHIFT)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `<<` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1962,13 +1962,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.RSHIFT)
+				vm:emitOp(e3d.Opcode.RSHIFT)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `>>` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1987,13 +1987,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.ARSHIFT)
+				vm:emitOp(e3d.Opcode.ARSHIFT)
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `>>>` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2005,20 +2005,20 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.MUL)
 			
-			operator_type_check(vm, e3d.Token.ADD, temp, true)
+			operatorTypeCheck(vm, e3d.Token.ADD, temp, true)
 
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.ADD)
+					vm:emitOp(e3d.Opcode.ADD)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.ADDF)
+					vm:emitOp(e3d.Opcode.ADDF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.ADDV)
+					vm:emitOp(e3d.Opcode.ADDV)
 					vm:emit8(temp.type_id == e3d.EVMType.VEC3 and 1 or 0)
 				else
 					if temp.type_id > e3d.EVMType.POINTER then
-						vm:emitop(e3d.Opcode.ADDP)
-						vm:emit16(e3d.size_pointed_to(temp))
+						vm:emitOp(e3d.Opcode.ADDP)
+						vm:emit16(e3d.sizePointedTo(temp))
 					end
 			end
 			
@@ -2028,20 +2028,20 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			
 			expression(vm, e3d.Token.MUL)
 
-			operator_type_check(vm, e3d.Token.SUB, temp, true)
+			operatorTypeCheck(vm, e3d.Token.SUB, temp, true)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.SUB)
+					vm:emitOp(e3d.Opcode.SUB)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.SUBF)
+					vm:emitOp(e3d.Opcode.SUBF)
 				case e3d.EVMType.VEC2, e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.SUBV)
+					vm:emitOp(e3d.Opcode.SUBV)
 					vm:emit8(temp == e3d.EVMType.VEC3 and 1 or 0)
 				else
 					if temp.type_id > e3d.EVMType.POINTER then
-						vm:emitop(e3d.Opcode.SUBP)
-						vm:emit16(e3d.size_pointed_to(temp))
+						vm:emitOp(e3d.Opcode.SUBP)
+						vm:emit16(e3d.sizePointedTo(temp))
 					end
 			end
 			
@@ -2051,35 +2051,35 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			expression(vm, e3d.Token.BRAK)
 
-			operator_type_check(vm, e3d.Token.MUL, temp, false)
+			operatorTypeCheck(vm, e3d.Token.MUL, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.VEC2 then
-							vm:emitop(e3d.Opcode.MULV)
+							vm:emitOp(e3d.Opcode.MULV)
 							vm:emit8(e3d.MulVMode.INT_V2)
 						case e3d.EVMType.VEC3 then
-							vm:emitop(e3d.Opcode.MULV)
+							vm:emitOp(e3d.Opcode.MULV)
 							vm:emit8(e3d.MulVMode.INT_V3)
 						else
 							vm.expr_type = temp
-							vm:emitop(e3d.Opcode.MUL)
+							vm:emitOp(e3d.Opcode.MUL)
 					end
 				case e3d.EVMType.FLOAT then
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.VEC2 then
-							vm:emitop(e3d.Opcode.MULV)
+							vm:emitOp(e3d.Opcode.MULV)
 							vm:emit8(e3d.MulVMode.FLOAT_V2)
 						case e3d.EVMType.VEC3 then
-							vm:emitop(e3d.Opcode.MULV)
+							vm:emitOp(e3d.Opcode.MULV)
 							vm:emit8(e3d.MulVMode.FLOAT_V3)
 						else
 							vm.expr_type = temp
-							vm:emitop(e3d.Opcode.MULF)
+							vm:emitOp(e3d.Opcode.MULF)
 					end
 				case e3d.EVMType.VEC2 then
-					vm:emitop(e3d.Opcode.MULV)
+					vm:emitOp(e3d.Opcode.MULV)
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.INT then
 							vm:emit8(e3d.MulVMode.V2_INT)
@@ -2090,7 +2090,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					end
 					vm.expr_type = temp
 				case e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.MULV)
+					vm:emitOp(e3d.Opcode.MULV)
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.INT then
 							vm:emit8(e3d.MulVMode.V3_INT)
@@ -2106,15 +2106,15 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			
 			expression(vm, e3d.Token.BRAK)
 
-			operator_type_check(vm, e3d.Token.DIV, temp, false)
+			operatorTypeCheck(vm, e3d.Token.DIV, temp, false)
 			
 			switch temp.type_id do
 				case e3d.EVMType.INT then
-					vm:emitop(e3d.Opcode.DIV)
+					vm:emitOp(e3d.Opcode.DIV)
 				case e3d.EVMType.FLOAT then
-					vm:emitop(e3d.Opcode.DIVF)
+					vm:emitOp(e3d.Opcode.DIVF)
 				case e3d.EVMType.VEC2 then
-					vm:emitop(e3d.Opcode.DIVV)
+					vm:emitOp(e3d.Opcode.DIVV)
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.INT then
 							vm:emit8(e3d.DivVMode.V2_INT)
@@ -2124,7 +2124,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 							vm:emit8(e3d.DivVMode.V2_V2)
 					end
 				case e3d.EVMType.VEC3 then
-					vm:emitop(e3d.Opcode.DIVV)
+					vm:emitOp(e3d.Opcode.DIVV)
 					switch vm.expr_type.type_id do
 						case e3d.EVMType.INT then
 							vm:emit8(e3d.DivVMode.V3_INT)
@@ -2148,21 +2148,21 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 			
 			if temp.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.MOD)
+				vm:emitOp(e3d.Opcode.MOD)
 				vm.expr_type = {e3d.EVMType.INT}
 			elseif temp.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
-				vm:emitop(e3d.Opcode.ITOF)
-				vm:emitop(e3d.Opcode.MODF)
+				vm:emitOp(e3d.Opcode.ITOF)
+				vm:emitOp(e3d.Opcode.MODF)
 				vm.expr_type = {e3d.EVMType.FLOAT}
 			elseif temp.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
-				vm:emitop(e3d.Opcode.MODF)
+				vm:emitOp(e3d.Opcode.MODF)
 				vm.expr_type = {e3d.EVMType.FLOAT}
 			else
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `%` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.get_type_name(temp),
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(temp),
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2171,7 +2171,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			if not (vm.expr_type.type_id >= (e3d.EVMType.VEC2 + e3d.EVMType.POINTER) and vm.expr_type.type_id <= (e3d.EVMType.STRING + e3d.EVMType.POINTER)) then
 				vm.error = string.format("COMPILE ERROR: line %d: cannot index members of type `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2182,7 +2182,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			match(vm, e3d.Token.ID)
 	
 			-- lookup member
-			vm.has_id, vm.current_id = vm.expr_type.structref:get_member(vm.current_id_name)
+			vm.has_id, vm.current_id = vm.expr_type.structref:getMember(vm.current_id_name)
 			if not vm.has_id then
 				vm.error = string.format("COMPILE ERROR: line %d: cannot index member `%s` of symbol `%s`\n", vm.line, vm.current_id_name, id.name)
 				vm.compile_err = true
@@ -2190,11 +2190,11 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			end
 
 			if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRING then
-				vm:emitop(e3d.Opcode.GET_MX)
+				vm:emitOp(e3d.Opcode.GET_MX)
 				vm:emit16(vm.current_id.index)
 				vm:emit16(vm.current_id.type_info.structref.size)
 			else
-				vm:emitop(e3d.Opcode.GET_M)
+				vm:emitOp(e3d.Opcode.GET_M)
 				vm:emit16(vm.current_id.index)
 			end
 
@@ -2206,7 +2206,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot index members of type `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2252,7 +2252,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			match(vm, e3d.Token.ID)
 	
 			-- lookup member
-			vm.has_id, vm.current_id = id.type_info.structref:get_member(vm.current_id_name)
+			vm.has_id, vm.current_id = id.type_info.structref:getMember(vm.current_id_name)
 			if not vm.has_id then
 				vm.error = string.format("COMPILE ERROR: line %d: cannot index member `%s` of symbol `%s`\n", vm.line, vm.current_id_name, id.name)
 				vm.compile_err = true
@@ -2261,38 +2261,38 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 			if class == e3d.Class.GLOBAL then
 				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.GET_GX)
+					vm:emitOp(e3d.Opcode.GET_GX)
 					vm:emit16(index + vm.current_id.index)
 					vm:emit16(vm.current_id.type_info.structref.size)
 				else
-					vm:emitop(e3d.Opcode.GET_G)
+					vm:emitOp(e3d.Opcode.GET_G)
 					vm:emit16(index + vm.current_id.index)
 				end
 			elseif class == e3d.Class.ARG then
 				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.GET_AX)
+					vm:emitOp(e3d.Opcode.GET_AX)
 					vm:emit16(index + vm.current_id.index)
 					vm:emit16(vm.current_id.type_info.structref.size)
 				else
-					vm:emitop(e3d.Opcode.GET_A)
+					vm:emitOp(e3d.Opcode.GET_A)
 					vm:emit16(index + vm.current_id.index)
 				end
 			elseif class == e3d.Class.LOCAL then
 				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.GET_LX)
+					vm:emitOp(e3d.Opcode.GET_LX)
 					vm:emit16(index + vm.current_id.index)
 					vm:emit16(vm.current_id.type_info.structref.size)
 				else
-					vm:emitop(e3d.Opcode.GET_L)
+					vm:emitOp(e3d.Opcode.GET_L)
 					vm:emit16(index + vm.current_id.index)
 				end
 			elseif class == e3d.Class.MEMORY then
 				if vm.current_id.type_info.type_id >= e3d.EVMType.VEC2 and vm.current_id.type_info.type_id <= e3d.EVMType.STRING then
-					vm:emitop(e3d.Opcode.GET_MX)
+					vm:emitOp(e3d.Opcode.GET_MX)
 					vm:emit16(index + vm.current_id.index)
 					vm:emit16(vm.current_id.type_info.structref.size)
 				else
-					vm:emitop(e3d.Opcode.GET_M)
+					vm:emitOp(e3d.Opcode.GET_M)
 					vm:emit16(index + vm.current_id.index)
 				end
 			end
@@ -2305,7 +2305,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			local size: uint16
 
 			if vm.expr_type.type_id > e3d.EVMType.POINTER then
-				size = e3d.size_pointed_to(vm.expr_type)
+				size = e3d.sizePointedTo(vm.expr_type)
 				vm.expr_type.type_id = vm.expr_type.type_id - e3d.EVMType.POINTER
 				temp = vm.expr_type
 			elseif vm.expr_type.type_id == e3d.EVMType.STRING then
@@ -2315,7 +2315,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot subscript expression of type `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2329,26 +2329,26 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use type `%s` as an array index\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
 			elseif vm.expr_type.type_id == e3d.EVMType.FLOAT then
-				vm:emitop(e3d.Opcode.FTOI)
+				vm:emitOp(e3d.Opcode.FTOI)
 			end
 
 			if is_string then
-				vm:emitop(e3d.Opcode.GET_S)
+				vm:emitOp(e3d.Opcode.GET_S)
 			else
-				vm:emitop(e3d.Opcode.ADDP)
+				vm:emitOp(e3d.Opcode.ADDP)
 				vm:emit16(size)
 
 				if (temp.type_id >= e3d.EVMType.VEC2) and (temp.type_id <= e3d.EVMType.STRING) then
-					vm:emitop(e3d.Opcode.GET_MX)
+					vm:emitOp(e3d.Opcode.GET_MX)
 					vm:emit16(0)
 					vm:emit16(size)
 				else
-					vm:emitop(e3d.Opcode.GET_M)
+					vm:emitOp(e3d.Opcode.GET_M)
 					vm:emit16(0)
 				end
 			end
@@ -2358,7 +2358,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: unexpected token `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2416,7 +2416,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2438,9 +2438,9 @@ local function statement(vm: *e3d.EVM): void
 		vm.current_id.class = e3d.Class.LOCAL
 		vm.current_id.type_info = {var_type, structref}
 		vm.current_id.index = vm.local_index
-		vm:add_scoped_symbol(vm.current_id.name, vm.current_id)
+		vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
-		local type_size: uinteger = e3d.size_of_type(vm.current_id.type_info)
+		local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
 		
 		if vm.token == e3d.Token.BRAK then
 			vm.current_id.is_array = true
@@ -2471,7 +2471,7 @@ local function statement(vm: *e3d.EVM): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 					vm.line,
-					e3d.get_token_string(vm.token)
+					e3d.getTokenString(vm.token)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2486,12 +2486,12 @@ local function statement(vm: *e3d.EVM): void
 			array_size = array_size * type_size
 
 			vm.local_index = vm.local_index + array_size
-			vm:inc_scope_locals_size(array_size)
+			vm:incScopeLocalsSize(array_size)
 
 			match(vm, ']'_u8)
 		else			
 			vm.local_index = vm.local_index + type_size
-			vm:inc_scope_locals_size(type_size)
+			vm:incScopeLocalsSize(type_size)
 
 			if vm.token == e3d.Token.ASSIGN then
 				local id: *e3d.Identifier = vm.current_id
@@ -2504,7 +2504,7 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 						vm.line,
-						e3d.get_type_name({var_type, structref})
+						e3d.getTypeName({var_type, structref})
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -2514,11 +2514,11 @@ local function statement(vm: *e3d.EVM): void
 					
 					if var_type == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 						can_convert = true
-						vm:emitop(e3d.Opcode.FTOI)
+						vm:emitOp(e3d.Opcode.FTOI)
 					elseif var_type == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 						can_convert = true
 					elseif var_type == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
-						vm:emitop(e3d.Opcode.ITOF)
+						vm:emitOp(e3d.Opcode.ITOF)
 					elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 						can_convert = true
 					elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -2529,18 +2529,18 @@ local function statement(vm: *e3d.EVM): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 							vm.line,
-							e3d.get_type_name(vm.expr_type),
-							e3d.get_type_name({var_type, structref})
+							e3d.getTypeName(vm.expr_type),
+							e3d.getTypeName({var_type, structref})
 						)
 						vm.compile_err = true
 						coroutine.yield()
 					end
 	
-					vm:emitop(e3d.Opcode.SET_L)
+					vm:emitOp(e3d.Opcode.SET_L)
 					vm:emit16(id.index)
 				else
 					if var_type == e3d.EVMType.VEC2 or var_type == e3d.EVMType.VEC3 then
-						vm:emitop(e3d.Opcode.SET_LX)
+						vm:emitOp(e3d.Opcode.SET_LX)
 						vm:emit16(id.index)
 						vm:emit16(type_size)
 					elseif var_type == e3d.EVMType.STRUCT or var_type == e3d.EVMType.STRING then
@@ -2550,11 +2550,11 @@ local function statement(vm: *e3d.EVM): void
 							coroutine.yield()
 						end
 						
-						vm:emitop(e3d.Opcode.SET_LX)
+						vm:emitOp(e3d.Opcode.SET_LX)
 						vm:emit16(id.index)
 						vm:emit16(id.type_info.structref.size)
 					else
-						vm:emitop(e3d.Opcode.SET_L)
+						vm:emitOp(e3d.Opcode.SET_L)
 						vm:emit16(id.index)
 					end
 				end
@@ -2593,7 +2593,7 @@ local function statement(vm: *e3d.EVM): void
 		end
 
 		if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
-			vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+			vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
 
 			b = vm.bytecode_len
 		
@@ -2602,7 +2602,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: invalid type for if statement condition. expected `int` or pointer, got `%s`\n",
 				vm.line,
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2619,7 +2619,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.bytecode[b + 1] = ((vm.bytecode_len + 3) & 0xFF)
 
 			-- emit bytecode for JUMP b
-			vm:emitop(e3d.Opcode.JUMP)
+			vm:emitOp(e3d.Opcode.JUMP)
 			b = vm.bytecode_len
 			vm:emit16(0)
 
@@ -2646,9 +2646,9 @@ local function statement(vm: *e3d.EVM): void
 
 		match(vm, e3d.Token.FOR)
 		
-		vm:push_scope()
+		vm:pushScope()
 		
-		vm:emitop(e3d.Opcode.NEW_L)
+		vm:emitOp(e3d.Opcode.NEW_L)
 		local new_l_index: uinteger = vm.bytecode_len
 		vm:emit16(0)
 		
@@ -2702,7 +2702,7 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 						vm.line,
-						e3d.get_token_string(vm.token)
+						e3d.getTokenString(vm.token)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -2724,9 +2724,9 @@ local function statement(vm: *e3d.EVM): void
 				vm.current_id.class = e3d.Class.LOCAL
 				vm.current_id.type_info = {var_type, structref}
 				vm.current_id.index = vm.local_index
-				vm:add_scoped_symbol(vm.current_id.name, vm.current_id)
+				vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
-				local type_size: uinteger = e3d.size_of_type(vm.current_id.type_info)
+				local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
 				
 				if vm.token == e3d.Token.BRAK then
 					vm.current_id.is_array = true
@@ -2757,7 +2757,7 @@ local function statement(vm: *e3d.EVM): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 							vm.line,
-							e3d.get_token_string(vm.token)
+							e3d.getTokenString(vm.token)
 						)
 						vm.compile_err = true
 						coroutine.yield()
@@ -2772,12 +2772,12 @@ local function statement(vm: *e3d.EVM): void
 					array_size = array_size * type_size
 
 					vm.local_index = vm.local_index + array_size
-					vm:inc_scope_locals_size(array_size)
+					vm:incScopeLocalsSize(array_size)
 
 					match(vm, ']'_u8)
 				else
 					vm.local_index = vm.local_index + type_size
-					vm:inc_scope_locals_size(type_size)
+					vm:incScopeLocalsSize(type_size)
 
 					if vm.token == e3d.Token.ASSIGN then
 						local id: *e3d.Identifier = vm.current_id
@@ -2790,7 +2790,7 @@ local function statement(vm: *e3d.EVM): void
 							vm.error = string.format(
 								"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 								vm.line,
-								e3d.get_type_name({var_type, structref})
+								e3d.getTypeName({var_type, structref})
 							)
 							vm.compile_err = true
 							coroutine.yield()
@@ -2800,11 +2800,11 @@ local function statement(vm: *e3d.EVM): void
 							
 							if var_type == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 								can_convert = true
-								vm:emitop(e3d.Opcode.FTOI)
+								vm:emitOp(e3d.Opcode.FTOI)
 							elseif var_type == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 								can_convert = true
 							elseif var_type == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
-								vm:emitop(e3d.Opcode.ITOF)
+								vm:emitOp(e3d.Opcode.ITOF)
 							elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 								can_convert = true
 							elseif var_type >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -2816,17 +2816,17 @@ local function statement(vm: *e3d.EVM): void
 									"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 									vm.line,
 									vm.expr_type.type_id,
-									e3d.get_type_name({var_type, structref})
+									e3d.getTypeName({var_type, structref})
 								)
 								vm.compile_err = true
 								coroutine.yield()
 							end
 			
-							vm:emitop(e3d.Opcode.SET_L)
+							vm:emitOp(e3d.Opcode.SET_L)
 							vm:emit16(id.index)
 						else
 							if var_type == e3d.EVMType.VEC2 or var_type == e3d.EVMType.VEC3 then
-								vm:emitop(e3d.Opcode.SET_LX)
+								vm:emitOp(e3d.Opcode.SET_LX)
 								vm:emit16(id.index)
 								vm:emit16(type_size)
 							elseif var_type == e3d.EVMType.STRUCT or var_type == e3d.EVMType.STRING then
@@ -2836,11 +2836,11 @@ local function statement(vm: *e3d.EVM): void
 									coroutine.yield()
 								end
 								
-								vm:emitop(e3d.Opcode.SET_LX)
+								vm:emitOp(e3d.Opcode.SET_LX)
 								vm:emit16(id.index)
 								vm:emit16(id.type_info.structref.size)
 							else
-								vm:emitop(e3d.Opcode.SET_L)
+								vm:emitOp(e3d.Opcode.SET_L)
 								vm:emit16(id.index)
 							end
 						end
@@ -2866,7 +2866,7 @@ local function statement(vm: *e3d.EVM): void
 		-- cond
 		a = vm.bytecode_len
 
-		vm:push_loop(vm.bytecode_len)
+		vm:pushLoop(vm.bytecode_len)
 		
 		local has_condition: boolean = false
 		if vm.token ~= ';'_u8 then
@@ -2881,7 +2881,7 @@ local function statement(vm: *e3d.EVM): void
 			end
 	
 			if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
-				vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+				vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
 	
 				b = vm.bytecode_len
 			
@@ -2890,7 +2890,7 @@ local function statement(vm: *e3d.EVM): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.get_type_name(vm.expr_type)
+					e3d.getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2908,7 +2908,7 @@ local function statement(vm: *e3d.EVM): void
 		local step_index: uinteger = vm.prev_src_index
 		
 		if vm.token ~= ')'_u8 then
-			vm:set_loop_has_step()
+			vm:setLoopHasStep()
 		end
 		while vm.token ~= ')'_u8 and vm.token ~= 0 do
 			next(vm)
@@ -2937,7 +2937,7 @@ local function statement(vm: *e3d.EVM): void
 
 		next(vm)
 		if vm.token ~= ')'_u8 then
-			vm:set_loop_step(vm.bytecode_len)
+			vm:setLoopStep(vm.bytecode_len)
 		end
 		while vm.token ~= ')'_u8 do
 			expression(vm, e3d.Token.ASSIGN)
@@ -2950,17 +2950,17 @@ local function statement(vm: *e3d.EVM): void
 		match(vm, ')'_u8)
 
 		-- time to wrap up the loop with a jump
-		vm:emitop(e3d.Opcode.JUMP)
+		vm:emitOp(e3d.Opcode.JUMP)
 		vm:emit16(a)
 
-		vm:set_loop_end(vm.bytecode_len)
+		vm:setLoopEnd(vm.bytecode_len)
 		
 		if has_condition then
 			vm.bytecode[b] = ((vm.bytecode_len) >> 8)
 			vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
 		end
 
-		vm:pop_loop()
+		vm:popLoop()
 
 		-- and now we can jump back to the end of the loop body
 		vm.prev_token = end_prev_token
@@ -2971,7 +2971,7 @@ local function statement(vm: *e3d.EVM): void
 		vm.line = end_line
 
 		-- cleanup any loop init variables allocated
-		local size: uinteger = vm:get_scope_locals_size()
+		local size: uinteger = vm:getScopeLocalsSize()
 		if size > 0 then
 			-- patch new_l size
 			if size > e3d.LOCALS_SIZE - 1 then
@@ -2984,13 +2984,13 @@ local function statement(vm: *e3d.EVM): void
 			vm.bytecode[new_l_index + 1] = ((size) & 0xFF)
 			
 			-- cleanup
-			vm:emitop(e3d.Opcode.DEL_L)
+			vm:emitOp(e3d.Opcode.DEL_L)
 			vm:emit16(size)
 			
 			vm.local_index = vm.local_index - size
 		end
 		
-		vm:pop_scope()
+		vm:popScope()
 	elseif vm.token == e3d.Token.WHILE then
 		--[[
 			ERA-C:         | BYTECODE:
@@ -3008,7 +3008,7 @@ local function statement(vm: *e3d.EVM): void
 
 		a = vm.bytecode_len
 
-		vm:push_loop(vm.bytecode_len)
+		vm:pushLoop(vm.bytecode_len)
 
 		match(vm, '('_u8)
 
@@ -3021,7 +3021,7 @@ local function statement(vm: *e3d.EVM): void
 		end
 
 		if vm.expr_type.type_id == e3d.EVMType.INT or vm.expr_type.type_id >= e3d.EVMType.POINTER then
-			vm:emitop((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
+			vm:emitOp((vm.expr_type.type_id == e3d.EVMType.INT) and e3d.Opcode.JUMP_Z or e3d.Opcode.JUMP_NULL)
 
 			b = vm.bytecode_len
 		
@@ -3030,7 +3030,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
 				vm.line,
-				e3d.get_type_name(vm.expr_type)
+				e3d.getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3040,15 +3040,15 @@ local function statement(vm: *e3d.EVM): void
 
 		statement(vm)
 
-		vm:emitop(e3d.Opcode.JUMP)
+		vm:emitOp(e3d.Opcode.JUMP)
 		vm:emit16(a)
 
-		vm:set_loop_end(vm.bytecode_len)
+		vm:setLoopEnd(vm.bytecode_len)
 
 		vm.bytecode[b] = ((vm.bytecode_len) >> 8)
 		vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
 
-		vm:pop_loop()
+		vm:popLoop()
 	elseif vm.token == e3d.Token.RETURN then
 		match(vm, e3d.Token.RETURN)
 
@@ -3073,12 +3073,12 @@ local function statement(vm: *e3d.EVM): void
 				
 				if target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id == e3d.EVMType.FLOAT then
 					can_convert = true
-					vm:emitop(e3d.Opcode.FTOI)
+					vm:emitOp(e3d.Opcode.FTOI)
 				elseif target_info.type_id == e3d.EVMType.INT and vm.expr_type.type_id >= e3d.EVMType.POINTER then
 					can_convert = true
 				elseif target_info.type_id == e3d.EVMType.FLOAT and vm.expr_type.type_id == e3d.EVMType.INT then
 					can_convert = true
-					vm:emitop(e3d.Opcode.ITOF)
+					vm:emitOp(e3d.Opcode.ITOF)
 				elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id == e3d.EVMType.INT then
 					can_convert = true
 				elseif target_info.type_id >= e3d.EVMType.POINTER and vm.expr_type.type_id >= e3d.EVMType.POINTER then
@@ -3089,8 +3089,8 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot return `%s` from function of type `%s`\n",
 						vm.line,
-						e3d.get_type_name(vm.expr_type),
-						e3d.get_type_name(target_info)
+						e3d.getTypeName(vm.expr_type),
+						e3d.getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -3106,7 +3106,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: function of type `%s` must return a value\n",
 				vm.line,
-				e3d.get_type_name(vm.current_func_id.type_info)
+				e3d.getTypeName(vm.current_func_id.type_info)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3114,7 +3114,7 @@ local function statement(vm: *e3d.EVM): void
 
 		match(vm, ';'_u8)
 
-		vm:emitop(e3d.Opcode.RETURN)
+		vm:emitOp(e3d.Opcode.RETURN)
 	elseif vm.token == e3d.Token.BREAK then
 		match(vm, e3d.Token.BREAK)
 
@@ -3124,12 +3124,12 @@ local function statement(vm: *e3d.EVM): void
 			coroutine.yield()
 		end
 
-		vm:emitop(e3d.Opcode.DEL_L)
-		vm:add_del_l(vm.bytecode_len)
+		vm:emitOp(e3d.Opcode.DEL_L)
+		vm:addDelL(vm.bytecode_len)
 		vm:emit16(0)
 		
-		vm:emitop(e3d.Opcode.JUMP)
-		vm:add_break(vm.bytecode_len)
+		vm:emitOp(e3d.Opcode.JUMP)
+		vm:addBreak(vm.bytecode_len)
 		vm:emit16(0)
 		
 		match(vm, ';'_u8)
@@ -3142,17 +3142,17 @@ local function statement(vm: *e3d.EVM): void
 			coroutine.yield()
 		end
 
-		vm:emitop(e3d.Opcode.DEL_L)
-		vm:add_del_l(vm.bytecode_len)
+		vm:emitOp(e3d.Opcode.DEL_L)
+		vm:addDelL(vm.bytecode_len)
 		vm:emit16(0)
 		
-		vm:emitop(e3d.Opcode.JUMP)
+		vm:emitOp(e3d.Opcode.JUMP)
 
-		if vm:loop_has_step() then
-			vm:add_jump_to_step(vm.bytecode_len)
+		if vm:loopHasStep() then
+			vm:addJumpToStep(vm.bytecode_len)
 			vm:emit16(0)
 		else
-			vm:emit16(vm:get_loop_start())
+			vm:emit16(vm:getLoopStart())
 		end
 
 		match(vm, ';'_u8)
@@ -3161,9 +3161,9 @@ local function statement(vm: *e3d.EVM): void
 
 		match(vm, '{'_u8)
 
-		vm:push_scope()
+		vm:pushScope()
 
-		vm:emitop(e3d.Opcode.NEW_L)
+		vm:emitOp(e3d.Opcode.NEW_L)
 		local new_l_index: uinteger = vm.bytecode_len
 		vm:emit16(0)
 		
@@ -3174,7 +3174,7 @@ local function statement(vm: *e3d.EVM): void
 		match(vm, '}'_u8)
 
 		-- cleanup any local variables allocated
-		local size: uinteger = vm:get_scope_locals_size()
+		local size: uinteger = vm:getScopeLocalsSize()
 		vm.prev_scope_size = size
 		
 		-- patch new_l size
@@ -3189,13 +3189,13 @@ local function statement(vm: *e3d.EVM): void
 			vm.bytecode[new_l_index + 1] = ((size) & 0xFF)
 
 			-- cleanup
-			vm:emitop(e3d.Opcode.DEL_L)
+			vm:emitOp(e3d.Opcode.DEL_L)
 			vm:emit16(size)
 
 			vm.local_index = vm.local_index - size
 		end
 		
-		vm:pop_scope()
+		vm:popScope()
 	elseif vm.token == ';'_u8 then
 		-- empty statement
 		match(vm, ';'_u8)
@@ -3206,7 +3206,7 @@ local function statement(vm: *e3d.EVM): void
 	end
 end
 
-local function enum_declaration(vm: *e3d.EVM): void
+local function enumDeclaration(vm: *e3d.EVM): void
 	local i: int32
 	while vm.token ~= '}'_u8 do
 		if vm.token ~= e3d.Token.ID then
@@ -3232,7 +3232,7 @@ local function enum_declaration(vm: *e3d.EVM): void
 		vm.current_id.class = e3d.Class.CONSTANT
 		vm.current_id.type_info = {e3d.EVMType.INT}
 		vm.current_id.const_val = i
-		vm:add_scoped_symbol(vm.current_id.name, vm.current_id)
+		vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 		i = i + 1
 
 		if vm.token == ','_u8 then
@@ -3241,7 +3241,7 @@ local function enum_declaration(vm: *e3d.EVM): void
 	end
 end
 
-local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
+local function functionParameters(vm: *e3d.EVM, hook_index: integer): void
 	local arg_type: uinteger
 	local arg_index: uinteger
 
@@ -3283,7 +3283,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3303,7 +3303,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3319,7 +3319,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 		vm.current_id.class = e3d.Class.ARG
 		vm.current_id.type_info = {arg_type, structref}
 		vm.current_id.index = arg_index
-		vm:add_scoped_symbol(vm.current_id.name, vm.current_id)
+		vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 		
 		if structref and not structref.is_complete then
 			vm.error = string.format("COMPILE ERROR: line %d: cannot declare function parameter of incomplete type\n", vm.line)
@@ -3327,7 +3327,7 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 			coroutine.yield()
 		end
 
-		arg_index = arg_index + e3d.size_of_type(vm.current_id.type_info)
+		arg_index = arg_index + e3d.sizeOfType(vm.current_id.type_info)
 
 		vm.current_func_id.argdata:push(vm.current_id.type_info)
 
@@ -3357,38 +3357,38 @@ local function function_parameters(vm: *e3d.EVM, hook_index: integer): void
 	end
 end
 
-local function function_body(vm: *e3d.EVM): void
+local function functionBody(vm: *e3d.EVM): void
 	vm.local_index = 0
 	while vm.token ~= '}'_u8 do
 		statement(vm)
 	end
 
 	--if vm.prev_opcode ~= e3d.Opcode.RETURN then
-	vm:emitop(e3d.Opcode.RETURN)
+	vm:emitOp(e3d.Opcode.RETURN)
 end
 
-local function function_declaration(vm: *e3d.EVM, hook_index: integer): void
-	vm:push_scope() -- function scope
+local function functionDeclaration(vm: *e3d.EVM, hook_index: integer): void
+	vm:pushScope() -- function scope
 	match(vm, '('_u8)
-	function_parameters(vm, hook_index)
+	functionParameters(vm, hook_index)
 	match(vm, ')'_u8)
 	match(vm, '{'_u8)
 
 	if vm.current_func_id.is_varargs then
 		-- establish starting point for vararg pointer and set vargs flag
-		vm:emitop(e3d.Opcode.VARGP)
+		vm:emitOp(e3d.Opcode.VARGP)
 		vm:emit16(vm.current_func_id.varargs_index)
 	end
 	
-	vm:emitop(e3d.Opcode.NEW_L)
+	vm:emitOp(e3d.Opcode.NEW_L)
 	local new_l_index: uinteger = vm.bytecode_len
 	vm:emit16(0)
 	
-	function_body(vm)
+	functionBody(vm)
 	match(vm, '}'_u8)
 	
 	-- patch new_l size
-	local size: uinteger = vm:get_scope_locals_size()
+	local size: uinteger = vm:getScopeLocalsSize()
 	if size > 0 then
 		if size > e3d.LOCALS_SIZE - 1 then
 			vm.error = string.format("COMPILE ERROR: function `%s` local variable allocation limit exceeded by %d word(s)\n", vm.current_func_id.name, size - (e3d.LOCALS_SIZE - 1))
@@ -3400,10 +3400,10 @@ local function function_declaration(vm: *e3d.EVM, hook_index: integer): void
 		vm.bytecode[new_l_index + 1] = ((size) & 0xFF)
 	end
 
-	vm:pop_scope()
+	vm:popScope()
 end
 
-local function struct_declaration(vm: *e3d.EVM): void
+local function structDeclaration(vm: *e3d.EVM): void
 	local struct_id: *e3d.Identifier
 	local struct: *e3d.Struct = new(@e3d.Struct)
 	local member: *e3d.Identifier
@@ -3420,7 +3420,7 @@ local function struct_declaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 			vm.line,
-			e3d.get_token_string(vm.token)
+			e3d.getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3480,7 +3480,7 @@ local function struct_declaration(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3503,13 +3503,13 @@ local function struct_declaration(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.get_token_string(vm.token)
+				e3d.getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
 		end
 
-		vm.has_id = struct:has_member(vm.current_id_name)
+		vm.has_id = struct:hasMember(vm.current_id_name)
 		if vm.has_id then
 			vm.error = string.format("COMPILE ERROR: line %d: duplicate declaration of struct member `%s`\n", vm.line, vm.current_id_name)
 			vm.compile_err = true
@@ -3528,9 +3528,9 @@ local function struct_declaration(vm: *e3d.EVM): void
 			coroutine.yield()
 		end
 		
-		member_index = member_index + e3d.size_of_type(member.type_info)
+		member_index = member_index + e3d.sizeOfType(member.type_info)
 		
-		struct:add_member(member)
+		struct:addMember(member)
 		
 		match(vm, ';'_u8)
 	end
@@ -3540,7 +3540,7 @@ local function struct_declaration(vm: *e3d.EVM): void
 	match(vm, '}'_u8)
 end
 
-local function global_declaration(vm: *e3d.EVM): void
+local function globalDeclaration(vm: *e3d.EVM): void
 	local base_type: uinteger
 	local var_type: uinteger
 	local temp: uinteger
@@ -3551,12 +3551,12 @@ local function global_declaration(vm: *e3d.EVM): void
 	if vm.token == e3d.Token.ENUM then
 		match(vm, e3d.Token.ENUM)
 		match(vm, '{'_u8)
-		enum_declaration(vm)
+		enumDeclaration(vm)
 		match(vm, '}'_u8)
 		match(vm, ';'_u8)
 		return
 	elseif vm.token == e3d.Token.STRUCT then
-		struct_declaration(vm)
+		structDeclaration(vm)
 		match(vm, ';'_u8)
 		return
 	end
@@ -3590,7 +3590,7 @@ local function global_declaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 			vm.line,
-			e3d.get_token_string(vm.token)
+			e3d.getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3607,7 +3607,7 @@ local function global_declaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 			vm.line,
-			e3d.get_token_string(vm.token)
+			e3d.getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3620,7 +3620,7 @@ local function global_declaration(vm: *e3d.EVM): void
 
 	match(vm, e3d.Token.ID)
 	vm.current_id.type_info = {var_type, structref}
-	vm:add_scoped_symbol(vm.current_id.name, vm.current_id)
+	vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
 	if vm.token == '('_u8 then
 		vm.current_id.class = e3d.Class.FUNCTION
@@ -3654,7 +3654,7 @@ local function global_declaration(vm: *e3d.EVM): void
 		end
 
 		vm.current_func_id = vm.current_id
-		function_declaration(vm, hook_index)
+		functionDeclaration(vm, hook_index)
 	else
 		if var_type ~= e3d.EVMType.VOID then
 			vm.current_id.class = e3d.Class.GLOBAL
@@ -3666,7 +3666,7 @@ local function global_declaration(vm: *e3d.EVM): void
 				coroutine.yield()
 			end
 
-			local type_size: uinteger = e3d.size_of_type(vm.current_id.type_info)
+			local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
 
 			if vm.token == e3d.Token.BRAK then
 				vm.current_id.is_array = true
@@ -3697,7 +3697,7 @@ local function global_declaration(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 						vm.line,
-						e3d.get_token_string(vm.token)
+						e3d.getTokenString(vm.token)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -3748,17 +3748,17 @@ local function program(vm: *e3d.EVM): void
 	vm.line = 1
 	vm.src_index = 1 -- 1-based string indexing
 	vm.prev_src_index = 1
-	vm:push_scope() -- global scope
+	vm:pushScope() -- global scope
 	
 	next(vm)
 	while vm.token ~= 0 do
-		global_declaration(vm)
+		globalDeclaration(vm)
 	end
 
-	vm:pop_scope()
+	vm:popScope()
 end
 
-function e3d.EVM:compile_file(filename: string): boolean
+function e3d.EVM:compileFile(filename: string): boolean
 	local fs, err, errcode = filestream.open(filename)
 	if not fs:isopen() then
 		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", filename, err, errcode)
@@ -3776,11 +3776,11 @@ function e3d.EVM:compile_file(filename: string): boolean
 	self.compile_err = false
 	co, errmsg = coroutine.create(program)
 	success, errmsg = coroutine.resume(co, self)
-	self:reset_compiler()
+	self:resetCompiler()
 	return success and not self.compile_err
 end
 
-function e3d.EVM:compile_src(src: string): boolean
+function e3d.EVM:compileSrc(src: string): boolean
 	self.src = src
 	
 	local success: boolean
@@ -3790,6 +3790,6 @@ function e3d.EVM:compile_src(src: string): boolean
 	self.compile_err = false
 	co, errmsg = coroutine.create(program)
 	success, errmsg = coroutine.resume(co, self)
-	self:reset_compiler()
+	self:resetCompiler()
 	return success and not self.compile_err
 end
