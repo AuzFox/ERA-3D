@@ -23,6 +23,27 @@ global e3d = @record{}
 --[[ VM RAM logical memory map (WIP)
 	note: 1 vm word = 4 bytes
 
+	SYSTEM MEMORY (24 MiB):
+	heap      8 MiB
+	tmem      4 MiB
+	omem      3 MiB + 384 KiB
+	amem      8 KiB
+	wmem      7 MiB
+	smem    256 KiB
+	globals 256 KiB
+	locals  256 KiB
+	args    256 KiB
+
+	CART ROM (64 MiB):
+	tbank[0-3]  16 MiB
+	obank[0-3]  16 MiB
+	wbank[0-1]  14 MiB
+	sbank[0-7]   2 MiB
+	general ROM 16 MiB
+
+	MEMORY CARD (256 KiB):
+	general RAM 256 KiB
+
 	heap:      8 MiB
 	globals: 256 KiB           (65536 vm words)
 	locals:  256 KiB           (65536 vm words)
@@ -39,6 +60,7 @@ global e3d = @record{}
 		track state:      72 B           (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
 		unused:                          (the rest of the 256 KiB)
 	amem:     8 KiB (audio output buffer (2048 16bit stereo audio samples))
+
 	unused: 568 KiB
 	rom:     64 KiB (65536 bytes)
 	
@@ -68,20 +90,42 @@ global e3d.BYTECODE_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE      <comptime> = 256
 global e3d.API_FUNCS_SIZE      <comptime> = 65536
 global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
-global e3d.OMEM_SIZE           <comptime> = (3*1024*1024) + (640*1024) -- 3 MiB + 640 KiB
 
-global e3d.RAM_MAX_ADDR       <comptime> = 0x01FFFFFF
-global e3d.GLOBALS_START_ADDR <comptime> = e3d.HEAP_SIZE
-global e3d.LOCALS_START_ADDR  <comptime> = e3d.GLOBALS_START_ADDR + (e3d.GLOBALS_SIZE * 4)
-global e3d.ARGS_START_ADDR    <comptime> = e3d.LOCALS_START_ADDR + (e3d.LOCALS_SIZE * 4)
-global e3d.TMEM_START_ADDR    <comptime> = e3d.ARGS_START_ADDR + (e3d.ARGS_SIZE * 4)
-global e3d.OMEM_START_ADDR    <comptime> = e3d.TMEM_START_ADDR + (GPU_TMEM_SIZE * 4)
-global e3d.WMEM_START_ADDR    <comptime> = e3d.OMEM_START_ADDR + GPU_OMEM_SIZE
-global e3d.SMEM_START_ADDR    <comptime> = e3d.WMEM_START_ADDR + (SOUNDCHIP_WMEM_SIZE * 2)
-global e3d.AMEM_START_ADDR    <comptime> = e3d.SMEM_START_ADDR + SOUNDCHIP_SMEM_SIZE
-global e3d.UNUSED_START_ADDR  <comptime> = e3d.AMEM_START_ADDR + (SOUNDCHIP_AMEM_SIZE * 2)
-global e3d.ROM_START_ADDR     <comptime> = (e3d.RAM_MAX_ADDR + 1) - e3d.ROM_SIZE
+##[[
+local mem_regions = {
+	-- system memory
+	{name='HEAP',    size=8 * 1024 * 1024},
+	{name='TMEM',    size=GPU_TMEM_SIZE.value * 4},
+	{name='OMEM',    size=GPU_OMEM_SIZE.value},
+	{name='AMEM',    size=SOUNDCHIP_AMEM_SIZE.value * 2},
+	{name='UNUSED',  size=((4 * 1024 * 1024) - GPU_OMEM_SIZE.value) - (SOUNDCHIP_AMEM_SIZE.value * 2)},
+	{name='WMEM',    size=SOUNDCHIP_WMEM_SIZE.value * 2},
+	{name='SMEM',    size=SOUNDCHIP_SMEM_SIZE.value},
+	{name='GLOBALS', size=65536 * 4},
+	{name='LOCALS',  size=65536 * 4},
+	{name='ARGS',    size=65536 * 4},
 
+	-- cart data
+	{name='TBANK', size=16 * 1024 * 1024},
+	{name='OBANK', size=16 * 1024 * 1024},
+	{name='WBANK', size=14 * 1024 * 1024},
+	{name='SBANK', size= 2 * 1024 * 1024},
+	{name='ROM',   size=16 * 1024 * 1024},
+
+	-- memory card
+	{name='MEMCARD', size=256 * 1024}
+}
+]]
+
+-- global e3d.#|region.name..'_START_SIZE'|# <comptime> = #[region.size]#
+
+## local mem_region_offset = 0
+## for _ , region in ipairs(mem_regions) do
+	global e3d.#|region.name..'_START_ADDR'|# <comptime> = #[mem_region_offset]#
+	## mem_region_offset = mem_region_offset + region.size
+## end
+
+global e3d.RAM_MAX_ADDR <comptime> = #[mem_region_offset - 1]#
 global e3d.NULL <comptime> = 0xFFFFFFFF
 
 -- emulate a PS1-like controller

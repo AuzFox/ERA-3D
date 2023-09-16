@@ -32,7 +32,7 @@ global GPU_MODELVIEW <comptime> = 1
 global GPU_TMEM_WIDTH <comptime> = 1024
 global GPU_TMEM_HEIGHT <comptime> = 1024
 global GPU_TMEM_SIZE <comptime> = (GPU_TMEM_WIDTH * GPU_TMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
-global GPU_OMEM_SIZE <comptime> = (32768 * (36 * 3)) -- 32768 vertices
+global GPU_OMEM_SIZE <comptime> = (32768 * (36 * 3)) -- 32768 triangles
 
 -- holds graphics information for the vm
 global GPU = @record {
