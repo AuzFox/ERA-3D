@@ -69,24 +69,6 @@ local function run(): void
 	end
 end
 
-io.printf('HEAP:     0x%08X\n', e3d.HEAP_START_ADDR)
-io.printf('TMEM:     0x%08X\n', e3d.TMEM_START_ADDR)
-io.printf('OMEM:     0x%08X\n', e3d.OMEM_START_ADDR)
-io.printf('AMEM:     0x%08X\n', e3d.AMEM_START_ADDR)
-io.printf('UNUSED:   0x%08X\n', e3d.UNUSED_START_ADDR)
-io.printf('WMEM:     0x%08X\n', e3d.WMEM_START_ADDR)
-io.printf('SMEM:     0x%08X\n', e3d.SMEM_START_ADDR)
-io.printf('GLOBALS:  0x%08X\n', e3d.GLOBALS_START_ADDR)
-io.printf('LOCALS:   0x%08X\n', e3d.LOCALS_START_ADDR)
-io.printf('ARGS:     0x%08X\n', e3d.ARGS_START_ADDR)
-io.printf('TBANK:    0x%08X\n', e3d.TBANK_START_ADDR)
-io.printf('OBANK:    0x%08X\n', e3d.OBANK_START_ADDR)
-io.printf('WBANK:    0x%08X\n', e3d.WBANK_START_ADDR)
-io.printf('SBANK:    0x%08X\n', e3d.SBANK_START_ADDR)
-io.printf('ROM:      0x%08X\n', e3d.ROM_START_ADDR)
-io.printf('MEMCARD:  0x%08X\n', e3d.MEMCARD_START_ADDR)
-io.printf('MAX_ADDR: 0x%08X\n', e3d.RAM_MAX_ADDR)
-
 if #arg == 1 then
 	init()
 	run()

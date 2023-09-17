@@ -20,63 +20,35 @@ global e3d = @record{}
 --                         --
 -----------------------------
 
---[[ VM RAM logical memory map (WIP)
+--[[ VM logical memory map
 	note: 1 vm word = 4 bytes
 
-	SYSTEM MEMORY (24 MiB):
-	heap      8 MiB
-	tmem      4 MiB
-	omem      3 MiB + 384 KiB
-	amem      8 KiB
-	wmem      7 MiB
-	smem    256 KiB
-	globals 256 KiB
-	locals  256 KiB
-	args    256 KiB
-
-	CART ROM (64 MiB):
-	tbank[0-3]  16 MiB
-	obank[0-3]  16 MiB
-	wbank[0-1]  14 MiB
-	sbank[0-7]   2 MiB
-	general ROM 16 MiB
-
-	MEMORY CARD (256 KiB):
-	general RAM 256 KiB
-
-	heap:      8 MiB
-	globals: 256 KiB           (65536 vm words)
-	locals:  256 KiB           (65536 vm words)
-	args:    256 KiB           (65536 vm words)
-	tmem:      4 MiB           (1024*1024 pixels (32BPP))
-	omem:      3 MiB + 384 KiB (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-	wmem:     15 MiB           (~2min 58s of audio wave data (22050hz, 16bit, stereo))
-	smem:    256 KiB           (sfx/music tracker data)
-		song data:         2 KiB         (256 * 8 bytes)
-		pattern data:    128 KiB         (256 * 64 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
-		instrument data:   2 KiB + 512 B (256 * 10 bytes (sample start (24bit), sample end(24bit), attack, decay, sustain, release))
-		groove data:     256 B           (16 * 16 bytes)
-		audio state:       1 B           (1 byte (track playing flags))
-		track state:      72 B           (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
-		unused:                          (the rest of the 256 KiB)
-	amem:     8 KiB (audio output buffer (2048 16bit stereo audio samples))
-
-	unused: 568 KiB
-	rom:     64 KiB (65536 bytes)
-	
-	TOTAL: 32 MiB
-
-	0x00000000 - 0x007FFFFF: heap
-	0x00800000 - 0x0083FFFF: globals
-	0x00840000 - 0x0087FFFF: locals
-	0x00880000 - 0x008BFFFF: args
-	0x008C0000 - 0x00CBFFFF: tmem
-	0x00CC0000 - 0x0101FFFF: omem
-	0x01020000 - 0x01F1FFFF: wmem
-	0x01F20000 - 0x01F2FFFF: smem
-	0x01F30000 - 0x01F31FFF: amem
-	0x01F32000 - 0x01FEFFFF: unused
-	0x01FF0000 - 0x01FFFFFF: rom
+	SYSTEM MEMORY:
+		HEAP                (8MiB         ) 0x00000000 - 0x007FFFFF (general purpose RAM)
+		TMEM                (4MiB         ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
+		OMEM                (3MiB + 384KiB) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		AMEM                (8KiB         ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
+		UNUSED              (???KiB       ) 0x00F62000 - 0x00FFFFFF (unused)
+		WMEM                (7MiB         ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
+		SMEM                (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
+			song data       (2KiB         )                         (256 * 8 bytes)
+			pattern data    (128KiB       )                         (256 * 64 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
+			instrument data (2KiB + 512B  )                         (256 * 10 bytes (sample start (24bit), sample end(24bit), attack, decay, sustain, release))
+			groove data     (256B         )                         (16 * 16 bytes)
+			audio state     (1B           )                         (1 byte (track playing flags))
+			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
+			unused          (???KiB + ???B)                         (unused)
+		GLOBALS             (256KiB       ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
+		LOCALS              (256KiB       ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
+		ARGS                (256KiB       ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
+	CART ROM:
+		TBANK[0-3]          (16MiB        ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
+		OBANK[0-3]          (16MiB        ) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		WBANK[0-3]          (14MiB        ) 0x03800000 - 0x045FFFFF (4x wav data buffers (22050hz, 16bit, stereo))
+		SBANK[0-7]          (2MiB         ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
+		ROM                 (16MiB        ) 0x04800000 - 0x057FFFFF (string data + user ROM)
+	MEMORY CARD:
+		MEMCARD             (256KiB       ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
 ]]
 
 -- memory size and address constants
@@ -122,7 +94,10 @@ local mem_regions = {
 ## local mem_region_offset = 0
 ## for _ , region in ipairs(mem_regions) do
 	global e3d.#|region.name..'_START_ADDR'|# <comptime> = #[mem_region_offset]#
+
 	## mem_region_offset = mem_region_offset + region.size
+	
+	global e3d.#|region.name..'_MAX_ADDR'|# <comptime> = #[mem_region_offset - 1]#
 ## end
 
 global e3d.RAM_MAX_ADDR <comptime> = #[mem_region_offset - 1]#

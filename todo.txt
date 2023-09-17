@@ -1,5 +1,5 @@
 GENERAL:
-- cleanup+refactor nasty code (looking at you, operator_type_check())
+- cleanup+refactor nasty code (looking at you, operatorTypeCheck())
 - implement safeguards on everything
 
 COMPILER:
@@ -27,7 +27,6 @@ VM:
 - implement cycle limit (how to deal with incomplete calls?)
 
 HOST:
-- rewrite main.nelua
 - implement debugger
 - implement boot animation
 - implement model loading

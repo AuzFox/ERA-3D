@@ -264,22 +264,11 @@ local function setEVMValueByte(array: *[0]e3d.EVMValue, segment_start: uint32, a
 	v.u = (v.u & (0xFF000000 >> shift)) | (((@uint32)(val) << 24) >> shift)
 end
 
--- get one byte from the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:getRAM8(addr: uint32): uint8
-	if addr < e3d.GLOBALS_START_ADDR then
-		-- heap
+-- get one byte from the vm memory, does not do bounds or alignment checking!
+function e3d.EVM:getMem8(addr: uint32): uint8
+	if addr <= e3d.HEAP_MAX_ADDR then
 		return self.heap[addr]
-	elseif addr < e3d.LOCALS_START_ADDR then
-		-- globals
-		return getEVMValueBtye(&self.globals, e3d.GLOBALS_START_ADDR, addr)
-	elseif addr < e3d.ARGS_START_ADDR then
-		-- locals
-		return getEVMValueBtye(&self.locals, e3d.LOCALS_START_ADDR, addr)
-	elseif addr < e3d.TMEM_START_ADDR then
-		-- args
-		return getEVMValueBtye(&self.args, e3d.ARGS_START_ADDR, addr)
-	elseif addr < e3d.OMEM_START_ADDR then
-		-- tmem
+	elseif addr <= e3d.TMEM_MAX_ADDR then
 		local col: *rl.color = &self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
 
 		switch addr & 0b11 do
@@ -295,47 +284,46 @@ function e3d.EVM:getRAM8(addr: uint32): uint8
 				-- should not happen
 				return 0
 		end
-	elseif addr < e3d.WMEM_START_ADDR then
-		-- omem
+	elseif addr <= e3d.OMEM_MAX_ADDR then
 		return self.gpu.omem[addr - e3d.OMEM_START_ADDR]
-	elseif addr < e3d.SMEM_START_ADDR then
-		-- wmem
-		local frame: uint16 = self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2]
-
-		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
-	elseif addr < e3d.AMEM_START_ADDR then
-		-- smem
-		return self.soundchip.smem[addr - e3d.SMEM_START_ADDR]
-	elseif addr < e3d.UNUSED_START_ADDR then
-		-- amem
+	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame: uint16 = self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2]
-
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
-	elseif addr < e3d.ROM_START_ADDR then
-		-- unused
+	elseif addr <= e3d.UNUSED_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.WMEM_MAX_ADDR then
+		local frame: uint16 = self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2]
+		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
+	elseif addr <= e3d.SMEM_MAX_ADDR then
+		return self.soundchip.smem[addr - e3d.SMEM_START_ADDR]
+	elseif addr <= e3d.GLOBALS_MAX_ADDR then
+		return getEVMValueBtye(&self.globals, e3d.GLOBALS_START_ADDR, addr)
+	elseif addr <= e3d.LOCALS_MAX_ADDR then
+		return getEVMValueBtye(&self.locals, e3d.LOCALS_START_ADDR, addr)
+	elseif addr <= e3d.ARGS_MAX_ADDR then
+		return getEVMValueBtye(&self.args, e3d.ARGS_START_ADDR, addr)
+	elseif addr <= e3d.TBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.OBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.WBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.SBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.ROM_MAX_ADDR then
+		return self.rom[addr - e3d.ROM_START_ADDR]
+	elseif addr <= e3d.MEMCARD_MAX_ADDR then
 		return 0
 	else
-		-- rom
-		return self.rom[addr - e3d.ROM_START_ADDR]
+		return 0
 	end
 end
 
--- set one byte in the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:setRAM8(addr: uint32, val: uint8): boolean
-	if addr < e3d.GLOBALS_START_ADDR then
-		-- heap
+-- set one byte in the vm memory, does not do bounds or alignment checking!
+function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean
+	if addr <= e3d.HEAP_MAX_ADDR then
 		self.heap[addr] = val
-	elseif addr < e3d.LOCALS_START_ADDR then
-		-- globals
-		setEVMValueByte(&self.globals, e3d.GLOBALS_START_ADDR, addr, val)
-	elseif addr < e3d.ARGS_START_ADDR then
-		-- locals
-		setEVMValueByte(&self.locals, e3d.LOCALS_START_ADDR, addr, val)
-	elseif addr < e3d.TMEM_START_ADDR then
-		-- args
-		setEVMValueByte(&self.args, e3d.ARGS_START_ADDR, addr, val)
-	elseif addr < e3d.OMEM_START_ADDR then
-		-- tmem
+	elseif addr <= e3d.TMEM_MAX_ADDR then
 		local col: *rl.color = &self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
 
 		switch addr & 0b11 do
@@ -349,104 +337,102 @@ function e3d.EVM:setRAM8(addr: uint32, val: uint8): boolean
 				col.a = (@cuchar)(val)
 		end
 		self.gpu.update_tex = true
-	elseif addr < e3d.WMEM_START_ADDR then
-		-- omem
+	elseif addr <= e3d.OMEM_MAX_ADDR then
 		self.gpu.omem[addr - e3d.OMEM_START_ADDR] = val
-	elseif addr < e3d.SMEM_START_ADDR then
-		-- wmem
-		local frame: *uint16 = (@*uint16)(&self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2])
-		local shift: uinteger = 8 * (addr & 1)
-
-		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
-	elseif addr < e3d.AMEM_START_ADDR then
-		-- smem
-		self.soundchip.smem[addr - e3d.SMEM_START_ADDR] = val
-	elseif addr < e3d.UNUSED_START_ADDR then
-		-- amem
+	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame: *uint16 = (@*uint16)(&self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2])
 		local shift: uinteger = 8 * (addr & 1)
-
 		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
-	elseif addr < e3d.ROM_START_ADDR then
-		-- unused
+	elseif addr <= e3d.UNUSED_MAX_ADDR then
+		return true
+	elseif addr <= e3d.WMEM_MAX_ADDR then
+		local frame: *uint16 = (@*uint16)(&self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2])
+		local shift: uinteger = 8 * (addr & 1)
+		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
+	elseif addr <= e3d.SMEM_MAX_ADDR then
+		self.soundchip.smem[addr - e3d.SMEM_START_ADDR] = val
+	elseif addr <= e3d.GLOBALS_MAX_ADDR then
+		setEVMValueByte(&self.globals, e3d.GLOBALS_START_ADDR, addr, val)
+	elseif addr <= e3d.LOCALS_MAX_ADDR then
+		setEVMValueByte(&self.locals, e3d.LOCALS_START_ADDR, addr, val)
+	elseif addr <= e3d.ARGS_MAX_ADDR then
+		setEVMValueByte(&self.args, e3d.ARGS_START_ADDR, addr, val)
+	elseif addr <= e3d.TBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.OBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.WBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.SBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.ROM_MAX_ADDR then
+		return false
+	elseif addr <= e3d.MEMCARD_MAX_ADDR then
 		return true
 	else
-		-- rom
 		return false
 	end
 
 	return true
 end
 
--- get one word from the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:getRAM32(addr: uint32): uint32
-	if addr < e3d.GLOBALS_START_ADDR then
-		-- heap
+-- get one word from the vm memory, does not do bounds or alignment checking!
+function e3d.EVM:getMem32(addr: uint32): uint32
+	if addr <= e3d.HEAP_MAX_ADDR then
 		return ((@uint32)(self.heap[addr]) << 24) | ((@uint32)(self.heap[addr + 1]) << 16) | ((@uint32)(self.heap[addr + 2]) << 8) | (@uint32)(self.heap[addr + 3])
-	elseif addr < e3d.LOCALS_START_ADDR then
-		-- globals
-		return self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u
-	elseif addr < e3d.ARGS_START_ADDR then
-		-- locals
-		return self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u
-	elseif addr < e3d.TMEM_START_ADDR then
-		-- args
-		return self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u
-	elseif addr < e3d.OMEM_START_ADDR then
-		-- tmem
+	elseif addr <= e3d.TMEM_MAX_ADDR then
 		local col: rl.color = self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
 		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
-	elseif addr < e3d.WMEM_START_ADDR then
-		-- omem
+	elseif addr <= e3d.OMEM_MAX_ADDR then
 		addr = addr - e3d.OMEM_START_ADDR
 		return ((@uint32)(self.gpu.omem[addr]) << 24) | ((@uint32)(self.gpu.omem[addr + 1]) << 16) | ((@uint32)(self.gpu.omem[addr + 2]) << 8) | (@uint32)(self.gpu.omem[addr + 3])
-	elseif addr < e3d.SMEM_START_ADDR then
-		-- wmem
-		local index: uinteger = (addr - e3d.WMEM_START_ADDR) /// 2
-		local frame0: uint32 = (@uint32)(self.soundchip.wmem[index])
-		local frame1: uint32 = (@uint32)(self.soundchip.wmem[index + 1])
-
-		return (frame0 << 16) | frame1
-	elseif addr < e3d.AMEM_START_ADDR then
-		-- smem
-		addr = addr - e3d.SMEM_START_ADDR
-		return ((@uint32)(self.soundchip.smem[addr]) << 24) | ((@uint32)(self.soundchip.smem[addr + 1]) << 16) | ((@uint32)(self.soundchip.smem[addr + 2]) << 8) | (@uint32)(self.soundchip.smem[addr + 3])
-	elseif addr < e3d.UNUSED_START_ADDR then
-		-- amem
+	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local index: uinteger = (addr - e3d.AMEM_START_ADDR) /// 2
 		local frame0: uint32 = (@uint32)(self.soundchip.amem[index])
 		local frame1: uint32 = (@uint32)(self.soundchip.amem[index + 1])
-
 		return (frame0 << 16) | frame1
-	elseif addr < e3d.ROM_START_ADDR then
-		-- unused
+	elseif addr <= e3d.UNUSED_MAX_ADDR then
 		return 0
-	else
-		-- rom
+	elseif addr <= e3d.WMEM_MAX_ADDR then
+		local index: uinteger = (addr - e3d.WMEM_START_ADDR) /// 2
+		local frame0: uint32 = (@uint32)(self.soundchip.wmem[index])
+		local frame1: uint32 = (@uint32)(self.soundchip.wmem[index + 1])
+		return (frame0 << 16) | frame1
+	elseif addr <= e3d.SMEM_MAX_ADDR then
+		addr = addr - e3d.SMEM_START_ADDR
+		return ((@uint32)(self.soundchip.smem[addr]) << 24) | ((@uint32)(self.soundchip.smem[addr + 1]) << 16) | ((@uint32)(self.soundchip.smem[addr + 2]) << 8) | (@uint32)(self.soundchip.smem[addr + 3])
+	elseif addr <= e3d.GLOBALS_MAX_ADDR then
+		return self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u
+	elseif addr <= e3d.LOCALS_MAX_ADDR then
+		return self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u
+	elseif addr <= e3d.ARGS_MAX_ADDR then
+		return self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u
+	elseif addr <= e3d.TBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.OBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.WBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.SBANK_MAX_ADDR then
+		return 0
+	elseif addr <= e3d.ROM_MAX_ADDR then
 		addr = addr - e3d.ROM_START_ADDR
 		return ((@uint32)(self.rom[addr]) << 24) | ((@uint32)(self.rom[addr + 1]) << 16) | ((@uint32)(self.rom[addr + 2]) << 8) | (@uint32)(self.rom[addr + 3])
+	elseif addr <= e3d.MEMCARD_MAX_ADDR then
+		return 0
+	else
+		return 0
 	end
 end
 
--- set one word in the vm RAM, does not do bounds or alignment checking!
-function e3d.EVM:setRAM32(addr: uint32, val: uint32): boolean
-	if addr < e3d.GLOBALS_START_ADDR then
-		-- heap
+-- set one word in the vm memory, does not do bounds or alignment checking!
+function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
+	if addr <= e3d.HEAP_MAX_ADDR then
 		self.heap[addr] = val >> 24
 		self.heap[addr + 1] = (val & 0xFF0000) >> 16
 		self.heap[addr + 2] = (val & 0x00FF00) >> 8
 		self.heap[addr + 3] = val & 0xFF
-	elseif addr < e3d.LOCALS_START_ADDR then
-		-- globals
-		self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u = val
-	elseif addr < e3d.ARGS_START_ADDR then
-		-- locals
-		self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u = val
-	elseif addr < e3d.TMEM_START_ADDR then
-		-- args
-		self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u = val
-	elseif addr < e3d.OMEM_START_ADDR then
-		-- tmem
+	elseif addr <= e3d.TMEM_MAX_ADDR then
 		local col: rl.color
 		addr = (addr - e3d.TMEM_START_ADDR) /// 4
 		col.r = val >> 24
@@ -455,39 +441,51 @@ function e3d.EVM:setRAM32(addr: uint32, val: uint32): boolean
 		col.a = val & 0xFF
 		self.gpu.tmem[addr] = col
 		self.gpu.update_tex = true
-	elseif addr < e3d.WMEM_START_ADDR then
-		-- omem
+	elseif addr <= e3d.OMEM_MAX_ADDR then
 		addr = (addr - e3d.OMEM_START_ADDR) /// 4
 		self.gpu.omem[addr] = val >> 24
 		self.gpu.omem[addr + 1] = (val & 0xFF0000) >> 16
 		self.gpu.omem[addr + 2] = (val & 0x00FF00) >> 8
 		self.gpu.omem[addr + 3] = val & 0xFF
-	elseif addr < e3d.SMEM_START_ADDR then
-		-- wmem
-		local frame0: uint16 = val >> 16
-		local frame1: uint16 = val & 0xFFFF
-		addr = (addr - e3d.WMEM_START_ADDR) /// 2
-		self.soundchip.wmem[addr] = frame0
-		self.soundchip.wmem[addr + 1] = frame1
-	elseif addr < e3d.AMEM_START_ADDR then
-		-- smem
-		addr = (addr - e3d.SMEM_START_ADDR) /// 4
-		self.soundchip.smem[addr] = val >> 24
-		self.soundchip.smem[addr + 1] = (val & 0xFF0000) >> 16
-		self.soundchip.smem[addr + 2] = (val & 0x00FF00) >> 8
-		self.soundchip.smem[addr + 3] = val & 0xFF
-	elseif addr < e3d.UNUSED_START_ADDR then
-		-- amem
+	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame0: uint16 = val >> 16
 		local frame1: uint16 = val & 0xFFFF
 		addr = (addr - e3d.AMEM_START_ADDR) /// 2
 		self.soundchip.amem[addr] = frame0
 		self.soundchip.amem[addr + 1] = frame1
-	elseif addr < e3d.ROM_START_ADDR then
-		-- unused
+	elseif addr <= e3d.UNUSED_MAX_ADDR then
+		return true
+	elseif addr <= e3d.WMEM_MAX_ADDR then
+		local frame0: uint16 = val >> 16
+		local frame1: uint16 = val & 0xFFFF
+		addr = (addr - e3d.WMEM_START_ADDR) /// 2
+		self.soundchip.wmem[addr] = frame0
+		self.soundchip.wmem[addr + 1] = frame1
+	elseif addr <= e3d.SMEM_MAX_ADDR then
+		addr = (addr - e3d.SMEM_START_ADDR) /// 4
+		self.soundchip.smem[addr] = val >> 24
+		self.soundchip.smem[addr + 1] = (val & 0xFF0000) >> 16
+		self.soundchip.smem[addr + 2] = (val & 0x00FF00) >> 8
+		self.soundchip.smem[addr + 3] = val & 0xFF
+	elseif addr <= e3d.GLOBALS_MAX_ADDR then
+		self.globals[(addr - e3d.GLOBALS_START_ADDR) /// 4].u = val
+	elseif addr <= e3d.LOCALS_MAX_ADDR then
+		self.locals[(addr - e3d.LOCALS_START_ADDR) /// 4].u = val
+	elseif addr <= e3d.ARGS_MAX_ADDR then
+		self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u = val
+	elseif addr <= e3d.TBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.OBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.WBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.SBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.ROM_MAX_ADDR then
+		return false
+	elseif addr <= e3d.MEMCARD_MAX_ADDR then
 		return true
 	else
-		-- rom
 		return false
 	end
 
@@ -949,7 +947,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 				
-				self:pushU(self:getRAM32((@uint32)(ptr + (@int32)(index) * 4)))
+				self:pushU(self:getMem32((@uint32)(ptr + (@int32)(index) * 4)))
 			case e3d.Opcode.GET_MX then
 				index = self:next16() -- offset in words
 				local size: uint16 = self:next16()
@@ -972,7 +970,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 					end
 					
-					self:pushU(self:getRAM32(addr))
+					self:pushU(self:getMem32(addr))
 				end
 			case e3d.Opcode.SET_M then
 				index = self:next16() -- offset in words
@@ -987,7 +985,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 				
-				if not self:setRAM32((@uint32)(ptr + (@int32)(index) * 4), v) then
+				if not self:setMem32((@uint32)(ptr + (@int32)(index) * 4), v) then
 					self.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", ptr)
 					return false
 				end
@@ -1019,7 +1017,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 						return false
 					end
 					
-					self:setRAM32(mem_addr, self.opstack[struct_word_index].u)
+					self:setMem32(mem_addr, self.opstack[struct_word_index].u)
 				end
 
 				self.osp = (self.osp - 1) - size -- pop ptr and struct from stack
@@ -1034,7 +1032,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 			
-				self:pushU(self:getRAM8(addr))
+				self:pushU(self:getMem8(addr))
 			case e3d.Opcode.SET_S then
 				local c: uint8 = (@uint8)(self:popU() & 0xFF)
 				local i: uint32 = self:popU()
@@ -1047,7 +1045,7 @@ function e3d.EVM:run(cycles: uinteger): boolean
 					return false
 				end
 			
-				if not self:setRAM8(addr, c) then
+				if not self:setMem8(addr, c) then
 					self.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
 					return false
 				end
@@ -1412,14 +1410,14 @@ function e3d.EVM:run(cycles: uinteger): boolean
 								return false
 							end
 						
-							ac = self:getRAM8(a_addr)
+							ac = self:getMem8(a_addr)
 
 							if b_addr > e3d.RAM_MAX_ADDR then
 								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
 								return false
 							end
 						
-							bc = self:getRAM8(b_addr)
+							bc = self:getMem8(b_addr)
 
 							if ac ~= bc then
 								result = 0
@@ -1480,14 +1478,14 @@ function e3d.EVM:run(cycles: uinteger): boolean
 								return false
 							end
 						
-							ac = self:getRAM8(a_addr)
+							ac = self:getMem8(a_addr)
 
 							if b_addr > e3d.RAM_MAX_ADDR then
 								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
 								return false
 							end
 						
-							bc = self:getRAM8(b_addr)
+							bc = self:getMem8(b_addr)
 
 							if ac ~= bc then
 								result = 1

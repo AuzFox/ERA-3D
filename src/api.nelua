@@ -13,10 +13,10 @@ function e3d.EVM:pushV2(val: rl.vector2): void <forwarddecl> end
 function e3d.EVM:pushV3(val: rl.vector3): void <forwarddecl> end
 function e3d.EVM:pushStr(val: e3d.EVMString): void <forwarddecl> end
 
-function e3d.EVM:getRAM8(addr: uint32): uint8 <forwarddecl> end
-function e3d.EVM:setRAM8(addr: uint32, val: uint8): boolean <forwarddecl> end
-function e3d.EVM:getRAM32(addr: uint32): uint32 <forwarddecl> end
-function e3d.EVM:setRAM32(addr: uint32, val: uint32): boolean <forwarddecl> end
+function e3d.EVM:getMem8(addr: uint32): uint8 <forwarddecl> end
+function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean <forwarddecl> end
+function e3d.EVM:getMem32(addr: uint32): uint32 <forwarddecl> end
+function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 
 --[[
 	API FUNCTIONS TO IMPLEMENT:
@@ -59,20 +59,20 @@ end
 
 -- API FUNCTIONS:
 
--- getRAM8() helper function for apiPrint2D()
-local function getRAM8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
+-- getMem8() helper function for apiPrint2D()
+local function getMem8(vm: *e3d.EVM, addr: uint32, c: *uint8): boolean
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
 		return false
 	end
 
-	$c = vm:getRAM8(addr)
+	$c = vm:getMem8(addr)
 
 	return true
 end
 
--- getRAM32() helper function for apiPrint2D()
-local function getRAM32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
+-- getMem32() helper function for apiPrint2D()
+local function getMem32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
 	if addr > e3d.RAM_MAX_ADDR then
 		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
 		return false
@@ -81,7 +81,7 @@ local function getRAM32(vm: *e3d.EVM, addr: uint32, v: *uint32): boolean
 		return false
 	end
 
-	$v = vm:getRAM32(addr)
+	$v = vm:getMem32(addr)
 
 	return true
 end
@@ -144,10 +144,10 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 
 		addr = start_addr + i
 
-		if not getRAM8(vm, addr, &c) then return false end
+		if not getMem8(vm, addr, &c) then return false end
 		
 		if c == '%'_u8 then
-			if not getRAM8(vm, addr + 1, &c) then return false end
+			if not getMem8(vm, addr + 1, &c) then return false end
 
 			switch c do
 				case 'i'_u8, 'd'_u8 then
@@ -157,7 +157,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 					end
 
 					arg_addr = vargv(vm, 1)
-					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.i)
@@ -180,7 +180,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 					end
 
 					arg_addr = vargv(vm, 1)
-					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.u)
@@ -203,7 +203,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 					end
 
 					arg_addr = vargv(vm, 1)
-					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08x", arg_val0.u)
@@ -226,7 +226,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 					end
 
 					arg_addr = vargv(vm, 1)
-					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08X", arg_val0.u)
@@ -249,7 +249,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 					end
 
 					arg_addr = vargv(vm, 1)
-					if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%.2f", arg_val0.f)
@@ -266,7 +266,7 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 
 					i = i + 1
 				case 'v'_u8 then
-					if not getRAM8(vm, addr + 2, &c) then return false end
+					if not getMem8(vm, addr + 2, &c) then return false end
 
 					switch c do
 						case '2'_u8 then
@@ -276,8 +276,8 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 							end
 		
 							arg_addr = vargv(vm, 2)
-							if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
-							if not getRAM32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+							if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f)", arg_val0.f, arg_val1.f)
@@ -300,9 +300,9 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 							end
 		
 							arg_addr = vargv(vm, 3)
-							if not getRAM32(vm, arg_addr, &arg_val0.u) then return false end
-							if not getRAM32(vm, arg_addr + 4, &arg_val1.u) then return false end
-							if not getRAM32(vm, arg_addr + 8, &arg_val2.u) then return false end
+							if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+							if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							if not getMem32(vm, arg_addr + 8, &arg_val2.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f, %.2f)", arg_val0.f, arg_val1.f, arg_val2.f)
@@ -2012,7 +2012,7 @@ local function apiPeek8(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	vm:pushU(vm:getRAM8(addr))
+	vm:pushU(vm:getMem8(addr))
 
 	return true
 end
@@ -2029,7 +2029,7 @@ local function apiPoke8(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	if not vm:setRAM8(addr, val) then
+	if not vm:setMem8(addr, val) then
 		vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
 		return false
 	end
@@ -2051,7 +2051,7 @@ local function apiPeek32(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	vm:pushU(vm:getRAM32(addr))
+	vm:pushU(vm:getMem32(addr))
 
 	return true
 end
@@ -2071,7 +2071,7 @@ local function apiPoke32(vm: *e3d.EVM): boolean
 		return false
 	end
 
-	if not vm:setRAM32(addr, val) then
+	if not vm:setMem32(addr, val) then
 		vm.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", addr)
 		return false
 	end
@@ -2115,9 +2115,9 @@ local function apiMemcpy(vm: *e3d.EVM): boolean
 		dest = dest + (nbytes - 1)
 
 		for i = 0, < nbytes do
-			local byte: uint8 = vm:getRAM8(src)
+			local byte: uint8 = vm:getMem8(src)
 
-			if not vm:setRAM8(dest, byte) then
+			if not vm:setMem8(dest, byte) then
 				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 				return false
 			end
@@ -2128,9 +2128,9 @@ local function apiMemcpy(vm: *e3d.EVM): boolean
 	else
 		-- copy from the beginning
 		for i = 0, < nbytes do
-			local byte: uint8 = vm:getRAM8(src)
+			local byte: uint8 = vm:getMem8(src)
 
-			if not vm:setRAM8(dest, byte) then
+			if not vm:setMem8(dest, byte) then
 				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 				return false
 			end
@@ -2162,7 +2162,7 @@ local function apiMemset(vm: *e3d.EVM): boolean
 	end
 
 	for i = 0, < nbytes do
-		if not vm:setRAM8(dest, value) then
+		if not vm:setMem8(dest, value) then
 			vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
 			return false
 		end
