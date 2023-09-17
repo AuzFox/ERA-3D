@@ -1820,6 +1820,31 @@ local function apiSprite2DEx(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function apiDrawModel(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void drawModel(int mode, int start, int n);
+
+	local start: uint32 = vm:getArgU(0)
+	local n: uint32 = vm:getArgU(1)
+
+	vm.gpu:drawModel(GPU_TRIANGLES, start, n)
+
+	return true
+end
+
+local function apiDrawModelEx(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void drawModelEx(int mode, int start, int n);
+
+	local mode: uint32 = vm:getArgU(0)
+	local start: uint32 = vm:getArgU(1)
+	local n: uint32 = vm:getArgU(2)
+
+	vm.gpu:drawModel(mode, start, n)
+
+	return true
+end
+
 local function apiBeginMesh(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void beginMesh(int mode);
@@ -2677,6 +2702,25 @@ function e3d.EVM:registerAPI(): void
 				{type_id=e3d.EVMType.INT}
 			},
 			func=apiSprite2DEx
+		},
+		{
+			name="drawModel",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=apiDrawModel
+		},
+		{
+			name="drawModelEx",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT},
+				{type_id=e3d.EVMType.INT}
+			},
+			func=apiDrawModelEx
 		},
 
 		{

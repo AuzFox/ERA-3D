@@ -442,7 +442,7 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
 		self.gpu.tmem[addr] = col
 		self.gpu.update_tex = true
 	elseif addr <= e3d.OMEM_MAX_ADDR then
-		addr = (addr - e3d.OMEM_START_ADDR) /// 4
+		addr = addr - e3d.OMEM_START_ADDR
 		self.gpu.omem[addr] = val >> 24
 		self.gpu.omem[addr + 1] = (val & 0xFF0000) >> 16
 		self.gpu.omem[addr + 2] = (val & 0x00FF00) >> 8
@@ -462,7 +462,7 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
 		self.soundchip.wmem[addr] = frame0
 		self.soundchip.wmem[addr + 1] = frame1
 	elseif addr <= e3d.SMEM_MAX_ADDR then
-		addr = (addr - e3d.SMEM_START_ADDR) /// 4
+		addr = addr - e3d.SMEM_START_ADDR
 		self.soundchip.smem[addr] = val >> 24
 		self.soundchip.smem[addr + 1] = (val & 0xFF0000) >> 16
 		self.soundchip.smem[addr + 2] = (val & 0x00FF00) >> 8

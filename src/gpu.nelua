@@ -64,9 +64,6 @@ global GPU = @record {
 	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
 	triangle_mode: boolean,
 	triangle_vert_index: integer,
-	triangle_vert_color: rl.color,
-	triangle_vert_uv: rl.vector2,
-	triangle_vert_pos: rl.vector3,
 
 	proj_matrix_count: uinteger, -- used to track matrix stack
 	view_matrix_count: uinteger, -- used to track matrix stack
@@ -86,6 +83,18 @@ global GPU = @record {
 	fog_color: rl.vector4,
 	viewport_w: cint,
 	viewport_h: cint
+}
+
+global Vertex = @record {
+	pos: rl.vector3,
+	normal: rl.vector3,
+	uv: rl.vector2,
+	col: uint32,
+}
+
+local IntFloat = @union {
+	u: uint32,
+	f: float32
 }
 
 function GPU:clear(col: uint32): void
@@ -208,21 +217,11 @@ function GPU:vertex(v: rl.vector3): void
 	if self.triangle_mode then
 		if self.triangle_vert_index == 0 then
 			-- send copy of first vertex to allow textured tris
-			rlgl.color4ub(
-				self.triangle_vert_color.r,
-				self.triangle_vert_color.g,
-				self.triangle_vert_color.b,
-				self.triangle_vert_color.a
-			)
-			rlgl.texCoord2f(
-				self.triangle_vert_uv.x,
-				self.triangle_vert_uv.y
-			)
 			rlgl.vertex3f(v.x, v.y, v.z)
 		end
 
 		self.triangle_vert_index = self.triangle_vert_index + 1
-		if self.triangle_vert_index >= 2 then
+		if self.triangle_vert_index > 2 then
 			self.triangle_vert_index = 0
 		end
 	end
@@ -234,21 +233,11 @@ function GPU:vertex2D(v: rl.vector2): void
 	if self.triangle_mode then
 		if self.triangle_vert_index == 0 then
 			-- send copy of first vertex to allow textured tris
-			rlgl.color4ub(
-				self.triangle_vert_color.r,
-				self.triangle_vert_color.g,
-				self.triangle_vert_color.b,
-				self.triangle_vert_color.a
-			)
-			rlgl.texCoord2f(
-				self.triangle_vert_uv.x,
-				self.triangle_vert_uv.y
-			)
 			rlgl.vertex2f(v.x, v.y)
 		end
 
 		self.triangle_vert_index = self.triangle_vert_index + 1
-		if self.triangle_vert_index >= 2 then
+		if self.triangle_vert_index > 2 then
 			self.triangle_vert_index = 0
 		end
 	end
@@ -256,10 +245,6 @@ end
 
 function GPU:vertUV(v: rl.vector2): void
 	rlgl.texCoord2f(v.x, v.y)
-
-	if self.triangle_mode and (self.triangle_vert_index == 0) then
-		self.triangle_vert_uv = v
-	end
 end
 
 function GPU:vertColor(col: uint32): void
@@ -269,10 +254,6 @@ function GPU:vertColor(col: uint32): void
 	local a: cuchar = (@cuchar)(col & 0xFF)
 	
 	rlgl.color4ub(r, g, b, a)
-
-	if self.triangle_mode and (self.triangle_vert_index == 0) then
-		self.triangle_vert_color = {r, g, b, a}
-	end
 end
 
 function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
@@ -419,16 +400,49 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
-function GPU:drawModelEx(start: uint32, mode: uint32, n: uint32): void
-	--[[
+function GPU:getOMEMVertex(index: uint32): Vertex
+	local v: Vertex
+	local byte_index: uinteger = index * 36
+	local ptr: *[0]uint8 = &self.omem[byte_index]
+
+	-- get position
+	local temp: IntFloat
+	temp.u = ((@uint32)(ptr[0]) << 24) | ((@uint32)(ptr[1]) << 16) | ((@uint32)(ptr[2]) << 8) | (@uint32)(ptr[3])
+	v.pos.x = temp.f
+	temp.u = ((@uint32)(ptr[4]) << 24) | ((@uint32)(ptr[5]) << 16) | ((@uint32)(ptr[6]) << 8) | (@uint32)(ptr[7])
+	v.pos.y = temp.f
+	temp.u = ((@uint32)(ptr[8]) << 24) | ((@uint32)(ptr[9]) << 16) | ((@uint32)(ptr[10]) << 8) | (@uint32)(ptr[11])
+	v.pos.z = temp.f
+
+	-- get normal
+	temp.u = ((@uint32)(ptr[12]) << 24) | ((@uint32)(ptr[13]) << 16) | ((@uint32)(ptr[14]) << 8) | (@uint32)(ptr[15])
+	v.normal.x = temp.f
+	temp.u = ((@uint32)(ptr[16]) << 24) | ((@uint32)(ptr[17]) << 16) | ((@uint32)(ptr[18]) << 8) | (@uint32)(ptr[19])
+	v.normal.y = temp.f
+	temp.u = ((@uint32)(ptr[20]) << 24) | ((@uint32)(ptr[21]) << 16) | ((@uint32)(ptr[22]) << 8) | (@uint32)(ptr[23])
+	v.normal.z = temp.f
+
+	-- get uv
+	temp.u = ((@uint32)(ptr[24]) << 24) | ((@uint32)(ptr[25]) << 16) | ((@uint32)(ptr[26]) << 8) | (@uint32)(ptr[27])
+	v.uv.x = temp.f
+	temp.u = ((@uint32)(ptr[28]) << 24) | ((@uint32)(ptr[29]) << 16) | ((@uint32)(ptr[30]) << 8) | (@uint32)(ptr[31])
+	v.uv.y = temp.f
+
+	-- get color
+	v.col = ((@uint32)(ptr[32]) << 24) | ((@uint32)(ptr[33]) << 16) | ((@uint32)(ptr[34]) << 8) | (@uint32)(ptr[35])
+
+	return v
+end
+
+function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
 	if n == 0 then
 		return
 	end
 
-	self:beginMesh()
-		for i = 0, i < n do
+	self:beginMesh(GPU_TRIANGLES)
+		for i = 0, < n do
 			-- get vertices
-			local tri_start: uint32 = start + i * 3
+			local tri_start: uint32 = start + (i * 3)
 			local v0: Vertex = self:getOMEMVertex(tri_start)
 			local v1: Vertex = self:getOMEMVertex(tri_start + 1)
 			local v2: Vertex = self:getOMEMVertex(tri_start + 2)
@@ -445,17 +459,8 @@ function GPU:drawModelEx(start: uint32, mode: uint32, n: uint32): void
 			self:vertUV(v2.uv)
 			self:vertColor(v2.col)
 			self:vertex(v2.pos)
-
-			self:vertUV(v0.uv)
-			self:vertColor(v0.col)
-			self:vertex(v0.pos)
 		end
 	self:endMesh()
-	]]--
-end
-
-function GPU:drawModel(start: uint32, tris: uint32): void
-	self:drawModelEx(start, GPU_TRIANGLES, tris)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
@@ -538,7 +543,6 @@ function GPU:resetGPU(): void
 
 	self.cull_mode = 0
 	self.wire_mode = false
-	self.triangle_vert_color = {0xFF, 0xFF, 0xFF, 0xFF}
 	
 	self.tex_mode = 0
 	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
