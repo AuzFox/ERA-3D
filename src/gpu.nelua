@@ -439,26 +439,71 @@ function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
 		return
 	end
 
-	self:beginMesh(GPU_TRIANGLES)
-		for i = 0, < n do
-			-- get vertices
-			local tri_start: uint32 = start + (i * 3)
-			local v0: Vertex = self:getOMEMVertex(tri_start)
-			local v1: Vertex = self:getOMEMVertex(tri_start + 1)
-			local v2: Vertex = self:getOMEMVertex(tri_start + 2)
+	self:beginMesh(mode)
+		switch mode do
+			case GPU_LINES then
+				for i = 0, < n do
+					-- get vertices
+					local tri_start: uint32 = start + (i * 2)
+					local v0: Vertex = self:getOMEMVertex(tri_start)
+					local v1: Vertex = self:getOMEMVertex(tri_start + 1)
+		
+					-- upload vertices
+					self:vertUV(v0.uv)
+					self:vertColor(v0.col)
+					self:vertex(v0.pos)
+		
+					self:vertUV(v1.uv)
+					self:vertColor(v1.col)
+					self:vertex(v1.pos)
+				end
+			case GPU_TRIANGLES then
+				for i = 0, < n do
+					-- get vertices
+					local tri_start: uint32 = start + (i * 3)
+					local v0: Vertex = self:getOMEMVertex(tri_start)
+					local v1: Vertex = self:getOMEMVertex(tri_start + 1)
+					local v2: Vertex = self:getOMEMVertex(tri_start + 2)
+		
+					-- upload vertices
+					self:vertUV(v0.uv)
+					self:vertColor(v0.col)
+					self:vertex(v0.pos)
+		
+					self:vertUV(v1.uv)
+					self:vertColor(v1.col)
+					self:vertex(v1.pos)
+		
+					self:vertUV(v2.uv)
+					self:vertColor(v2.col)
+					self:vertex(v2.pos)
+				end
+			case GPU_QUADS then
+				for i = 0, < n do
+					-- get vertices
+					local quad_start: uint32 = start + (i * 4)
+					local v0: Vertex = self:getOMEMVertex(quad_start)
+					local v1: Vertex = self:getOMEMVertex(quad_start + 1)
+					local v2: Vertex = self:getOMEMVertex(quad_start + 2)
+					local v3: Vertex = self:getOMEMVertex(quad_start + 3)
+		
+					-- upload vertices
+					self:vertUV(v0.uv)
+					self:vertColor(v0.col)
+					self:vertex(v0.pos)
+		
+					self:vertUV(v1.uv)
+					self:vertColor(v1.col)
+					self:vertex(v1.pos)
+		
+					self:vertUV(v2.uv)
+					self:vertColor(v2.col)
+					self:vertex(v2.pos)
 
-			-- upload vertices
-			self:vertUV(v0.uv)
-			self:vertColor(v0.col)
-			self:vertex(v0.pos)
-
-			self:vertUV(v1.uv)
-			self:vertColor(v1.col)
-			self:vertex(v1.pos)
-
-			self:vertUV(v2.uv)
-			self:vertColor(v2.col)
-			self:vertex(v2.pos)
+					self:vertUV(v3.uv)
+					self:vertColor(v3.col)
+					self:vertex(v3.pos)
+				end
 		end
 	self:endMesh()
 end

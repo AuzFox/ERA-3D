@@ -24,6 +24,6 @@ void draw() {
 
     pushMatrix();
         rotate((vec3){0.0, wrapf(time() * 45.0, 0.0, 360.0), 0.0});
-        drawModel(3, 1);
+        drawModelEx(1, 0, 2);
     popMatrix();
 }
