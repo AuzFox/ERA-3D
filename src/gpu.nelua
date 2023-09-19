@@ -32,12 +32,17 @@ global GPU_MODELVIEW <comptime> = 1
 global GPU_TMEM_WIDTH <comptime> = 1024
 global GPU_TMEM_HEIGHT <comptime> = 1024
 global GPU_TMEM_SIZE <comptime> = (GPU_TMEM_WIDTH * GPU_TMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
-global GPU_OMEM_SIZE <comptime> = (32768 * (36 * 3)) -- 32768 triangles
+global GPU_OMEM_SIZE <comptime> = (32768 * 3 * 9) -- 32768 triangles, 9 IntFloats per vertex
+
+global IntFloat = @union {
+	u: uint32,
+	f: float32
+}
 
 -- holds graphics information for the vm
 global GPU = @record {
 	tmem: [GPU_TMEM_SIZE]rl.color,
-	omem: [GPU_OMEM_SIZE]uint8,
+	omem: [GPU_OMEM_SIZE]IntFloat,
 	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
 	cameras: [GPU_CAMERAS_COUNT]rl.camera,
 	gfx_texture: rl.texture,
@@ -83,18 +88,6 @@ global GPU = @record {
 	fog_color: rl.vector4,
 	viewport_w: cint,
 	viewport_h: cint
-}
-
-global Vertex = @record {
-	pos: rl.vector3,
-	normal: rl.vector3,
-	uv: rl.vector2,
-	col: uint32,
-}
-
-local IntFloat = @union {
-	u: uint32,
-	f: float32
 }
 
 function GPU:clear(col: uint32): void
@@ -400,38 +393,12 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
-function GPU:getOMEMVertex(index: uint32): Vertex
-	local v: Vertex
-	local byte_index: uinteger = index * 36
-	local ptr: *[0]uint8 = &self.omem[byte_index]
+function GPU:uploadOMEMVertex(index: uint32): void
+	local word_index: uinteger = index * 9
 
-	-- get position
-	local temp: IntFloat
-	temp.u = ((@uint32)(ptr[0]) << 24) | ((@uint32)(ptr[1]) << 16) | ((@uint32)(ptr[2]) << 8) | (@uint32)(ptr[3])
-	v.pos.x = temp.f
-	temp.u = ((@uint32)(ptr[4]) << 24) | ((@uint32)(ptr[5]) << 16) | ((@uint32)(ptr[6]) << 8) | (@uint32)(ptr[7])
-	v.pos.y = temp.f
-	temp.u = ((@uint32)(ptr[8]) << 24) | ((@uint32)(ptr[9]) << 16) | ((@uint32)(ptr[10]) << 8) | (@uint32)(ptr[11])
-	v.pos.z = temp.f
-
-	-- get normal
-	temp.u = ((@uint32)(ptr[12]) << 24) | ((@uint32)(ptr[13]) << 16) | ((@uint32)(ptr[14]) << 8) | (@uint32)(ptr[15])
-	v.normal.x = temp.f
-	temp.u = ((@uint32)(ptr[16]) << 24) | ((@uint32)(ptr[17]) << 16) | ((@uint32)(ptr[18]) << 8) | (@uint32)(ptr[19])
-	v.normal.y = temp.f
-	temp.u = ((@uint32)(ptr[20]) << 24) | ((@uint32)(ptr[21]) << 16) | ((@uint32)(ptr[22]) << 8) | (@uint32)(ptr[23])
-	v.normal.z = temp.f
-
-	-- get uv
-	temp.u = ((@uint32)(ptr[24]) << 24) | ((@uint32)(ptr[25]) << 16) | ((@uint32)(ptr[26]) << 8) | (@uint32)(ptr[27])
-	v.uv.x = temp.f
-	temp.u = ((@uint32)(ptr[28]) << 24) | ((@uint32)(ptr[29]) << 16) | ((@uint32)(ptr[30]) << 8) | (@uint32)(ptr[31])
-	v.uv.y = temp.f
-
-	-- get color
-	v.col = ((@uint32)(ptr[32]) << 24) | ((@uint32)(ptr[33]) << 16) | ((@uint32)(ptr[34]) << 8) | (@uint32)(ptr[35])
-
-	return v
+	self:vertColor(self.omem[word_index + 8].u)
+	self:vertUV({self.omem[word_index + 6].f, self.omem[word_index + 7].f})
+	self:vertex({self.omem[word_index].f, self.omem[word_index + 1].f, self.omem[word_index + 2].f})
 end
 
 function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
@@ -443,66 +410,25 @@ function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
 		switch mode do
 			case GPU_LINES then
 				for i = 0, < n do
-					-- get vertices
-					local tri_start: uint32 = start + (i * 2)
-					local v0: Vertex = self:getOMEMVertex(tri_start)
-					local v1: Vertex = self:getOMEMVertex(tri_start + 1)
-		
-					-- upload vertices
-					self:vertUV(v0.uv)
-					self:vertColor(v0.col)
-					self:vertex(v0.pos)
-		
-					self:vertUV(v1.uv)
-					self:vertColor(v1.col)
-					self:vertex(v1.pos)
+					local line_start: uint32 = start + (i * 2)
+					self:uploadOMEMVertex(line_start)
+					self:uploadOMEMVertex(line_start + 1)
 				end
 			case GPU_TRIANGLES then
 				for i = 0, < n do
-					-- get vertices
 					local tri_start: uint32 = start + (i * 3)
-					local v0: Vertex = self:getOMEMVertex(tri_start)
-					local v1: Vertex = self:getOMEMVertex(tri_start + 1)
-					local v2: Vertex = self:getOMEMVertex(tri_start + 2)
-		
-					-- upload vertices
-					self:vertUV(v0.uv)
-					self:vertColor(v0.col)
-					self:vertex(v0.pos)
-		
-					self:vertUV(v1.uv)
-					self:vertColor(v1.col)
-					self:vertex(v1.pos)
-		
-					self:vertUV(v2.uv)
-					self:vertColor(v2.col)
-					self:vertex(v2.pos)
+					self:uploadOMEMVertex(tri_start)
+					self:uploadOMEMVertex(tri_start + 1)
+					self:uploadOMEMVertex(tri_start + 2)
 				end
 			case GPU_QUADS then
 				for i = 0, < n do
 					-- get vertices
 					local quad_start: uint32 = start + (i * 4)
-					local v0: Vertex = self:getOMEMVertex(quad_start)
-					local v1: Vertex = self:getOMEMVertex(quad_start + 1)
-					local v2: Vertex = self:getOMEMVertex(quad_start + 2)
-					local v3: Vertex = self:getOMEMVertex(quad_start + 3)
-		
-					-- upload vertices
-					self:vertUV(v0.uv)
-					self:vertColor(v0.col)
-					self:vertex(v0.pos)
-		
-					self:vertUV(v1.uv)
-					self:vertColor(v1.col)
-					self:vertex(v1.pos)
-		
-					self:vertUV(v2.uv)
-					self:vertColor(v2.col)
-					self:vertex(v2.pos)
-
-					self:vertUV(v3.uv)
-					self:vertColor(v3.col)
-					self:vertex(v3.pos)
+					self:uploadOMEMVertex(quad_start)
+					self:uploadOMEMVertex(quad_start + 1)
+					self:uploadOMEMVertex(quad_start + 2)
+					self:uploadOMEMVertex(quad_start + 3)
 				end
 		end
 	self:endMesh()

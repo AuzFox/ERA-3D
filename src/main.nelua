@@ -69,9 +69,5 @@ local function run(): void
 	end
 end
 
-if #arg == 1 then
-	init()
-	run()
-else
-	print("SYNTAX: era-3d <script>")
-end
+init()
+run()

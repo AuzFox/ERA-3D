@@ -253,6 +253,16 @@ function e3d.EVM:discard(n: uint16): void
 	self.osp = self.osp - n
 end
 
+local function getIntFloatBtye(array: *[0]IntFloat, segment_start: uint32, addr: uint32): uint8
+	return (@uint8)((array[(addr - segment_start) /// 4].u >> (8 * (3 - (addr & 0b11)))) & 0xFF)
+end
+
+local function setIntFloatByte(array: *[0]IntFloat, segment_start: uint32, addr: uint32, val: uint8): void
+	local shift: uinteger = 8 * (3 - (addr & 0b11))
+	local v: *IntFloat = &array[(addr - segment_start) /// 4]
+	v.u = (v.u & (0xFF000000 >> shift)) | (((@uint32)(val) << 24) >> shift)
+end
+
 local function getEVMValueBtye(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32): uint8
 	return (@uint8)((array[(addr - segment_start) /// 4].u >> (8 * (3 - (addr & 0b11)))) & 0xFF)
 end
@@ -260,7 +270,6 @@ end
 local function setEVMValueByte(array: *[0]e3d.EVMValue, segment_start: uint32, addr: uint32, val: uint8): void
 	local shift: uinteger = 8 * (3 - (addr & 0b11))
 	local v: *e3d.EVMValue = &array[(addr - segment_start) /// 4]
-
 	v.u = (v.u & (0xFF000000 >> shift)) | (((@uint32)(val) << 24) >> shift)
 end
 
@@ -285,7 +294,7 @@ function e3d.EVM:getMem8(addr: uint32): uint8
 				return 0
 		end
 	elseif addr <= e3d.OMEM_MAX_ADDR then
-		return self.gpu.omem[addr - e3d.OMEM_START_ADDR]
+		return getIntFloatBtye(&self.gpu.omem, e3d.OMEM_START_ADDR, addr)
 	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame: uint16 = self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2]
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
@@ -303,15 +312,30 @@ function e3d.EVM:getMem8(addr: uint32): uint8
 	elseif addr <= e3d.ARGS_MAX_ADDR then
 		return getEVMValueBtye(&self.args, e3d.ARGS_START_ADDR, addr)
 	elseif addr <= e3d.TBANK_MAX_ADDR then
-		return 0
+		local col: *rl.color = &self.cart.tbank[(addr - e3d.TBANK_START_ADDR) /// 4]
+
+		switch addr & 0b11 do
+			case 0 then
+				return (@uint8)(col.r)
+			case 1 then
+				return (@uint8)(col.g)
+			case 2 then
+				return (@uint8)(col.b)
+			case 3 then
+				return (@uint8)(col.a)
+			else
+				-- should not happen
+				return 0
+		end
 	elseif addr <= e3d.OBANK_MAX_ADDR then
-		return 0
+		return getEVMValueBtye(&self.cart.obank, e3d.OBANK_START_ADDR, addr)
 	elseif addr <= e3d.WBANK_MAX_ADDR then
-		return 0
+		local frame: uint16 = self.cart.wbank[(addr - e3d.WBANK_START_ADDR) /// 2]
+		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
 	elseif addr <= e3d.SBANK_MAX_ADDR then
-		return 0
+		return self.cart.sbank[addr - e3d.SBANK_START_ADDR]
 	elseif addr <= e3d.ROM_MAX_ADDR then
-		return self.rom[addr - e3d.ROM_START_ADDR]
+		return self.cart.rom[addr - e3d.ROM_START_ADDR]
 	elseif addr <= e3d.MEMCARD_MAX_ADDR then
 		return 0
 	else
@@ -338,7 +362,7 @@ function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean
 		end
 		self.gpu.update_tex = true
 	elseif addr <= e3d.OMEM_MAX_ADDR then
-		self.gpu.omem[addr - e3d.OMEM_START_ADDR] = val
+		setIntFloatByte(&self.gpu.omem, e3d.OMEM_START_ADDR, addr, val)
 	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame: *uint16 = (@*uint16)(&self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2])
 		local shift: uinteger = 8 * (addr & 1)
@@ -384,8 +408,7 @@ function e3d.EVM:getMem32(addr: uint32): uint32
 		local col: rl.color = self.gpu.tmem[(addr - e3d.TMEM_START_ADDR) /// 4]
 		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
 	elseif addr <= e3d.OMEM_MAX_ADDR then
-		addr = addr - e3d.OMEM_START_ADDR
-		return ((@uint32)(self.gpu.omem[addr]) << 24) | ((@uint32)(self.gpu.omem[addr + 1]) << 16) | ((@uint32)(self.gpu.omem[addr + 2]) << 8) | (@uint32)(self.gpu.omem[addr + 3])
+		return self.gpu.omem[(addr - e3d.OMEM_START_ADDR) /// 4].u
 	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local index: uinteger = (addr - e3d.AMEM_START_ADDR) /// 2
 		local frame0: uint32 = (@uint32)(self.soundchip.amem[index])
@@ -408,16 +431,21 @@ function e3d.EVM:getMem32(addr: uint32): uint32
 	elseif addr <= e3d.ARGS_MAX_ADDR then
 		return self.args[(addr - e3d.ARGS_START_ADDR) /// 4].u
 	elseif addr <= e3d.TBANK_MAX_ADDR then
-		return 0
+		local col: rl.color = self.cart.tbank[(addr - e3d.TBANK_START_ADDR) /// 4]
+		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
 	elseif addr <= e3d.OBANK_MAX_ADDR then
-		return 0
+		return self.cart.obank[(addr - e3d.OBANK_START_ADDR) /// 4].u
 	elseif addr <= e3d.WBANK_MAX_ADDR then
-		return 0
+		local index: uinteger = (addr - e3d.WBANK_START_ADDR) /// 2
+		local frame0: uint32 = (@uint32)(self.cart.wbank[index])
+		local frame1: uint32 = (@uint32)(self.cart.wbank[index + 1])
+		return (frame0 << 16) | frame1
 	elseif addr <= e3d.SBANK_MAX_ADDR then
-		return 0
+		addr = addr - e3d.SBANK_START_ADDR
+		return ((@uint32)(self.cart.sbank[addr]) << 24) | ((@uint32)(self.cart.sbank[addr + 1]) << 16) | ((@uint32)(self.cart.sbank[addr + 2]) << 8) | (@uint32)(self.cart.sbank[addr + 3])
 	elseif addr <= e3d.ROM_MAX_ADDR then
 		addr = addr - e3d.ROM_START_ADDR
-		return ((@uint32)(self.rom[addr]) << 24) | ((@uint32)(self.rom[addr + 1]) << 16) | ((@uint32)(self.rom[addr + 2]) << 8) | (@uint32)(self.rom[addr + 3])
+		return ((@uint32)(self.cart.rom[addr]) << 24) | ((@uint32)(self.cart.rom[addr + 1]) << 16) | ((@uint32)(self.cart.rom[addr + 2]) << 8) | (@uint32)(self.cart.rom[addr + 3])
 	elseif addr <= e3d.MEMCARD_MAX_ADDR then
 		return 0
 	else
@@ -442,11 +470,7 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
 		self.gpu.tmem[addr] = col
 		self.gpu.update_tex = true
 	elseif addr <= e3d.OMEM_MAX_ADDR then
-		addr = addr - e3d.OMEM_START_ADDR
-		self.gpu.omem[addr] = val >> 24
-		self.gpu.omem[addr + 1] = (val & 0xFF0000) >> 16
-		self.gpu.omem[addr + 2] = (val & 0x00FF00) >> 8
-		self.gpu.omem[addr + 3] = val & 0xFF
+		self.gpu.omem[(addr - e3d.OMEM_START_ADDR) /// 4].u = val
 	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame0: uint16 = val >> 16
 		local frame1: uint16 = val & 0xFFFF
@@ -1820,6 +1844,64 @@ function e3d.EVM:callHook(hook: integer): boolean
 		return result
 	end
 	return true
+end
+
+function e3d.EVM:loadCart(filename: string): boolean
+	local fs, err, errcode = filestream.open(filename, "rb")
+	if not fs:isopen() then
+		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", filename, err, errcode)
+		return false
+	end
+	defer
+		fs:close()
+		print("file closed")
+	end
+
+	--[[ .E3D CART FORMAT
+		HEADER:
+			"ERA3DROM" magic header (8 bytes)
+			version number          (4 bytes)
+				major (uint16)
+				minor (uint8)
+				patch (uint8)
+			src length              (4 bytes)
+		ROM DATA:
+			source code (plain text) (??? bytes)
+			ROM banks                (64 MiB)
+	]]
+
+	-- read file header (file header must start with the bytes "ERA3DROM")
+	local data: string
+	local src_len: uint32
+	local ver_maj: uint16
+	local ver_min: uint8
+	local ver_pat: uint8
+	
+	data, err, errcode = fs:read(16)
+	data, ver_maj, ver_min, ver_pat, src_len = string.unpack(">c8 I2 I1 I1 I4", data)
+
+	if data ~= "ERA3DROM" then
+		self.error = string.format("failed to open file `%s`: invalid file header\n", filename)
+		return false
+	end
+
+	-- TODO: CHECK VERSION
+	-- ...
+
+	-- read source code
+	self.src, err, errcode = fs:read(src_len)
+
+	-- read ROM data
+	data, err, errcode = fs:read(64*1024*1024) -- read 64MiB
+
+	-- upload data into cart ROM banks
+	-- ...
+
+	return true
+end
+
+function e3d.EVM:saveCart(filename: string): boolean
+	return false
 end
 
 function e3d.EVM:__gc(): void

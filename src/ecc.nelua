@@ -393,7 +393,7 @@ local function next(vm: *e3d.EVM): void
 							vm.compile_err = true
 							coroutine.yield()
 						end
-						vm.rom[vm.rom_len] = (@uint8)(vm.token_val)
+						vm.cart.rom[vm.rom_len] = (@uint8)(vm.token_val)
 						vm.rom_len = vm.rom_len + 1
 					end
 					
@@ -3783,6 +3783,18 @@ end
 function e3d.EVM:compileSrc(src: string): boolean
 	self.src = src
 	
+	local success: boolean
+	local co: coroutine
+	local errmsg: string
+
+	self.compile_err = false
+	co, errmsg = coroutine.create(program)
+	success, errmsg = coroutine.resume(co, self)
+	self:resetCompiler()
+	return success and not self.compile_err
+end
+
+function e3d.EVM:compile(): boolean
 	local success: boolean
 	local co: coroutine
 	local errmsg: string

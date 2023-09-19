@@ -1,4 +1,3 @@
-require("arg")
 require("statemachine")
 
 global function stateMainInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
@@ -9,7 +8,7 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
         print("-- BYTECODE --")
         vm:dumpBytecode()
     elseif (rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)) and rl.isKeyPressed(rl.keyboardKey.R) then
-        if vm:compileFile(arg[1]) then
+        if vm:compile() then
             vm:resetVM(true)
             
             if vm:callHook(e3d.Hook.INIT) then
@@ -22,6 +21,29 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
         end
     elseif rl.isKeyPressed(rl.keyboardKey.M) then
         sm.queued_state = StateID.TRACKER -- switch to tracker state next frame
+    elseif rl.isKeyPressed(rl.keyboardKey.P) then
+        io.printf('HEAP:     0x%08X - 0x%08X\n', e3d.HEAP_START_ADDR, e3d.HEAP_MAX_ADDR)
+        io.printf('TMEM:     0x%08X - 0x%08X\n', e3d.TMEM_START_ADDR, e3d.TMEM_MAX_ADDR)
+        io.printf('OMEM:     0x%08X - 0x%08X\n', e3d.OMEM_START_ADDR, e3d.OMEM_MAX_ADDR)
+        io.printf('AMEM:     0x%08X - 0x%08X\n', e3d.AMEM_START_ADDR, e3d.AMEM_MAX_ADDR)
+        io.printf('UNUSED:   0x%08X - 0x%08X\n', e3d.UNUSED_START_ADDR, e3d.UNUSED_MAX_ADDR)
+        io.printf('WMEM:     0x%08X - 0x%08X\n', e3d.WMEM_START_ADDR, e3d.WMEM_MAX_ADDR)
+        io.printf('SMEM:     0x%08X - 0x%08X\n', e3d.SMEM_START_ADDR, e3d.SMEM_MAX_ADDR)
+        io.printf('GLOBALS:  0x%08X - 0x%08X\n', e3d.GLOBALS_START_ADDR, e3d.GLOBALS_MAX_ADDR)
+        io.printf('LOCALS:   0x%08X - 0x%08X\n', e3d.LOCALS_START_ADDR, e3d.LOCALS_MAX_ADDR)
+        io.printf('ARGS:     0x%08X - 0x%08X\n', e3d.ARGS_START_ADDR, e3d.ARGS_MAX_ADDR)
+        io.printf('TBANK:    0x%08X - 0x%08X\n', e3d.TBANK_START_ADDR, e3d.TBANK_MAX_ADDR)
+        io.printf('OBANK:    0x%08X - 0x%08X\n', e3d.OBANK_START_ADDR, e3d.OBANK_MAX_ADDR)
+        io.printf('WBANK:    0x%08X - 0x%08X\n', e3d.WBANK_START_ADDR, e3d.WBANK_MAX_ADDR)
+        io.printf('SBANK:    0x%08X - 0x%08X\n', e3d.SBANK_START_ADDR, e3d.SBANK_MAX_ADDR)
+        io.printf('ROM:      0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
+        io.printf('MEMCARD:  0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
+    elseif rl.isKeyPressed(rl.keyboardKey.L) then
+        if vm:loadCart("demos/test.e3d") then
+            print("load OK!")
+        else
+            io.printf(vm.error)
+        end
     end
 
     return StateID.MAIN
@@ -35,6 +57,8 @@ global function stateMainDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): in
     vm.gpu:print2D(6, 20, GPU_WHITE, "PRESS [CTRL+R] TO COMPILE AND RUN")
     vm.gpu:print2D(6, 30, GPU_WHITE, "PRESS [B] TO DUMP BYTECODE")
     vm.gpu:print2D(6, 40, GPU_WHITE, "PRESS [M] TO SWITCH TO TRACKER")
+    vm.gpu:print2D(6, 50, GPU_WHITE, "PRESS [P] TO PRINT MEMORY MAP")
+    vm.gpu:print2D(6, 60, GPU_WHITE, "PRESS [L] TO LOAD TEST.E3D")
 
     return StateID.MAIN
 end

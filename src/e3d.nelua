@@ -56,7 +56,11 @@ global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
 global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.ROM_SIZE            <comptime> = 65536 --  64KiB (65536 bytes)
+global e3d.TBANK_SIZE          <comptime> = (4*1024*1024)  --  16MiB
+global e3d.OBANK_SIZE          <comptime> = ((16*1024*1024)///4) --  16MiB
+global e3d.WBANK_SIZE          <comptime> = ((14*1024*1024)///2) --  14MiB
+global e3d.SBANK_SIZE          <comptime> = (2*1024*1024)  --  2MiB
+global e3d.ROM_SIZE            <comptime> = (16*1024*1024) --  16MiB
 global e3d.OPSTACK_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.BYTECODE_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE      <comptime> = 256
@@ -68,9 +72,9 @@ local mem_regions = {
 	-- system memory
 	{name='HEAP',    size=8 * 1024 * 1024},
 	{name='TMEM',    size=GPU_TMEM_SIZE.value * 4},
-	{name='OMEM',    size=GPU_OMEM_SIZE.value},
+	{name='OMEM',    size=GPU_OMEM_SIZE.value * 4},
 	{name='AMEM',    size=SOUNDCHIP_AMEM_SIZE.value * 2},
-	{name='UNUSED',  size=((4 * 1024 * 1024) - GPU_OMEM_SIZE.value) - (SOUNDCHIP_AMEM_SIZE.value * 2)},
+	{name='UNUSED',  size=((4 * 1024 * 1024) - GPU_OMEM_SIZE.value * 4) - (SOUNDCHIP_AMEM_SIZE.value * 2)},
 	{name='WMEM',    size=SOUNDCHIP_WMEM_SIZE.value * 2},
 	{name='SMEM',    size=SOUNDCHIP_SMEM_SIZE.value},
 	{name='GLOBALS', size=65536 * 4},
@@ -416,13 +420,20 @@ e3d.Identifier = @record {
 	argdata: sequence(e3d.TypeInfo) -- only used to track function arguments
 }
 
+global e3d.Cart = @record {
+	tbank: [e3d.TBANK_SIZE]rl.color,
+	obank: [e3d.OBANK_SIZE]e3d.EVMValue,
+	wbank: [e3d.WBANK_SIZE]BKFrame,
+	sbank: [e3d.SBANK_SIZE]uint8,
+	rom: [e3d.ROM_SIZE]uint8,
+}
+
 e3d.EVM = @record {
 	-- vm vars
 	heap: [e3d.HEAP_SIZE]uint8,
 	globals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
 	locals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
 	args: [e3d.ARGS_SIZE]e3d.EVMValue,
-	rom: [e3d.ROM_SIZE]uint8,
 	opstack: [e3d.OPSTACK_SIZE]e3d.EVMValue,
 	bytecode: [e3d.BYTECODE_SIZE]uint8,
 	callstack: [e3d.CALLSTACK_SIZE]e3d.CallFrame,
@@ -477,6 +488,7 @@ e3d.EVM = @record {
 	loop_del_l_stack: sequence(uint16),
 	
 	-- general vars
+	cart: e3d.Cart,
 	soundchip: SoundChip,
 	gpu: GPU,
 	error: string,
