@@ -1895,7 +1895,44 @@ function e3d.EVM:loadCart(filename: string): boolean
 	data, err, errcode = fs:read(64*1024*1024) -- read 64MiB
 
 	-- upload data into cart ROM banks
-	-- ...
+
+	-- TBANK + OBANK
+	local offset: uinteger = 1 + (16*1024*1024)
+	for i = 0, < 16*1024*1024 do
+		local byte_index: uinteger = 1 + i * 4
+		self.cart.tbank[i] = {
+			data.data[byte_index],
+			data.data[byte_index + 1],
+			data.data[byte_index + 2],
+			data.data[byte_index + 3]
+		}
+		self.cart.obank[i] = {
+			u=(
+				((@uint32)(data.data[offset + byte_index]) << 24) |
+				((@uint32)(data.data[offset + byte_index + 1]) << 16) |
+				((@uint32)(data.data[offset + byte_index + 2]) << 8) |
+				(@uint32)(data.data[offset + byte_index + 3])
+			)
+		}
+	end
+
+	-- WBANK
+	offset = 1 + (32*1024*1024)
+	for i = 0, < 14*1024*1024 do
+		local byte_index = offset + (i * 2)
+		self.cart.wbank[i] = (
+			((@uint16)(data.data[offset + byte_index]) << 8) | (@uint16)(data.data[offset + byte_index + 1])
+		)
+	end
+
+	memory.copy(&self.cart.sbank, &data.data[46*1024*1024], 2*1024*1024)
+	memory.copy(&self.cart.rom,   &data.data[48*1024*1024], 16*1024*1024)
+
+	-- load cart ROM banks into system memory
+	memory.copy(&self.gpu.tmem, &self.cart.tbank, 4*1024*1024)
+	memory.copy(&self.gpu.omem, &self.cart.obank, (3*1024*1024) + (384*1024))
+	memory.copy(&self.gpu.wmem, &self.cart.wbank, 7*1024*1024)
+	memory.copy(&self.gpu.smem, &self.cart.sbank, 256*1024)
 
 	return true
 end
