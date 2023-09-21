@@ -51,7 +51,12 @@ global e3d = @record{}
 		MEMCARD             (256KiB       ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
 ]]
 
+global e3d.VER_MAJOR <comptime> = 0
+global e3d.VER_MINOR <comptime> = 0
+global e3d.VER_PATCH <comptime> = 0
+
 -- memory size and address constants
+global e3d.SRC_SIZE            <comptime> = 1024*1024
 global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
 global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
@@ -452,7 +457,9 @@ e3d.EVM = @record {
 	current_hook: uinteger,
 	
 	-- compiler vars
-	src: string,
+	--src: string,
+	src: [e3d.SRC_SIZE]uint8,
+	src_len: uinteger,
 	src_index: uinteger,
 	prev_src_index: uinteger,
 	token: uinteger,
@@ -489,6 +496,7 @@ e3d.EVM = @record {
 	
 	-- general vars
 	cart: e3d.Cart,
+	temp_cart: e3d.Cart, -- used for temp storage while saving cart data
 	soundchip: SoundChip,
 	gpu: GPU,
 	error: string,

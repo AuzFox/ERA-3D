@@ -1,3 +1,4 @@
+require("C.stdio")
 require("api")
 
 function e3d.EVM:getGlobal(i: uint16): e3d.EVMValue
@@ -1846,99 +1847,261 @@ function e3d.EVM:callHook(hook: integer): boolean
 	return true
 end
 
-function e3d.EVM:loadCart(filename: string): boolean
-	local fs, err, errcode = filestream.open(filename, "rb")
-	if not fs:isopen() then
-		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", filename, err, errcode)
+local function isLittleEndian(): boolean
+	local x: uint32 <volatile> = 0x01234567
+	local p: *uint8 = (@*uint8)(&x)
+	return $p == 0x67
+end
+
+local function byteSwapCartData(cart: *e3d.Cart): void
+	local p: *[0]uint8 = (@*[0]uint8)(&cart.tbank)
+	local p2: *[0]uint8 = (@*[0]uint8)(&cart.obank)
+	for i: uint64 = 0, < 4*1024*1024 do
+		local byte_index: uint64 = i * 4
+
+		p[byte_index], p[byte_index + 3] = p[byte_index + 3], p[byte_index]
+		p[byte_index + 1], p[byte_index + 2] = p[byte_index + 2], p[byte_index + 1]
+
+		p2[byte_index], p2[byte_index + 3] = p2[byte_index + 3], p2[byte_index]
+		p2[byte_index + 1], p2[byte_index + 2] = p2[byte_index + 2], p2[byte_index + 1]
+	end
+
+	p = (@*[0]uint8)(&cart.wbank)
+	for i: uint64 = 0, < 7*1024*1024 do
+		local byte_index: uint64 = i * 2
+		p[byte_index], p[byte_index + 1] = p[byte_index + 1], p[byte_index]
+	end
+end
+
+function e3d.EVM:saveCart(filename: string): boolean
+	local header: [16]uint8 = {
+		'E'_u8,
+		'R'_u8,
+		'A'_u8,
+		'3'_u8,
+		'D'_u8,
+		'R'_u8,
+		'O'_u8,
+		'M'_u8,
+		(@uint8)(e3d.VER_MAJOR >> 8),
+		(@uint8)(e3d.VER_MAJOR & 0xFF),
+		(@uint8)(e3d.VER_MINOR),
+		(@uint8)(e3d.VER_PATCH),
+		(@uint8)(self.src_len >> 24),
+		(@uint8)(self.src_len >> 16),
+		(@uint8)(self.src_len >> 8),
+		(@uint8)(self.src_len & 0xFF),
+	}
+	local result: csize
+	local file: *C.FILE = C.fopen(filename, "wb")
+	if file == nilptr then
+		self.error = "failed to open file\n"
 		return false
 	end
 	defer
-		fs:close()
-		print("file closed")
+		C.fclose(file)
 	end
 
+	-- memcpy cart data to temp_cart
+	memory.copy(&self.temp_cart.tbank, &self.cart.tbank, 16*1024*1024)
+	memory.copy(&self.temp_cart.obank, &self.cart.obank, 16*1024*1024)
+	memory.copy(&self.temp_cart.wbank, &self.cart.wbank, 14*1024*1024)
+	memory.copy(&self.temp_cart.sbank, &self.cart.sbank, 2*1024*1024)
+	memory.copy(&self.temp_cart.rom, &self.cart.rom, 16*1024*1024)
+
+	-- byteswap data if little endian
+	if isLittleEndian() then
+		byteSwapCartData(&self.temp_cart)
+	end
+
+	-- write data to file
+	result = C.fwrite(&header, 1, 16, file)
+	if result ~= 16 then
+		self.error = "failed to write header\n"
+		return false
+	end
+
+	result = C.fwrite(&self.src, 1, self.src_len, file)
+	if result ~= self.src_len then
+		self.error = "failed to write src\n"
+		return false
+	end
+
+	result = C.fwrite(&self.temp_cart.tbank, 4, 4*1024*1024, file)
+	if result ~= 4*1024*1024 then
+		self.error = "failed to write tbank data\n"
+		return false
+	end
+
+	result = C.fwrite(&self.temp_cart.obank, 4, 4*1024*1024, file)
+	if result ~= 4*1024*1024 then
+		self.error = "failed to write obank data\n"
+		return false
+	end
+
+	result = C.fwrite(&self.temp_cart.wbank, 2, 7*1024*1024, file)
+	if result ~= 7*1024*1024 then
+		self.error = "failed to write wbank data\n"
+		return false
+	end
+
+	result = C.fwrite(&self.temp_cart.sbank, 1, 2*1024*1024, file)
+	if result ~= 2*1024*1024 then
+		self.error = "failed to write sbank data\n"
+		return false
+	end
+
+	result = C.fwrite(&self.temp_cart.rom, 1, 16*1024*1024, file)
+	if result ~= 16*1024*1024 then
+		self.error = "failed to write rom data\n"
+		return false
+	end
+
+	return true
+end
+
+function e3d.EVM:loadCart(filename: string): boolean
 	--[[ .E3D CART FORMAT
 		HEADER:
-			"ERA3DROM" magic header (8 bytes)
-			version number          (4 bytes)
+			"ERA3DROM" magic header  (8 bytes)
+			version number           (4 bytes)
 				major (uint16)
 				minor (uint8)
 				patch (uint8)
-			src length              (4 bytes)
+			src length               (4 bytes)
 		ROM DATA:
 			source code (plain text) (??? bytes)
 			ROM banks                (64 MiB)
 	]]
 
-	-- read file header (file header must start with the bytes "ERA3DROM")
-	local data: string
-	local src_len: uint32
-	local ver_maj: uint16
-	local ver_min: uint8
-	local ver_pat: uint8
-	
-	data, err, errcode = fs:read(16)
-	data, ver_maj, ver_min, ver_pat, src_len = string.unpack(">c8 I2 I1 I1 I4", data)
+	local expected_header: [8]uint8 = {
+		'E'_u8,
+		'R'_u8,
+		'A'_u8,
+		'3'_u8,
+		'D'_u8,
+		'R'_u8,
+		'O'_u8,
+		'M'_u8
+	}
+	local header: [16]uint8
+	local result: csize
+	local file: *C.FILE = C.fopen(filename, "rb")
+	if file == nilptr then
+		self.error = "failed to open file\n"
+		return false
+	end
+	defer
+		C.fclose(file)
+	end
 
-	if data ~= "ERA3DROM" then
-		self.error = string.format("failed to open file `%s`: invalid file header\n", filename)
+	-- read data
+
+	result = C.fread(&header, 1, 16, file)
+	if result ~= 16 then
+		self.error = "failed to read header\n"
 		return false
 	end
 
-	-- TODO: CHECK VERSION
-	-- ...
-
-	-- read source code
-	self.src, err, errcode = fs:read(src_len)
-
-	-- read ROM data
-	data, err, errcode = fs:read(64*1024*1024) -- read 64MiB
-
-	-- upload data into cart ROM banks
-
-	-- TBANK + OBANK
-	local offset: uinteger = 1 + (16*1024*1024)
-	for i = 0, < 16*1024*1024 do
-		local byte_index: uinteger = 1 + i * 4
-		self.cart.tbank[i] = {
-			data.data[byte_index],
-			data.data[byte_index + 1],
-			data.data[byte_index + 2],
-			data.data[byte_index + 3]
-		}
-		self.cart.obank[i] = {
-			u=(
-				((@uint32)(data.data[offset + byte_index]) << 24) |
-				((@uint32)(data.data[offset + byte_index + 1]) << 16) |
-				((@uint32)(data.data[offset + byte_index + 2]) << 8) |
-				(@uint32)(data.data[offset + byte_index + 3])
-			)
-		}
+	for i = 0, < 8 do
+		if header[i] ~= expected_header[i] then
+			self.error = "invalid header\n"
+			return false
+		end
 	end
 
-	-- WBANK
-	offset = 1 + (32*1024*1024)
-	for i = 0, < 14*1024*1024 do
-		local byte_index = offset + (i * 2)
-		self.cart.wbank[i] = (
-			((@uint16)(data.data[offset + byte_index]) << 8) | (@uint16)(data.data[offset + byte_index + 1])
-		)
+	-- check version
+	local ver_major: uint16 = ((@uint16)(header[8]) << 8) | (@uint16)(header[9])
+	if ver_major < e3d.VER_MAJOR then
+		self.error = "cannot load cart made using incompatible past version of ERA-3D\n"
+		return false
+	elseif ver_major > e3d.VER_MAJOR then
+		self.error = "cannot load cart made using incompatible future version of ERA-3D\n"
+		return false
 	end
 
-	memory.copy(&self.cart.sbank, &data.data[46*1024*1024], 2*1024*1024)
-	memory.copy(&self.cart.rom,   &data.data[48*1024*1024], 16*1024*1024)
+	self.src_len = ((@uint32)(header[12]) << 24) | ((@uint32)(header[13]) << 16) | ((@uint32)(header[14]) << 8) | (@uint32)(header[15])
+
+	if self.src_len > e3d.SRC_SIZE then
+		self.error = "invalid src length\n"
+		return false
+	end
+
+	result = C.fread(&self.src, 1, self.src_len, file)
+	if result ~= self.src_len then
+		self.error = "failed to read src\n"
+		return false
+	end
+
+	result = C.fread(&self.cart.tbank, 4, 4*1024*1024, file)
+	if result ~= 4*1024*1024 then
+		self.error = "failed to read tbank data\n"
+		return false
+	end
+
+	result = C.fread(&self.cart.obank, 4, 4*1024*1024, file)
+	if result ~= 4*1024*1024 then
+		self.error = "failed to read obank data\n"
+		return false
+	end
+
+	result = C.fread(&self.cart.wbank, 2, 7*1024*1024, file)
+	if result ~= 7*1024*1024 then
+		self.error = "failed to read wbank data\n"
+		return false
+	end
+
+	result = C.fread(&self.cart.sbank, 1, 2*1024*1024, file)
+	if result ~= 2*1024*1024 then
+		self.error = "failed to read sbank data\n"
+		return false
+	end
+
+	result = C.fread(&self.cart.rom, 1, 16*1024*1024, file)
+	if result ~= 16*1024*1024 then
+		self.error = "failed to read rom data\n"
+		return false
+	end
+
+	-- swap bytes
+	if isLittleEndian() then
+		byteSwapCartData(&self.cart)
+	end
 
 	-- load cart ROM banks into system memory
 	memory.copy(&self.gpu.tmem, &self.cart.tbank, 4*1024*1024)
 	memory.copy(&self.gpu.omem, &self.cart.obank, (3*1024*1024) + (384*1024))
-	memory.copy(&self.gpu.wmem, &self.cart.wbank, 7*1024*1024)
-	memory.copy(&self.gpu.smem, &self.cart.sbank, 256*1024)
+	memory.copy(&self.soundchip.wmem, &self.cart.wbank, 7*1024*1024)
+	memory.copy(&self.soundchip.smem, &self.cart.sbank, 256*1024)
+
+	rl.updateTexture(self.gpu.gfx_texture, &self.gpu.tmem)
 
 	return true
 end
 
-function e3d.EVM:saveCart(filename: string): boolean
-	return false
+function e3d.EVM:loadData(src_file: string, tex_file: string): boolean
+	local sfs, err, errcode = filestream.open(src_file)
+	if not sfs:isopen() then
+		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", src_file, err, errcode)
+		return false
+	end
+
+	local data: string, err, errcode = sfs:read("a")
+	self.src_len = #data
+	memory.copy(&self.src, data.data, self.src_len)
+
+	sfs:close()
+
+	if tex_file ~= "" then
+		local img: rl.image = rl.loadImage(tex_file)
+		if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
+			rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
+		end
+		memory.copy(&self.cart.tbank, img.data, 1024 * 1024 * #rl.color)
+		rl.unloadImage(img)
+	end
+
+	return true
 end
 
 function e3d.EVM:__gc(): void

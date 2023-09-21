@@ -3,6 +3,8 @@ require("e3d")
 global StateID = @enum {
     BOOT = 0,
     MAIN,
+    CODE,
+    TEXTURE,
     TRACKER,
     RUN,
     COUNT

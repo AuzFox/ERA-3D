@@ -1,0 +1,12 @@
+require("statemachine")
+
+global function stateTextureInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateTextureUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.TEXTURE
+end
+
+global function stateTextureDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.TEXTURE
+end

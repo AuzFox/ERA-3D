@@ -21,10 +21,10 @@ enum {
 	BTN_START,
 
 	// color constants
-	BLACK          = 0x000000FF,
-	RED            = 0xFF0000FF,
-	WHITE_NO_ALPHA = 0xFFFFFF00, // used as a base for non-tinted transparency
-	WHITE          = 0xFFFFFFFF,
+	BLACK        = 0x000000FF,
+	RED          = 0xFF0000FF,
+	RED_NO_ALPHA = 0xFF000000,
+	WHITE        = 0xFFFFFFFF,
 
 	TMEM_START = 0x00800000, // TMEM start address
 	TMEM_W = 1024,         // each row in TMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
@@ -238,10 +238,10 @@ void draw() {
 			(float)(gridy + cursor_y * 2),
 		};
 		
-		texture(1023, 0, 1, 1);
+		setTextureMode(2);
 		beginMesh(QUADS);
 			// ping-pong between 25% and 100% transparency, no tinting
-			vertColor(WHITE_NO_ALPHA | (int)(((1.0 + sin(cursor_anim)) * 0.375 + 0.25) * 255.0));
+			vertColor(RED_NO_ALPHA | (int)(((1.0 + sin(cursor_anim)) * 0.375 + 0.25) * 255.0));
 			
 			vertUV((vec2){0.0, 0.0});
 			vertex2D(cursorpos);
@@ -255,5 +255,6 @@ void draw() {
 			vertUV((vec2){1.0, 0.0});
 			vertex2D(cursorpos + (vec2){2.0, 0.0});
 		endMesh();
+		setTextureMode(0);
 	}
 }

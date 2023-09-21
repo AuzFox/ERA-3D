@@ -1,13 +1,16 @@
+require("arg")
 require("statemachine")
 
 global function stateMainInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
+
     if rl.isKeyPressed(rl.keyboardKey.B) then
         print("-- BYTECODE --")
         vm:dumpBytecode()
-    elseif (rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)) and rl.isKeyPressed(rl.keyboardKey.R) then
+    elseif rl.isKeyPressed(rl.keyboardKey.R) and is_ctrl_down then
         if vm:compile() then
             vm:resetVM(true)
             
@@ -38,11 +41,25 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
         io.printf('SBANK:    0x%08X - 0x%08X\n', e3d.SBANK_START_ADDR, e3d.SBANK_MAX_ADDR)
         io.printf('ROM:      0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
         io.printf('MEMCARD:  0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
-    elseif rl.isKeyPressed(rl.keyboardKey.L) then
-        if vm:loadCart("demos/test.e3d") then
-            print("load OK!")
+    elseif rl.isKeyPressed(rl.keyboardKey.S) then
+        if vm:saveCart(arg[2]) then
+            print("save OK!")
         else
             io.printf(vm.error)
+        end
+    elseif rl.isKeyPressed(rl.keyboardKey.L) then
+        if is_ctrl_down then
+            if vm:loadData(arg[3], arg[4]) then
+                print("load OK!")
+            else
+                io.printf(vm.error)
+            end
+        else
+            if vm:loadCart(arg[1]) then
+                print("load OK!")
+            else
+                io.printf(vm.error)
+            end
         end
     end
 
@@ -58,7 +75,9 @@ global function stateMainDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): in
     vm.gpu:print2D(6, 30, GPU_WHITE, "PRESS [B] TO DUMP BYTECODE")
     vm.gpu:print2D(6, 40, GPU_WHITE, "PRESS [M] TO SWITCH TO TRACKER")
     vm.gpu:print2D(6, 50, GPU_WHITE, "PRESS [P] TO PRINT MEMORY MAP")
-    vm.gpu:print2D(6, 60, GPU_WHITE, "PRESS [L] TO LOAD TEST.E3D")
+    vm.gpu:print2D(6, 60, GPU_WHITE, "PRESS [S] TO SAVE CART")
+    vm.gpu:print2D(6, 70, GPU_WHITE, "PRESS [L] TO LOAD CART")
+    vm.gpu:print2D(6, 80, GPU_WHITE, "PRESS [CTRL+L] TO LOAD ASSETS")
 
     return StateID.MAIN
 end

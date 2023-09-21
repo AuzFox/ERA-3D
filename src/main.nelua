@@ -28,6 +28,16 @@ local function init(): void
 			stateMainDraw
 		},
 		{
+			stateCodeInit,
+			stateCodeUpdate,
+			stateCodeDraw
+		},
+		{
+			stateTextureInit,
+			stateTextureUpdate,
+			stateTextureDraw
+		},
+		{
 			stateTrackerInit,
 			stateTrackerUpdate,
 			stateTrackerDraw

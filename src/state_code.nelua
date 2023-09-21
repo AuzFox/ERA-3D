@@ -1,0 +1,14 @@
+require("statemachine")
+
+-- NOTE: consider using a gap buffer to implement editor
+
+global function stateCodeInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateCodeUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.CODE
+end
+
+global function stateCodeDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+    return StateID.CODE
+end

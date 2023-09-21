@@ -227,7 +227,7 @@ function e3d.EVM:emitF(val: float32): void
 end
 
 local function getChar(vm: *e3d.EVM): byte
-	if vm.src_index <= #vm.src then
+	if vm.src_index < vm.src_len then
 		vm.token = vm.src[vm.src_index]
 	else
 		vm.token = 0
@@ -3734,8 +3734,6 @@ local function globalDeclaration(vm: *e3d.EVM): void
 end
 
 local function program(vm: *e3d.EVM): void
-	local src_len = #vm.src
-
 	vm.rom_len = 0
 	vm.bytecode_len = 0
 	vm.globals_len = 0
@@ -3746,8 +3744,8 @@ local function program(vm: *e3d.EVM): void
 	end
 
 	vm.line = 1
-	vm.src_index = 1 -- 1-based string indexing
-	vm.prev_src_index = 1
+	vm.src_index = 0
+	vm.prev_src_index = 0
 	vm:pushScope() -- global scope
 	
 	next(vm)
@@ -3758,6 +3756,7 @@ local function program(vm: *e3d.EVM): void
 	vm:popScope()
 end
 
+--[[
 function e3d.EVM:compileFile(filename: string): boolean
 	local fs, err, errcode = filestream.open(filename)
 	if not fs:isopen() then
@@ -3793,7 +3792,7 @@ function e3d.EVM:compileSrc(src: string): boolean
 	self:resetCompiler()
 	return success and not self.compile_err
 end
-
+]]
 function e3d.EVM:compile(): boolean
 	local success: boolean
 	local co: coroutine

@@ -547,7 +547,7 @@ function GPU:init(): void
 
 	self.gfx_rendertex = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
 
-	local img: rl.image = rl.loadImage("assets/test.png")
+	local img: rl.image = rl.genImageColor(GPU_TMEM_WIDTH, GPU_TMEM_HEIGHT, {0,0,0,0})
 	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
 		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
 	end
