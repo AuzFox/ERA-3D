@@ -1,6 +1,8 @@
 require("blipkit")
 require("raylib")
 
+-- NOTE: use entire WMEM range as sample buffer, set sample range and repeat mode when changing instruments
+
 global SOUNDCHIP_TRACK_COUNT <comptime> = 8
 global SOUNDCHIP_SAMPLE_RATE <comptime> = 22050 -- 22050hz sample rate
 global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 2048
@@ -14,7 +16,7 @@ global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
 global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
 global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * 8
 global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
-global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 10
+global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 11
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
 global SOUNDCHIP_GROOVE_SIZE <comptime> = 16
 global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
@@ -40,6 +42,7 @@ global TrackContext = @record {
 	bk_track: BKTrack,
 	bk_clock: BKClock,
 	bk_divider: BKDivider,
+	bk_instrument: BKInstrument,
 	soundchip: *SoundChip,
 	track_index: uint8
 }
@@ -64,6 +67,7 @@ SoundChip = @record {
 	track_contexts: [SOUNDCHIP_TRACK_COUNT]TrackContext,
 	preview_bk_track: BKTrack,
 	bk_context: BKContext,
+	bk_data: BKData,
 	audio_stream: rl.audioStream,
 
 	-- smem pointers
@@ -160,7 +164,7 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 
 			state.song_pos = state.song_pos + 1
 
-			state.pattern_id = sc.song_data[state.song_pos * 8 + track_index]
+			state.pattern_id = sc.song_data[(@uint8)(state.song_pos * 8 + track_index)]
 			if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
 				sc:stopTrack(track_index)
 				return 0
@@ -225,6 +229,8 @@ function SoundChip:resetSoundchip(): void
 
 	self.song_data[0] = 0x00
 	self.song_data[8] = 0x01
+	self.song_data[1] = 0x10
+	self.song_data[9] = 0x11
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -254,6 +260,32 @@ function SoundChip:init(): void
 
 	-- init BlipKit stuff
 	BKContextInit(&self.bk_context, 2, SOUNDCHIP_SAMPLE_RATE)
+
+	--[[ sample loading test
+	local w: rl.wave = rl.loadWave("test_data/pluck.wav")
+	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
+	for i: uint64 = 0, < w.frameCount do
+		local frame: BKFrame = wframes[i]
+		self.wmem[i * 2] = frame
+		self.wmem[(i * 2) + 1] = frame
+	end
+	rl.unloadWave(w)
+	]]
+
+	BKDataInit(&self.bk_data)
+	local flags: BKEnum = BK_16_BIT_SIGNED
+	do
+		-- endian test
+		local x: uint32 <volatile> = 0x01234567
+		local p: *uint8 = (@*uint8)(&x)
+		if $p == 0x67 then
+			flags = flags | BK_LITTLE_ENDIAN
+		else
+			flags = flags | BK_BIG_ENDIAN
+		end
+	end
+	BKDataSetData(&self.bk_data, &self.wmem, 7*1024*1024, 2, flags)
+	BKSetAttr(&self.bk_data, BK_SAMPLE_PITCH, 0)
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -287,11 +319,18 @@ function SoundChip:init(): void
 		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume
 		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 4) -- note volume
 		BKTrackAttach(&tc.bk_track, &self.bk_context)
+
+		local range: [2]BKInt = {0, 88200 * 2}
+		BKSetPtr(&tc.bk_track, BK_SAMPLE, &self.bk_data, 0)
+		BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
+		BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, 1)
+
+		BKInstrumentInit(&tc.bk_instrument)
+		BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, 0, 3, BK_MAX_VOLUME, 3)
+		BKSetPtr(&tc.bk_track, BK_INSTRUMENT, &tc.bk_instrument, 0)
 		
 		BKDividerInit(&tc.bk_divider, 6, &callback)
-		
 		BKDividerAttachToClock(&tc.bk_divider, &tc.bk_clock)
-
 		BKClockAttach(&tc.bk_clock, &self.bk_context, nilptr)
 	end
 
@@ -316,15 +355,16 @@ function SoundChip:cleanup(): void
 	rl.unloadAudioStream(self.audio_stream)
 	rl.closeAudioDevice()
 
+	BKDispose(&self.bk_data)
+	
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
-
+		
 		BKDispose(&tc.bk_track)
 		BKDispose(&tc.bk_divider)
 		BKDispose(&tc.bk_clock)
 	end
-
+	
 	BKDispose(&self.preview_bk_track)
-
 	BKDispose(&self.bk_context)
 end

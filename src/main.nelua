@@ -3,6 +3,8 @@ require("ecc")
 require("evm")
 require("state_boot")
 require("state_main")
+require("state_code")
+require("state_texture")
 require("state_tracker")
 require("state_run")
 

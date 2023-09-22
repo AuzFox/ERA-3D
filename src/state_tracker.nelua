@@ -94,7 +94,7 @@ local function drawLevels(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
         if rtemp > r then r = rtemp end
     end
 
-    print("left", l, "right", r)
+    --print("left", l, "right", r)
 end
 
 local function drawSong(this: *State, sm: *StateMachine, vm: *e3d.EVM): void

@@ -33,7 +33,7 @@ global e3d = @record{}
 		SMEM                (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
 			song data       (2KiB         )                         (256 * 8 bytes)
 			pattern data    (128KiB       )                         (256 * 64 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
-			instrument data (2KiB + 512B  )                         (256 * 10 bytes (sample start (24bit), sample end(24bit), attack, decay, sustain, release))
+			instrument data (2KiB + 768B  )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
 			groove data     (256B         )                         (16 * 16 bytes)
 			audio state     (1B           )                         (1 byte (track playing flags))
 			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
