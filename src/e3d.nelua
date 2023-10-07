@@ -28,15 +28,15 @@ global e3d = @record{}
 		TMEM                (4MiB         ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
 		OMEM                (3MiB + 384KiB) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
 		AMEM                (8KiB         ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
-		UNUSED              (???KiB       ) 0x00F62000 - 0x00FFFFFF (unused)
+		RMEM                (632KiB       ) 0x00F62000 - 0x00FFFFFF (system state registers)
+			audio state     (1B           )                         (1 byte (track playing flags))
+			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
 		WMEM                (7MiB         ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
 		SMEM                (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
 			song data       (2KiB         )                         (256 * 8 bytes)
-			pattern data    (128KiB       )                         (256 * 64 * 8 bytes (note, vol, pan, instr, fx0, arg0, fx1, arg1))
+			pattern data    (80KiB        )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
 			instrument data (2KiB + 768B  )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
 			groove data     (256B         )                         (16 * 16 bytes)
-			audio state     (1B           )                         (1 byte (track playing flags))
-			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
 			unused          (???KiB + ???B)                         (unused)
 		GLOBALS             (256KiB       ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
 		LOCALS              (256KiB       ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
@@ -44,7 +44,7 @@ global e3d = @record{}
 	CART ROM:
 		TBANK[0-3]          (16MiB        ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
 		OBANK[0-3]          (16MiB        ) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		WBANK[0-3]          (14MiB        ) 0x03800000 - 0x045FFFFF (4x wav data buffers (22050hz, 16bit, stereo))
+		WBANK[0-1]          (14MiB        ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
 		SBANK[0-7]          (2MiB         ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
 		ROM                 (16MiB        ) 0x04800000 - 0x057FFFFF (string data + user ROM)
 	MEMORY CARD:
@@ -58,6 +58,7 @@ global e3d.VER_PATCH <comptime> = 0
 -- memory size and address constants
 global e3d.SRC_SIZE            <comptime> = 1024*1024
 global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
+global e3d.RMEM_SIZE           <comptime> = (632*1024) -- 632KiB
 global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
@@ -79,7 +80,7 @@ local mem_regions = {
 	{name='TMEM',    size=GPU_TMEM_SIZE.value * 4},
 	{name='OMEM',    size=GPU_OMEM_SIZE.value * 4},
 	{name='AMEM',    size=SOUNDCHIP_AMEM_SIZE.value * 2},
-	{name='UNUSED',  size=((4 * 1024 * 1024) - GPU_OMEM_SIZE.value * 4) - (SOUNDCHIP_AMEM_SIZE.value * 2)},
+	{name='RMEM',    size=632 * 1024},
 	{name='WMEM',    size=SOUNDCHIP_WMEM_SIZE.value * 2},
 	{name='SMEM',    size=SOUNDCHIP_SMEM_SIZE.value},
 	{name='GLOBALS', size=65536 * 4},
@@ -443,6 +444,7 @@ e3d.EVM = @record {
 	bytecode: [e3d.BYTECODE_SIZE]uint8,
 	callstack: [e3d.CALLSTACK_SIZE]e3d.CallFrame,
 	api_funcs: [e3d.API_FUNCS_SIZE]e3d.APIFunction,
+	rmem: [e3d.RMEM_SIZE]uint8,
 	cf: e3d.CallFrame,
 	rom_len: uinteger,
 	bytecode_len: uinteger,
@@ -457,7 +459,6 @@ e3d.EVM = @record {
 	current_hook: uinteger,
 	
 	-- compiler vars
-	--src: string,
 	src: [e3d.SRC_SIZE]uint8,
 	src_len: uinteger,
 	src_index: uinteger,

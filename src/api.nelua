@@ -29,7 +29,10 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	void print3d(vec3 pos, string fmt, ...);
 	
 	// advanced graphics
-	// ortho(), etc.?
+	lookat(),
+	mulmatrix(), ...
+	get/setBlendMode()
+
 	void normal(vec3 norm);
 	
 	// lighting
@@ -47,7 +50,8 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	string strfmt(string fmt, ...);
 	
 	// i/o
-	// ...
+	initMemoryCard()
+	swapCart()?
 ]]
 
 -- DEBUG API FUNCTIONS (TODO: remove)
@@ -2026,6 +2030,48 @@ local function apiScale(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function apiFrustum(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void frustum(float left, float right, float bottom, float top, float near, float far);
+
+	local left: float32 = vm:getArgF(0)
+	local right: float32 = vm:getArgF(1)
+	local bottom: float32 = vm:getArgF(2)
+	local top: float32 = vm:getArgF(3)
+	local near: float32 = vm:getArgF(4)
+	local far: float32 = vm:getArgF(5)
+
+	if left == right or top == bottom or near == far then
+		vm.error = "RUNTIME ERROR: invalid frustum parameters"
+		return false
+	end
+
+	rlgl.frustum(left, right, bottom, top, near, far)
+
+	return true
+end
+
+local function apiOrtho(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void ortho(float left, float right, float bottom, float top, float near, float far);
+	
+	local left: float32 = vm:getArgF(0)
+	local right: float32 = vm:getArgF(1)
+	local bottom: float32 = vm:getArgF(2)
+	local top: float32 = vm:getArgF(3)
+	local near: float32 = vm:getArgF(4)
+	local far: float32 = vm:getArgF(5)
+
+	if left == right or top == bottom or near == far then
+		vm.error = "RUNTIME ERROR: invalid ortho parameters"
+		return false
+	end
+
+	rlgl.ortho(left, right, bottom, top, near, far)
+
+	return true
+end
+
 local function apiPeek8(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int peek8(int addr);
@@ -2648,14 +2694,40 @@ function e3d.EVM:registerAPI(): void
 		{name="setFogEnd",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSetFogEnd},
 		{name="getFogColor",     type_info={e3d.EVMType.INT},                                         func=apiGetFogColor},
 		{name="setFogColor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetFogColor},
-		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiMatrixMode},
 		{name="clear",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiClear},
+		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiMatrixMode},
 		{name="pushMatrix",      type_info={e3d.EVMType.VOID},                                        func=apiPushMatrix},
 		{name="popMatrix",       type_info={e3d.EVMType.VOID},                                        func=apiPopMatrix},
 		{name="identity",        type_info={e3d.EVMType.VOID},                                        func=apiIdentity},
 		{name="translate",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiTranslate},
 		{name="rotate",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiRotate},
 		{name="scale",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiScale},
+		{
+			name="frustum",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT}
+			},
+			func=apiFrustum
+		},
+		{
+			name="ortho",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT},
+				{type_id=e3d.EVMType.FLOAT}
+			},
+			func=apiOrtho
+		},
 		{name="vertex",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiVertex},
 		{name="vertex2D",        type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertex2D},
 		{name="vertUV",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertUV},

@@ -29,7 +29,7 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
         io.printf('TMEM:     0x%08X - 0x%08X\n', e3d.TMEM_START_ADDR, e3d.TMEM_MAX_ADDR)
         io.printf('OMEM:     0x%08X - 0x%08X\n', e3d.OMEM_START_ADDR, e3d.OMEM_MAX_ADDR)
         io.printf('AMEM:     0x%08X - 0x%08X\n', e3d.AMEM_START_ADDR, e3d.AMEM_MAX_ADDR)
-        io.printf('UNUSED:   0x%08X - 0x%08X\n', e3d.UNUSED_START_ADDR, e3d.UNUSED_MAX_ADDR)
+        io.printf('RMEM:     0x%08X - 0x%08X\n', e3d.RMEM_START_ADDR, e3d.RMEM_MAX_ADDR)
         io.printf('WMEM:     0x%08X - 0x%08X\n', e3d.WMEM_START_ADDR, e3d.WMEM_MAX_ADDR)
         io.printf('SMEM:     0x%08X - 0x%08X\n', e3d.SMEM_START_ADDR, e3d.SMEM_MAX_ADDR)
         io.printf('GLOBALS:  0x%08X - 0x%08X\n', e3d.GLOBALS_START_ADDR, e3d.GLOBALS_MAX_ADDR)

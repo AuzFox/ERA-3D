@@ -299,8 +299,8 @@ function e3d.EVM:getMem8(addr: uint32): uint8
 	elseif addr <= e3d.AMEM_MAX_ADDR then
 		local frame: uint16 = self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2]
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
-	elseif addr <= e3d.UNUSED_MAX_ADDR then
-		return 0
+	elseif addr <= e3d.RMEM_MAX_ADDR then
+		return self.rmem[addr - e3d.RMEM_START_ADDR]
 	elseif addr <= e3d.WMEM_MAX_ADDR then
 		local frame: uint16 = self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2]
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
@@ -368,8 +368,8 @@ function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean
 		local frame: *uint16 = (@*uint16)(&self.soundchip.amem[(addr - e3d.AMEM_START_ADDR) /// 2])
 		local shift: uinteger = 8 * (addr & 1)
 		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
-	elseif addr <= e3d.UNUSED_MAX_ADDR then
-		return true
+	elseif addr <= e3d.RMEM_MAX_ADDR then
+		self.rmem[addr - e3d.RMEM_START_ADDR] = val
 	elseif addr <= e3d.WMEM_MAX_ADDR then
 		local frame: *uint16 = (@*uint16)(&self.soundchip.wmem[(addr - e3d.WMEM_START_ADDR) /// 2])
 		local shift: uinteger = 8 * (addr & 1)
@@ -415,8 +415,9 @@ function e3d.EVM:getMem32(addr: uint32): uint32
 		local frame0: uint32 = (@uint32)(self.soundchip.amem[index])
 		local frame1: uint32 = (@uint32)(self.soundchip.amem[index + 1])
 		return (frame0 << 16) | frame1
-	elseif addr <= e3d.UNUSED_MAX_ADDR then
-		return 0
+	elseif addr <= e3d.RMEM_MAX_ADDR then
+		addr = addr - e3d.RMEM_START_ADDR
+		return ((@uint32)(self.rmem[addr]) << 24) | ((@uint32)(self.rmem[addr + 1]) << 16) | ((@uint32)(self.rmem[addr + 2]) << 8) | (@uint32)(self.rmem[addr + 3])
 	elseif addr <= e3d.WMEM_MAX_ADDR then
 		local index: uinteger = (addr - e3d.WMEM_START_ADDR) /// 2
 		local frame0: uint32 = (@uint32)(self.soundchip.wmem[index])
@@ -478,8 +479,12 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
 		addr = (addr - e3d.AMEM_START_ADDR) /// 2
 		self.soundchip.amem[addr] = frame0
 		self.soundchip.amem[addr + 1] = frame1
-	elseif addr <= e3d.UNUSED_MAX_ADDR then
-		return true
+	elseif addr <= e3d.RMEM_MAX_ADDR then
+		addr = addr - e3d.RMEM_START_ADDR
+		self.rmem[addr] = val >> 24
+		self.rmem[addr + 1] = (val & 0xFF0000) >> 16
+		self.rmem[addr + 2] = (val & 0x00FF00) >> 8
+		self.rmem[addr + 3] = val & 0xFF
 	elseif addr <= e3d.WMEM_MAX_ADDR then
 		local frame0: uint16 = val >> 16
 		local frame1: uint16 = val & 0xFFFF
@@ -2116,7 +2121,7 @@ function e3d.newVM(): *e3d.EVM
 	vm:registerBuiltins()
 	
 	vm.gpu:init()
-	vm.soundchip:init()
+	vm.soundchip:init(&vm.rmem, &vm.cart.wbank, &vm.cart.sbank)
 	vm:resetVM(false)
 	return vm
 end

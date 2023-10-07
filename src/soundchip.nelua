@@ -1,7 +1,21 @@
 require("blipkit")
 require("raylib")
 
--- NOTE: use entire WMEM range as sample buffer, set sample range and repeat mode when changing instruments
+-- TODO: implement playback from SBANK
+
+global SoundchipBank = @enum {
+	SYSTEM = 0,
+	WBANK0 = 1,
+	WBANK1,
+	SBANK0 = 1,
+	SBANK1,
+	SBANK2,
+	SBANK3,
+	SBANK4,
+	SBANK5,
+	SBANK6,
+	SBANK7
+}
 
 global SOUNDCHIP_TRACK_COUNT <comptime> = 8
 global SOUNDCHIP_SAMPLE_RATE <comptime> = 22050 -- 22050hz sample rate
@@ -14,20 +28,16 @@ global SOUNDCHIP_MAX_OCTAVE <comptime> = 7
 global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
 
 global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
-global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * 8
+global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * 5
 global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
 global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 11
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
 global SOUNDCHIP_GROOVE_SIZE <comptime> = 16
 global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
-global SOUNDCHIP_AUDIO_STATE_SIZE <comptime> = 1
-global SOUNDCHIP_TRACK_STATE_SIZE <comptime> = 10
 
 global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
 global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
-global SOUNDCHIP_AUDIO_STATE_START <comptime> = SOUNDCHIP_GROOVE_DATA_START + (SOUNDCHIP_GROOVE_COUNT * SOUNDCHIP_GROOVE_SIZE)
-global SOUNDCHIP_TRACK_STATE_START <comptime> = SOUNDCHIP_AUDIO_STATE_START + SOUNDCHIP_AUDIO_STATE_SIZE
 global SOUNDCHIP_WMEM_SIZE <comptime> = ((7*1024*1024)///2) -- 7 MiB of 16 bit audio samples
 global SOUNDCHIP_SMEM_SIZE <comptime> = 256*1024 -- 256 KiB
 global SOUNDCHIP_AMEM_SIZE <comptime> = SOUNDCHIP_FRAMES_PER_UPDATE*2 -- 8 KiB
@@ -47,7 +57,7 @@ global TrackContext = @record {
 	track_index: uint8
 }
 
--- track state object, stored in smem
+-- track state object, stored in rmem
 global TrackState = @record {
 	bpm: uint8,
 	volume: uint8,
@@ -69,8 +79,14 @@ SoundChip = @record {
 	bk_context: BKContext,
 	bk_data: BKData,
 	audio_stream: rl.audioStream,
+	current_wbank: uint8, -- which region of memory to use for sample data
+	current_sbank: uint8, -- which region of memory to use for sequencer data
+	bk_data_flags: BKEnum, -- flags describing sample data format
 
-	-- smem pointers
+	-- memory pointers
+	rmem_ptr: *[0]uint8,
+	wbank_ptr: *[0]BKFrame,
+	sbank_ptr: *[0]uint8,
 	song_data: *[0]uint8,
 	pattern_data: *[0]uint8,
 	instrument_data: *[0]uint8,
@@ -79,23 +95,43 @@ SoundChip = @record {
 	track_state: *[0]uint8
 }
 
-function SoundChip:getTrackSate(id: uinteger): *TrackState
-    return (@*TrackState)(&self.smem[SOUNDCHIP_TRACK_STATE_START + (id * #TrackState)])
+function SoundChip:getTrackState(id: uinteger): *TrackState
+    return (@*TrackState)(&self.track_state[id * #TrackState])
 end
 
 function SoundChip:getPattern(id: uinteger): *[0]uint8
-    return (@*[0]uint8)(&self.smem[SOUNDCHIP_PATTERN_DATA_START + (id * SOUNDCHIP_PATTERN_SIZE)])
+    return (@*[0]uint8)(&self.pattern_data[id * SOUNDCHIP_PATTERN_SIZE])
 end
 
 function SoundChip:getPatternRow(id: uinteger, row: uinteger): *[0]uint8
-    return (@*[0]uint8)(&self.smem[SOUNDCHIP_PATTERN_DATA_START + (id * SOUNDCHIP_PATTERN_SIZE) + (row * 8)])
+    return (@*[0]uint8)(&self.pattern_data[(id * SOUNDCHIP_PATTERN_SIZE) + (row * 8)])
 end
 
 function SoundChip:getInstrument(id: uinteger): *[0]uint8
-    return (@*[0]uint8)(&self.smem[SOUNDCHIP_INSTRUMENT_DATA_START + (id * SOUNDCHIP_INSTRUMENT_SIZE)])
+    return (@*[0]uint8)(&self.instrument_data[id * SOUNDCHIP_INSTRUMENT_SIZE])
 end
 
 function SoundChip:setBPM(): void
+end
+
+function SoundChip:setInstrument(track: uint8, instrument: uint8): void
+	local idata: *[0]uint8 = self:getInstrument(instrument)
+	local flags: uint8 = idata[0]
+	local sample_start: uint32 = ((@uint32)(idata[1]) << 16) | ((@uint32)(idata[2]) << 8) | (@uint32)(idata[3])
+	local sample_end: uint32 = ((@uint32)(idata[4]) << 16) | ((@uint32)(idata[5]) << 8) | (@uint32)(idata[6])
+	local attack: uint8 = idata[7]
+	local decay: uint8 = idata[8]
+	local sustain: uint8 = idata[9]
+	local release: uint8 = idata[10]
+
+	local tc: *TrackContext = &self.track_contexts[track]
+	local range: [2]BKInt = {sample_start, sample_end}
+
+	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
+	BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & 0b10000000) and 1 or 0)
+	local percentage: float32 = (@float32)(sustain) / 255.0
+	local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, attack, decay, value, release)
 end
 
 function SoundChip:playPreviewNote(note: uint8): void
@@ -131,7 +167,7 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 	-- is track playing?
 	if (sc.audio_state.playing_flags & (0x80 >> track_index)) ~= 0 then
 		-- get track state pointer from smem
-		local state: *TrackState = sc:getTrackSate(track_index)
+		local state: *TrackState = sc:getTrackState(track_index)
 
 		if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
 			sc:stopTrack(track_index)
@@ -144,6 +180,20 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 		local pattern_row: *[0]uint8 = sc:getPatternRow(state.pattern_id, state.pattern_pos)
 
 		local note: uint8 = pattern_row[0]
+		local volume: uint8 = pattern_row[1]
+		local instrument: uint8 = pattern_row[2]
+		local pan: uint8 = pattern_row[3]
+
+		if instrument ~= SOUNDCHIP_EMPTY_VALUE then
+			BKSetAttr(&tc.bk_track, BK_NOTE, BK_NOTE_MUTE)
+			sc:setInstrument(track_index, instrument)
+		end
+
+		if volume ~= SOUNDCHIP_EMPTY_VALUE then
+			local percentage: float32 = (@float32)(volume) / 254.0
+			local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+			BKSetAttr(&tc.bk_track, BK_VOLUME, value) -- note volume
+		end
 
 		if note ~= SOUNDCHIP_EMPTY_VALUE then
 			local bknote: BKInt
@@ -190,7 +240,7 @@ function SoundChip:playPattern(track: uint8, pattern: uint8): void
 		self:stopTrack(track)
 	else
 		self.audio_state.playing_flags = self.audio_state.playing_flags | (0x80 >> track)
-		local state: *TrackState = self:getTrackSate(track)
+		local state: *TrackState = self:getTrackState(track)
 		state.pattern_id = pattern
 		state.pattern_pos = 0
 	end
@@ -198,7 +248,7 @@ end
 
 function SoundChip:playSongRow(song_row: uint8): void
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
-		local state: *TrackState = self:getTrackSate(i)
+		local state: *TrackState = self:getTrackState(i)
 		local pattern_id: uint8 = self.song_data[((@uinteger)(song_row) * 8) + i]
 
 		state.song_pos = song_row
@@ -215,26 +265,66 @@ function SoundChip:updateAudio(): void
 	end
 end
 
+local function isLittleEndian(): boolean
+	local x: uint32 <volatile> = 0x01234567
+	local p: *uint8 = (@*uint8)(&x)
+	return $p == 0x67
+end
+
+-- custom version of BKDataSetData that doesn't allocate separate storage
+local function setBKDataPointer(data: *BKData, frame_data: pointer, data_size: BKUInt, num_channels: BKUInt, params: BKEnum): void
+	local num_bits: BKUInt = 16
+	local num_frames: BKInt
+	local packet_size: BKInt
+	local data_size_bits: BKInt = data_size * 8
+
+	if num_bits <= 8 then
+		packet_size = (num_bits * num_channels)
+	else
+		packet_size = (num_bits + 3) /// 4 * 4 * num_channels;
+	end
+
+	num_frames = data_size_bits /// packet_size * num_channels;
+
+	data.frames = (@*BKFrame)(frame_data)
+	data.numFrames = num_frames /// num_channels
+	data.numChannels = num_channels
+	data.numBits = num_bits
+end
+
+function SoundChip:updateBankPointers(): void
+	local wp: pointer
+	if self.current_wbank == SoundchipBank.SYSTEM then
+		wp = &self.wmem
+	else
+		local index: uinteger = self.current_wbank - SoundchipBank.WBANK0
+		wp = &self.wbank_ptr[(7*1024*1024) * index]
+	end
+
+	setBKDataPointer(&self.bk_data, wp, 7*1024*1024, 2, self.bk_data_flags)
+	BKSetAttr(&self.bk_data, BK_SAMPLE_PITCH, 0)
+
+	if self.current_sbank == SoundchipBank.SYSTEM then
+		self.song_data = (@*[0]uint8)(&self.smem[0])
+		self.pattern_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_PATTERN_DATA_START])
+		self.instrument_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_INSTRUMENT_DATA_START])
+		self.groove_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_GROOVE_DATA_START])
+	else
+		local index: uint64 = self.current_sbank - SoundchipBank.SBANK0
+		index = index * SOUNDCHIP_SMEM_SIZE
+		self.song_data = (@*[0]uint8)(&self.sbank_ptr[index])
+		self.pattern_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_PATTERN_DATA_START])
+		self.instrument_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_INSTRUMENT_DATA_START])
+		self.groove_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_GROOVE_DATA_START])
+	end
+end
+
 function SoundChip:resetSoundchip(): void
 	self.audio_state.playing_flags = 0
 
-    -- reset song
-	memory.set(self.song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
-
-    -- reset patterns, each pattern row set to all EMPTY
-    memory.set(self.pattern_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
-
-	-- reset instruments
-	-- ...
-
-	self.song_data[0] = 0x00
-	self.song_data[8] = 0x01
-	self.song_data[1] = 0x10
-	self.song_data[9] = 0x11
-
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
-		local state: *TrackState = self:getTrackSate(i)
+		local state: *TrackState = self:getTrackState(i)
 		state.bpm = 154
 		state.volume = 127
 		state.pan = 0
@@ -250,7 +340,11 @@ function SoundChip:resetSoundchip(): void
 	self:stopPreviewNote()
 end
 
-function SoundChip:init(): void
+function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: *[0]uint8): void
+	self.rmem_ptr = rmem_ptr
+	self.wbank_ptr = wbank_ptr
+	self.sbank_ptr = sbank_ptr
+
 	rl.initAudioDevice()
 
 	rl.setAudioStreamBufferSizeDefault(SOUNDCHIP_FRAMES_PER_UPDATE)
@@ -261,31 +355,18 @@ function SoundChip:init(): void
 	-- init BlipKit stuff
 	BKContextInit(&self.bk_context, 2, SOUNDCHIP_SAMPLE_RATE)
 
-	--[[ sample loading test
-	local w: rl.wave = rl.loadWave("test_data/pluck.wav")
-	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
-	for i: uint64 = 0, < w.frameCount do
-		local frame: BKFrame = wframes[i]
-		self.wmem[i * 2] = frame
-		self.wmem[(i * 2) + 1] = frame
-	end
-	rl.unloadWave(w)
-	]]
-
 	BKDataInit(&self.bk_data)
-	local flags: BKEnum = BK_16_BIT_SIGNED
-	do
-		-- endian test
-		local x: uint32 <volatile> = 0x01234567
-		local p: *uint8 = (@*uint8)(&x)
-		if $p == 0x67 then
-			flags = flags | BK_LITTLE_ENDIAN
-		else
-			flags = flags | BK_BIG_ENDIAN
-		end
+	self.bk_data_flags = BK_16_BIT_SIGNED
+	if isLittleEndian() then
+		self.bk_data_flags = self.bk_data_flags | BK_LITTLE_ENDIAN
+	else
+		self.bk_data_flags = self.bk_data_flags | BK_BIG_ENDIAN
 	end
-	BKDataSetData(&self.bk_data, &self.wmem, 7*1024*1024, 2, flags)
-	BKSetAttr(&self.bk_data, BK_SAMPLE_PITCH, 0)
+	self.current_wbank = SoundchipBank.WBANK0
+	self.current_sbank = SoundchipBank.WBANK1
+	self:updateBankPointers()
+	self.audio_state = (@*AudioState)(&self.rmem_ptr[0])
+	self.track_state = (@*[0]uint8)(&self.rmem_ptr[1])
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -320,7 +401,7 @@ function SoundChip:init(): void
 		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 4) -- note volume
 		BKTrackAttach(&tc.bk_track, &self.bk_context)
 
-		local range: [2]BKInt = {0, 88200 * 2}
+		local range: [2]BKInt = {0, 88200}
 		BKSetPtr(&tc.bk_track, BK_SAMPLE, &self.bk_data, 0)
 		BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 		BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, 1)
@@ -339,14 +420,62 @@ function SoundChip:init(): void
 	BKSetAttr(&self.preview_bk_track, BK_VOLUME, BK_MAX_VOLUME /// 4) -- note volume
 	BKTrackAttach(&self.preview_bk_track, &self.bk_context)
 
-	self.song_data = (@*[0]uint8)(&self.smem[0])
-	self.pattern_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_PATTERN_DATA_START])
-	self.instrument_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_INSTRUMENT_DATA_START])
-	self.groove_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_GROOVE_DATA_START])
-	self.audio_state = (@*AudioState)(&self.smem[SOUNDCHIP_AUDIO_STATE_START])
-	self.track_state = (@*[0]uint8)(&self.smem[SOUNDCHIP_TRACK_STATE_START])
-
 	self:resetSoundchip()
+
+	-- reset song
+	memory.set(self.song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
+
+    -- reset patterns, each pattern row set to all EMPTY
+    memory.set(self.pattern_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
+
+	-- reset instruments
+	-- ...
+
+	self.song_data[0] = 0x00
+	self.song_data[8] = 0x01
+	self.song_data[1] = 0x10
+	self.song_data[9] = 0x11
+
+	for i = 0, < 16 do
+		self:getPatternRow(0x00, i)[1] = 0xA0
+		self:getPatternRow(0x00, i)[2] = 0
+	end
+
+	local instr0: *[0]uint8 = self:getInstrument(0)
+	local instr1: *[0]uint8 = self:getInstrument(1)
+
+	instr0[0] = 0
+	instr0[1] = 0
+	instr0[2] = 0
+	instr0[3] = 0
+	instr0[4] = (88200 >> 16) & 0xFF
+	instr0[5] = (88200 >> 8) & 0xFF
+	instr0[6] = (88200) & 0xFF
+	instr0[7] = 0
+	instr0[8] = 0
+	instr0[9] = 255
+	instr0[10] = 4
+
+	instr1[0] = 0b10000000
+	instr1[1] = (44100 >> 16) & 0xFF
+	instr1[2] = (44100 >> 8) & 0xFF
+	instr1[3] = (44100) & 0xFF
+	instr1[4] = 0
+	instr1[5] = 0
+	instr1[6] = 0
+	instr1[7] = 0
+	instr1[8] = 0
+	instr1[9] = 255
+	instr1[10] = 4
+
+	local w: rl.wave = rl.loadWave("test_data/pluck.wav")
+	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
+	for i: uint64 = 0, < w.frameCount do
+		local frame: BKFrame = wframes[i]
+		self.wbank_ptr[i * 2] = frame
+		self.wbank_ptr[(i * 2) + 1] = frame
+	end
+	rl.unloadWave(w)
 
 	rl.playAudioStream(self.audio_stream)
 end
