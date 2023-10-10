@@ -9,6 +9,7 @@ require("allocators.default")
 require("math")
 require("coroutine")
 
+require("util")
 require("soundchip")
 require("gpu")
 

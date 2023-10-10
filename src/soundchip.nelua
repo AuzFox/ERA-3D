@@ -28,7 +28,8 @@ global SOUNDCHIP_MAX_OCTAVE <comptime> = 7
 global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
 
 global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
-global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * 5
+global SOUNDCHIP_PATTERN_ROW_SIZE <comptime> = 5
+global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * SOUNDCHIP_PATTERN_ROW_SIZE
 global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
 global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 11
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
@@ -104,7 +105,7 @@ function SoundChip:getPattern(id: uinteger): *[0]uint8
 end
 
 function SoundChip:getPatternRow(id: uinteger, row: uinteger): *[0]uint8
-    return (@*[0]uint8)(&self.pattern_data[(id * SOUNDCHIP_PATTERN_SIZE) + (row * 8)])
+    return (@*[0]uint8)(&self.pattern_data[(id * SOUNDCHIP_PATTERN_SIZE) + (row * SOUNDCHIP_PATTERN_ROW_SIZE)])
 end
 
 function SoundChip:getInstrument(id: uinteger): *[0]uint8
@@ -430,16 +431,6 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 
 	-- reset instruments
 	-- ...
-
-	self.song_data[0] = 0x00
-	self.song_data[8] = 0x01
-	self.song_data[1] = 0x10
-	self.song_data[9] = 0x11
-
-	for i = 0, < 16 do
-		self:getPatternRow(0x00, i)[1] = 0xA0
-		self:getPatternRow(0x00, i)[2] = 0
-	end
 
 	local instr0: *[0]uint8 = self:getInstrument(0)
 	local instr1: *[0]uint8 = self:getInstrument(1)

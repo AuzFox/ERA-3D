@@ -1,6 +1,7 @@
 require("statemachine")
 
 local PIANO_KEYS_COUNT <comptime> = SOUNDCHIP_OCTAVE_SIZE * 2
+local HEX_KEYS_COUNT <comptime> = 16
 
 local Editor = @enum {
     SONG = 0,
@@ -19,7 +20,7 @@ local TrackerData = @record {
     song_id: uint8,
     song_x: integer,
     song_y: integer,
-    pattern_id: uint8,
+    track: integer,
     pattern_x: integer,
     pattern_y: integer
 }
@@ -66,7 +67,26 @@ local piano_keys: [PIANO_KEYS_COUNT]cint = {
     rl.keyboardKey.SIX,   -- G#
     rl.keyboardKey.Y,     -- A
     rl.keyboardKey.SEVEN, -- A#
-    rl.keyboardKey.U,     -- B
+    rl.keyboardKey.U      -- B
+}
+
+local hex_keys: [HEX_KEYS_COUNT]cint = {
+    rl.keyboardKey.ZERO,
+    rl.keyboardKey.ONE,
+    rl.keyboardKey.TWO,
+    rl.keyboardKey.THREE,
+    rl.keyboardKey.FOUR,
+    rl.keyboardKey.FIVE,
+    rl.keyboardKey.SIX,
+    rl.keyboardKey.SEVEN,
+    rl.keyboardKey.EIGHT,
+    rl.keyboardKey.NINE,
+    rl.keyboardKey.A,
+    rl.keyboardKey.B,
+    rl.keyboardKey.C,
+    rl.keyboardKey.D,
+    rl.keyboardKey.E,
+    rl.keyboardKey.F
 }
 
 local data: TrackerData
@@ -90,12 +110,7 @@ end
 local function drawSong(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     vm.gpu:print2D(6, 0, GPU_WHITE, "SBANK 0")
 
-    local start_row: int32 = data.song_y - 2
-    if start_row < 0 then
-        start_row = 0
-    elseif start_row > 251 then
-        start_row = 251
-    end
+    local start_row: int32 = util.midI(0, data.song_y - 2, 251)
 
     for x = 0, < SOUNDCHIP_TRACK_COUNT do
         for y = 0, < 5 do
@@ -107,7 +122,7 @@ local function drawSong(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
             vm.gpu:printHexByte2D(6, starty, GPU_RED, start_row + y)
 
             if (data.song_x /// 2) == x and data.song_y == (start_row + y) then
-                vm.gpu:drawRect2D(startx + ((data.song_x & 1) * 6), starty, 6, 9, GPU_RED)
+                vm.gpu:drawRect2D(startx + ((data.song_x & 1) * 6), starty, 6, 9, (data.current_editor == Editor.SONG) and GPU_RED or GPU_GRAY)
             end
 
             if byte_val == SOUNDCHIP_EMPTY_VALUE then
@@ -134,78 +149,125 @@ local function getNoteText(note: uint8): string
 end
 
 local function drawPatterns(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    --[[
-    if data.pattern_x == 0 then
-        vm.gpu:drawRect2D(12, 72 + (data.pattern_y * 9), 18, 9, cursor_color)
-    else
-        vm.gpu:drawRect2D(30 + ((data.pattern_x - 1) * 12), 72 + (data.pattern_y * 9), 12, 9, cursor_color)
-    end
+    local start_track: int32 = util.midI(0, data.track - 1, 4)
+    local start_pattern_y: int32 = 90
 
-    vm.gpu:printHexByte2D(0, 63, text_color, data.pattern_id)
+    for i = 0, < 4 do
+        local start_pattern_x: int32 = 6 + (i * 13 * 6)
 
-    for i = 0, < 16 do
-        local y: int32 = 72 + i * 9
-        local row: *[0]uint8 = vm.soundchip:getPatternRow(data.pattern_id, i)
+        if data.track == start_track + i then
+            vm.gpu:drawRect2D(start_pattern_x + 12, start_pattern_y - 18, 42, 9, (data.current_editor == Editor.PATTERN) and GPU_RED or GPU_GRAY)
+        end
+        vm.gpu:print2D(start_pattern_x + 12, start_pattern_y - 18, GPU_WHITE, "TRACK")
+        vm.gpu:printHexNibble2D(start_pattern_x + 48, start_pattern_y - 18, GPU_WHITE, start_track + i)
 
-        -- note, vol, pan, instr, fx0, arg0, fx1, arg1
-        local note_val: uint8 = row[0]
+        local start_row: int32 = util.midI(0, data.pattern_y - 7, 64-16)
+        for j = 0, < 16 do
+            local y: int32 = start_pattern_y + j * 9
 
-        vm.gpu:printHexNibble2D(0, y, text_color, (@uint8)(i))
+            if (data.track == start_track + i) and (data.pattern_y == start_row + j) then
+                -- draw cursor
+                local cx: int32
+                local cw: int32 = 6
 
-        vm.gpu:print2D(12, y, text_color, getNoteText(note_val))
+                if data.pattern_x == 0 then
+                    cx = 0
+                    cw = 18
+                else
+                    cx = 18 + ((data.pattern_x - 1) * 6)
+                end
 
-        for j = 1, < 8 do
-            local val: uint8 = row[j]
-            local x: int32 = 30 + ((j - 1) * 12)
-            if val == SOUNDCHIP_EMPTY_VALUE then
-                vm.gpu:print2D(x, y, text_color, "..")
+                vm.gpu:drawRect2D(start_pattern_x + 12 + cx, y, cw, 9, (data.current_editor == Editor.PATTERN) and GPU_RED or GPU_GRAY)
+            end
+
+            local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + (start_track + i)], start_row + j)
+            local note: uint8 = row[0]
+            local vol: uint8 = row[1]
+            local instr: uint8 = row[2]
+            local fx: uint8 = row[3]
+            local arg: uint8 = row[4]
+
+            vm.gpu:printHexByte2D(start_pattern_x, y, GPU_RED, start_row + j)
+            vm.gpu:print2D(start_pattern_x + 12, y, GPU_WHITE, getNoteText(note))
+            if vol == SOUNDCHIP_EMPTY_VALUE then
+                vm.gpu:print2D(start_pattern_x + 30, y, GPU_GREEN, "..")
             else
-                vm.gpu:printHexByte2D(x, y, text_color, val)
+                vm.gpu:printHexByte2D(start_pattern_x + 30, y, GPU_GREEN, vol)
+            end
+            if instr == SOUNDCHIP_EMPTY_VALUE then
+                vm.gpu:print2D(start_pattern_x + 42, y, GPU_BLUE, "..")
+            else
+                vm.gpu:printHexByte2D(start_pattern_x + 42, y, GPU_BLUE, instr)
+            end
+            vm.gpu:print2D(start_pattern_x + 54, y, GPU_RED, ".")
+            if fx == SOUNDCHIP_EMPTY_VALUE then
+                vm.gpu:print2D(start_pattern_x + 60, y, GPU_WHITE, "..")
+            else
+                vm.gpu:printHexByte2D(start_pattern_x + 60, y, GPU_WHITE, arg)
             end
         end
     end
-
-    for i = 0, < 4 do
-        local start_track: int32 = (data.song_x /// 2) - 1
-        if start_track < 0 then
-            start_track = 0
-        elseif start_track > then
-            start_track = 
-        end
-    end
-    ]]
 end
 
-local function doNoteInput(vm: *e3d.EVM): void
-    local row: *[0]uint8 = vm.soundchip:getPatternRow(data.pattern_id, data.pattern_y)
+local function doNoteInput(vm: *e3d.EVM): boolean
+    local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
 
     if rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
         row[0] = SOUNDCHIP_EMPTY_VALUE
-        data.pattern_y = data.pattern_y + 1
+        return true
     elseif rl.isKeyPressed(rl.keyboardKey.COMMA) then
         row[0] = SOUNDCHIP_NOTE_RELEASE
-        data.pattern_y = data.pattern_y + 1
+        return true
     elseif rl.isKeyPressed(rl.keyboardKey.PERIOD) then
         row[0] = SOUNDCHIP_NOTE_MUTE
-        data.pattern_y = data.pattern_y + 1
+        return true
     else
         for i = 0, < PIANO_KEYS_COUNT do
             if rl.isKeyPressed(piano_keys[i]) then
                 if vm.soundchip.audio_state.playing_flags == 0 then
                     local note: uint8 = (@uint8)(i + data.octave * SOUNDCHIP_OCTAVE_SIZE)
                     row[0] = note
-                    data.pattern_y = data.pattern_y + 1
                     vm.soundchip:playPreviewNote(note)
+                    return true
                 end
             elseif rl.isKeyReleased(piano_keys[i]) then
                 vm.soundchip:stopPreviewNote()
+                return false
             end
         end
     end
 
-    if data.pattern_y > 15 then
-        data.pattern_y = 0
+    return false
+end
+
+local function doHexInput(vm: *e3d.EVM, byte_ptr: *[0]uint8, nibble_index: uinteger): boolean
+    local pressed: boolean = false
+    local nibble: uint8
+
+    for i: uint8 = 0, < HEX_KEYS_COUNT do
+        if rl.isKeyPressed(hex_keys[i]) then
+            pressed = true
+            nibble = i
+        end
     end
+
+    if pressed then
+        local byte_val: uint8 = byte_ptr[0]
+
+        if byte_val == SOUNDCHIP_EMPTY_VALUE then
+            byte_val = 0
+        end
+
+        if nibble_index == 0 then
+            byte_val = (byte_val & 0x0F) | (nibble << 4)
+        else
+            byte_val = (byte_val & 0xF0) | nibble
+        end
+
+        byte_ptr[0] = byte_val
+    end
+
+    return pressed
 end
 
 global function stateTrackerInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
@@ -218,13 +280,14 @@ global function stateTrackerInit(this: *State, sm: *StateMachine, vm: *e3d.EVM):
     data.song_id = 0
     data.song_x = 0
     data.song_y = 0
-    data.pattern_id = 0
+    data.track = 0
     data.pattern_x = 0
     data.pattern_y = 0
 end
 
 global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
+    local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
 
     --[[
 
@@ -310,41 +373,77 @@ global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM
     end
     ]]
 
+    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.TAB) then
+        if data.current_editor == Editor.SONG then
+            data.current_editor = Editor.PATTERN
+        else
+            data.current_editor = Editor.SONG
+        end
+        return StateID.TRACKER
+    end
+
     switch data.current_editor do
         case Editor.SONG then
             if rl.isKeyPressed(rl.keyboardKey.UP) then
-                if data.song_y > 0 then
-                    data.song_y = data.song_y - 1
-                end
+                data.song_y = util.wrapI(data.song_y - 1, 0, 256)
             elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-                if data.song_y < 255 then
-                    data.song_y = data.song_y + 1
-                end
+                data.song_y = util.wrapI(data.song_y + 1, 0, 256)
             elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
-                if data.song_x > 0 then
-                    data.song_x = data.song_x - 1
-                end
+                data.song_x = util.wrapI(data.song_x - 1, 0, 16)
             elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-                if data.song_x < 15 then
-                    data.song_x = data.song_x + 1
+                data.song_x = util.wrapI(data.song_x + 1, 0, 16)
+            else
+                if doHexInput(
+                    vm,
+                    &vm.soundchip.song_data[8 * data.song_y + (data.song_x /// 2)],
+                    data.song_x & 1
+                ) then
+                    data.song_x = util.wrapI(data.song_x + 1, 0, 16)
                 end
             end
         case Editor.PATTERN then
-            if rl.isKeyPressed(rl.keyboardKey.UP) then
-                if data.pattern_y > 0 then
-                    data.pattern_y = data.pattern_y - 1
+            if rl.isKeyPressed(rl.keyboardKey.TAB) then
+                if is_shift_down then
+                    data.track = util.wrapI(data.track - 1, 0, 8)
+                else
+                    data.track = util.wrapI(data.track + 1, 0, 8)
                 end
+            elseif rl.isKeyPressed(rl.keyboardKey.UP) then
+                data.pattern_y = util.wrapI(data.pattern_y - 1, 0, 64)
             elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-                if data.pattern_y < 63 then
-                    data.pattern_y = data.pattern_y + 1
-                end
+                data.pattern_y = util.wrapI(data.pattern_y + 1, 0, 64)
             elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
-                if data.pattern_x > 0 then
-                    data.pattern_x = data.pattern_x - 1
-                end
+                data.pattern_x = util.wrapI(data.pattern_x - 1, 0, 8)
             elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-                if data.pattern_x < 10 then
-                    data.pattern_x = data.pattern_x + 1
+                data.pattern_x = util.wrapI(data.pattern_x + 1, 0, 8)
+            else
+                switch data.pattern_x do
+                    case 0 then -- note
+                        if doNoteInput(vm) then
+                            data.pattern_y = util.wrapI(data.pattern_y + 1, 0, 64)
+                        end
+                    case 1,2,3,4,6,7 then -- vol, inst, arg
+                        local nibble_index: uinteger
+                        local byte_index: uinteger
+                        local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
+
+                        if data.pattern_x < 6 then
+                            nibble_index = (data.pattern_x - 1) & 1
+                            byte_index = (data.pattern_x < 3) and 1 or 2
+                        else
+                            nibble_index = data.pattern_x & 1
+                            byte_index = 4
+                        end
+
+                        if doHexInput(
+                            vm,
+                            &row[byte_index],
+                            nibble_index
+                        ) then
+                            data.pattern_x = util.wrapI(data.pattern_x + 1, 0, 8)
+                        end
+                    case 5 then -- fx
+                        do end
                 end
             end
     end
@@ -355,6 +454,7 @@ end
 global function stateTrackerDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
     vm.gpu:clear(GPU_BLACK)
     
+    --[[
     vm.gpu:camera3D(0)
 
     rlgl.pushMatrix()
@@ -378,12 +478,13 @@ global function stateTrackerDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM):
             vm.gpu:vertex({0.0, 0.5, 0.0})
         vm.gpu:endMesh()
     rlgl.popMatrix()
+    ]]
 
     vm.gpu:camera2D(0)
 
     --drawLevels(this, sm, vm)
     drawSong(this, sm, vm)
-    --drawPatterns(this, sm, vm)
+    drawPatterns(this, sm, vm)
 
     return StateID.TRACKER
 end

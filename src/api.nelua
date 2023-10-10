@@ -503,24 +503,8 @@ local function apiMidi(vm: *e3d.EVM): boolean
 	local a: int32 = vm:getArgI(0)
 	local b: int32 = vm:getArgI(1)
 	local c: int32 = vm:getArgI(2)
-
-	if b < a then
-		local t: int32 = a
-		a = b
-		b = t
-	end
-	if c < b then
-		local t: int32 = c
-		c = b
-		b = t
-	end
-	if b < a then
-		local t: int32 = a
-		a = b
-		b = t
-	end
 	
-	vm:pushI(b)
+	vm:pushI(util.midI(a, b, c))
 
 	return true
 end
@@ -532,21 +516,8 @@ local function apiWrapi(vm: *e3d.EVM): boolean
 	local x: int32 = vm:getArgI(0)
 	local min: int32 = vm:getArgI(1)
 	local max: int32 = vm:getArgI(2)
-	
-	if min == max then
-        vm:pushI(min)
-		return true
-    elseif min > max then
-        min, max = max, min
-    end
 
-    -- TODO: code solution for when range is all negative
-    if max < 0 then
-        -- ???
-    end
-
-    local temp: float32 = max - min
-    vm:pushI(min + ((temp + ((x - min) %%% temp)) %%% temp))
+    vm:pushI(util.wrapI(x, min, max))
 	
 	return true
 end
@@ -590,24 +561,8 @@ local function apiMidf(vm: *e3d.EVM): boolean
 	local a: float32 = vm:getArgF(0)
 	local b: float32 = vm:getArgF(1)
 	local c: float32 = vm:getArgF(2)
-
-	if b < a then
-	    local t: float32 = a
-	    a = b
-	    b = t
-	end
-	if c < b then
-	    local t: float32 = c
-	    c = b
-	    b = t
-	end
-	if b < a then
-	    local t: float32 = a
-	    a = b
-	    b = t
-	end
 	
-	vm:pushF(b)
+	vm:pushF(util.midF(a, b, c))
 
 	return true
 end
@@ -620,20 +575,7 @@ local function apiWrapf(vm: *e3d.EVM): boolean
 	local min: float32 = vm:getArgF(1)
 	local max: float32 = vm:getArgF(2)
 	
-	if min == max then
-        vm:pushF(min)
-		return true
-    elseif min > max then
-        min, max = max, min
-    end
-
-    -- TODO: code solution for when range is all negative
-    if max < 0 then
-        -- ???
-    end
-
-    local temp: float32 = max - min
-    vm:pushF(min + ((temp + ((x - min) %%% temp)) %%% temp))
+	vm:pushF(util.wrapF(x, min, max))
 	
 	return true
 end

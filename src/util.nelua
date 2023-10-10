@@ -1,0 +1,73 @@
+global util = @record {}
+
+function util.midI(a: int32, b: int32, c: int32): int32
+    if b < a then
+		local t: int32 = a
+		a = b
+		b = t
+	end
+	if c < b then
+		local t: int32 = c
+		c = b
+		b = t
+	end
+	if b < a then
+		local t: int32 = a
+		a = b
+		b = t
+	end
+
+    return b
+end
+
+function util.wrapI(x: int32, min: int32, max: int32): int32
+    if min == max then
+        return min
+    elseif min > max then
+        min, max = max, min
+    end
+
+    -- TODO: code solution for when range is all negative
+    if max < 0 then
+        -- ???
+    end
+
+    local temp: float32 = max - min
+    return min + ((temp + ((x - min) %%% temp)) %%% temp)
+end
+
+function util.midF(a: float32, b: float32, c: float32): float32
+    if b < a then
+	    local t: float32 = a
+	    a = b
+	    b = t
+	end
+	if c < b then
+	    local t: float32 = c
+	    c = b
+	    b = t
+	end
+	if b < a then
+	    local t: float32 = a
+	    a = b
+	    b = t
+	end
+    
+    return b
+end
+
+function util.wrapF(x: float32, min: float32, max: float32): float32
+    if min == max then
+        return min
+    elseif min > max then
+        min, max = max, min
+    end
+
+    -- TODO: code solution for when range is all negative
+    if max < 0 then
+        -- ???
+    end
+
+    local temp: float32 = max - min
+    return min + ((temp + ((x - min) %%% temp)) %%% temp)
+end
