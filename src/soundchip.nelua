@@ -369,6 +369,32 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 	self.audio_state = (@*AudioState)(&self.rmem_ptr[0])
 	self.track_state = (@*[0]uint8)(&self.rmem_ptr[1])
 
+	local i1_start: uint32 = 0
+	local i1_end: uint32 = 0
+	local i2_start: uint32 = 0
+	local i2_end: uint32 = 0
+	local w: rl.wave = rl.loadWave("test_data/173_amen.wav")
+	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
+	i1_end = w.frameCount - 1
+	for i: uint64 = 0, < w.frameCount do
+		local frame: BKFrame = wframes[i]
+		self.wbank_ptr[i * 2] = frame
+		self.wbank_ptr[(i * 2) + 1] = frame
+	end
+	i1_end = w.frameCount - 1
+	rl.unloadWave(w)
+	
+	i2_start = i1_end + 1
+	w = rl.loadWave("test_data/m1_c.wav")
+	wframes = (@*[0]BKFrame)(w.data)
+	i2_end = i2_start + w.frameCount - 1
+	for i: uint64 = i2_start, <= i2_end do
+		local frame: BKFrame = wframes[i - i2_start]
+		self.wbank_ptr[i * 2] = frame
+		self.wbank_ptr[(i * 2) + 1] = frame
+	end
+	rl.unloadWave(w)
+
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
 
@@ -395,10 +421,10 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 		tc.soundchip = self
 		tc.track_index = i
 
-		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((154.0 * 4.0 * 6.0) / 60.0)), nilptr)
+		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((173.0 * 4.0 * 6.0) / 60.0)), nilptr)
 
 		BKTrackInit(&tc.bk_track, BK_SQUARE)
-		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume
+		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4) -- mix volume
 		BKSetAttr(&tc.bk_track, BK_VOLUME, BK_MAX_VOLUME /// 4) -- note volume
 		BKTrackAttach(&tc.bk_track, &self.bk_context)
 
@@ -436,37 +462,28 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 	local instr1: *[0]uint8 = self:getInstrument(1)
 
 	instr0[0] = 0
-	instr0[1] = 0
-	instr0[2] = 0
-	instr0[3] = 0
-	instr0[4] = (88200 >> 16) & 0xFF
-	instr0[5] = (88200 >> 8) & 0xFF
-	instr0[6] = (88200) & 0xFF
+	instr0[1] = (i1_start >> 16) & 0xFF
+	instr0[2] = (i1_start >> 8) & 0xFF
+	instr0[3] = (i1_start) & 0xFF
+	instr0[4] = (i1_end >> 16) & 0xFF
+	instr0[5] = (i1_end >> 8) & 0xFF
+	instr0[6] = (i1_end) & 0xFF
 	instr0[7] = 0
 	instr0[8] = 0
 	instr0[9] = 255
 	instr0[10] = 4
 
-	instr1[0] = 0b10000000
-	instr1[1] = (44100 >> 16) & 0xFF
-	instr1[2] = (44100 >> 8) & 0xFF
-	instr1[3] = (44100) & 0xFF
-	instr1[4] = 0
-	instr1[5] = 0
-	instr1[6] = 0
+	instr1[0] = 0
+	instr1[1] = (i2_start >> 16) & 0xFF
+	instr1[2] = (i2_start >> 8) & 0xFF
+	instr1[3] = (i2_start) & 0xFF
+	instr1[4] = (i2_end >> 16) & 0xFF
+	instr1[5] = (i2_end >> 8) & 0xFF
+	instr1[6] = (i2_end) & 0xFF
 	instr1[7] = 0
 	instr1[8] = 0
 	instr1[9] = 255
 	instr1[10] = 4
-
-	local w: rl.wave = rl.loadWave("test_data/pluck.wav")
-	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
-	for i: uint64 = 0, < w.frameCount do
-		local frame: BKFrame = wframes[i]
-		self.wbank_ptr[i * 2] = frame
-		self.wbank_ptr[(i * 2) + 1] = frame
-	end
-	rl.unloadWave(w)
 
 	rl.playAudioStream(self.audio_stream)
 end
