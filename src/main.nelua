@@ -5,6 +5,7 @@ require("state_boot")
 require("state_main")
 require("state_code")
 require("state_texture")
+require("state_model")
 require("state_tracker")
 require("state_run")
 
@@ -40,6 +41,11 @@ local function init(): void
 			stateTextureDraw
 		},
 		{
+			stateModelInit,
+			stateModelUpdate,
+			stateModelDraw
+		},
+		{
 			stateTrackerInit,
 			stateTrackerUpdate,
 			stateTrackerDraw
@@ -63,7 +69,7 @@ local function run(): void
 
 		-- update render settings
 		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
-			rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.tmem)
+			rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.texmem)
 			vm.gpu.update_tex = false
 		end
 
@@ -75,6 +81,7 @@ local function run(): void
 		rl.beginDrawing()
 			rl.clearBackground(rl.BLACK)
 			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+			rl.drawFPS(0, 0)
 		rl.endDrawing()
 
 		sm:setQueuedState()

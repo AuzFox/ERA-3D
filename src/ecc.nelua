@@ -1,10 +1,130 @@
 require("e3d")
 
+local type_names: []string = {
+	"void",
+	"int",
+	"float",
+	"vec2",
+	"vec3",
+	"struct",
+	"string",
+	"function",
+	"unmapped type (8)",
+	"unmapped type (9)",
+	"unmapped type (10)",
+	"unmapped type (11)",
+	"unmapped type (12)",
+	"unmapped type (13)",
+	"unmapped type (14)",
+	"unmapped type (15)"
+}
+
+local token_names: []string = {
+	"int literal",
+	"float literal",
+	"string literal",
+	"void",
+	"int",
+	"float",
+	"vec2",
+	"vec3",
+	"struct identifier",
+	"string",
+	"struct",
+	"function",
+	"enum",
+	"identifier",
+	"else",
+	"if",
+	"return",
+	"break",
+	"continue",
+	"sizeof",
+	"for",
+	"while",
+	"...",
+	"!",
+	"~",
+	"=",
+	"?",
+	"||",
+	"&&",
+	"|",
+	"^",
+	"&",
+	"==",
+	"!=",
+	"<",
+	">",
+	"<=",
+	">=",
+	"<<",
+	">>",
+	">>>",
+	"+",
+	"-",
+	"*",
+	"/",
+	"%",
+	"->",
+	".",
+	"["
+}
+
+local function getTypeName(info: e3d.TypeInfo): string
+	local sb: stringbuilder
+	local full_type: uinteger = info.type_id
+	local base_type: uinteger = info.type_id & (e3d.EVMType.POINTER - 1)
+
+	if base_type < e3d.EVMType.VEC3 then
+		sb:write(type_names[base_type])
+	else
+		sb:write(info.structref.name)
+	end
+
+	while full_type >= e3d.EVMType.POINTER do
+		sb:writebyte('*'_u8)
+		full_type = full_type - e3d.EVMType.POINTER
+	end
+
+	return sb:__tostring()
+end
+
+local function getTokenString(token: uinteger): string
+	if token == 0 then
+		return "EOF"
+	elseif token < e3d.Token.INT_LITERAL then
+		return string.format("%c", token)
+	else
+		return token_names[token - e3d.Token.INT_LITERAL]
+	end
+end
+
+local function sizeOfType(info: e3d.TypeInfo): uint16
+	-- returns size in words
+	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRING) then
+		return info.structref.size
+	end
+	
+	return 1
+end
+
+local function sizePointedTo(info: e3d.TypeInfo): uint16
+	-- returns size in words
+	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
+	
+	if (type_pointed_to >= e3d.EVMType.VEC2) and (type_pointed_to <= e3d.EVMType.STRING) then
+		return info.structref.size
+	end
+	
+	return 1
+end
+
 function e3d.Struct:addMember(member: *e3d.Identifier): void
 	self.members:push(member)
 	self.member_map[member.name] = #self.members
 
-	self.size = self.size + e3d.sizeOfType(member.type_info)
+	self.size = self.size + sizeOfType(member.type_info)
 end
 
 function e3d.Struct:hasMember(name: string): boolean
@@ -153,6 +273,9 @@ function e3d.EVM:lookupID(name: string): boolean
 	self.has_id, self.current_id = self.api_ids:has_and_get(name)
 	if self.has_id then return true end
 
+	self.has_id, self.current_id = self.builtin_struct_ids:has_and_get(name)
+	if self.has_id then return true end
+	
 	self.has_id, self.current_id = self.struct_ids:has_and_get(name)
 	if self.has_id then return true end
 
@@ -221,7 +344,7 @@ function e3d.EVM:emit32(val: uint32): void
 end
 
 function e3d.EVM:emitF(val: float32): void
-	local v: e3d.EVMValue = {f=val}
+	local v: util.IntFloat = {f=val}
 
 	self:emit32(v.u)
 end
@@ -606,8 +729,8 @@ local function match(vm: *e3d.EVM, tk: uinteger): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `%s`, got `%s`\n",
 			vm.line,
-			e3d.getTokenString(tk),
-			e3d.getTokenString(vm.token)
+			getTokenString(tk),
+			getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -653,9 +776,9 @@ local function operatorTypeCheck(vm: *e3d.EVM, operator: uinteger, target_info: 
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.getTokenString(operator),
-				e3d.getTypeName(target_info),
-				e3d.getTypeName(vm.expr_type)
+				getTokenString(operator),
+				getTypeName(target_info),
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -664,9 +787,9 @@ local function operatorTypeCheck(vm: *e3d.EVM, operator: uinteger, target_info: 
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 			vm.line,
-			e3d.getTokenString(operator),
-			e3d.getTypeName(target_info),
-			e3d.getTypeName(vm.expr_type)
+			getTokenString(operator),
+			getTypeName(target_info),
+			getTypeName(vm.expr_type)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -675,9 +798,9 @@ local function operatorTypeCheck(vm: *e3d.EVM, operator: uinteger, target_info: 
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.getTokenString(operator),
-				e3d.getTypeName(target_info),
-				e3d.getTypeName(vm.expr_type)
+				getTokenString(operator),
+				getTypeName(target_info),
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -687,9 +810,9 @@ local function operatorTypeCheck(vm: *e3d.EVM, operator: uinteger, target_info: 
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `%s` on types `%s` and `%s`\n",
 				vm.line,
-				e3d.getTokenString(operator),
-				e3d.getTypeName(target_info),
-				e3d.getTypeName(vm.expr_type)
+				getTokenString(operator),
+				getTypeName(target_info),
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -782,7 +905,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -801,7 +924,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 
 		match(vm, ')'_u8)
 
-		local size: uinteger = e3d.sizeOfType(target_info) * 4
+		local size: uinteger = sizeOfType(target_info) * 4
 
 		if size < 256 then
 			vm:emitOp(e3d.Opcode.PUSH_CHAR)
@@ -913,8 +1036,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 									vm.line,
 									argc + 1,
 									id.name,
-									e3d.getTypeName(target_info),
-									e3d.getTypeName(vm.expr_type)
+									getTypeName(target_info),
+									getTypeName(vm.expr_type)
 								)
 								vm.compile_err = true
 								coroutine.yield()
@@ -929,7 +1052,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					end
 
 					if constructor_index == -1 then
-						size = size + e3d.sizeOfType(vm.expr_type)
+						size = size + sizeOfType(vm.expr_type)
 					end
 
 					argc = argc + 1
@@ -1141,8 +1264,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 									vm.line,
 									memberc + 1,
 									target_struct.name,
-									e3d.getTypeName(target_member_info),
-									e3d.getTypeName(vm.expr_type)
+									getTypeName(target_member_info),
+									getTypeName(vm.expr_type)
 								)
 								vm.compile_err = true
 								coroutine.yield()
@@ -1172,7 +1295,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: invalid type `%s` for struct initializer\n",
 						vm.line,
-						e3d.getTypeName(target_info)
+						getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1190,7 +1313,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot cast expression of type `void` to `%s`\n",
 						vm.line,
-						e3d.getTypeName(target_info)
+						getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1216,8 +1339,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: cannot cast expression of type `%s` to `%s`\n",
 							vm.line,
-							e3d.getTypeName(vm.expr_type),
-							e3d.getTypeName(target_info)
+							getTypeName(vm.expr_type),
+							getTypeName(target_info)
 						)
 						vm.compile_err = true
 						coroutine.yield()
@@ -1247,7 +1370,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot dereference expression of type `%s`\n",
 				vm.line,
-				e3d.getTypeName(vm.expr_type)
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -1289,16 +1412,16 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		local index: uint16
 		if op == e3d.Opcode.GET_G or op == e3d.Opcode.GET_L or op == e3d.Opcode.GET_A then
 			vm.bytecode_len = vm.bytecode_len - 3
-			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 		elseif op == e3d.Opcode.GET_GX or op == e3d.Opcode.GET_LX or op == e3d.Opcode.GET_AX then
 			vm.bytecode_len = vm.bytecode_len - 5
-			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 		elseif op == e3d.Opcode.GET_M then
 			vm.bytecode_len = vm.bytecode_len - 3
-			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 		elseif op == e3d.Opcode.GET_MX then
 			vm.bytecode_len = vm.bytecode_len - 5
-			index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+			index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 		else
 			vm.error = string.format("COMPILE ERROR: line %d: invalid rvalue for address-of\n", vm.line)
 			vm.compile_err = true
@@ -1355,7 +1478,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: cannot use operator `!` on type `%s`\n",
 				vm.line,
-				e3d.getTypeName(vm.expr_type)
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -1378,7 +1501,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		else
 			vm.error = string.format("COMPILE ERROR: line %d: cannot use operator `~` on type `%s`\n",
 				vm.line,
-				e3d.getTypeName(vm.expr_type)
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -1446,7 +1569,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: unexpected token `%s`\n",
 			vm.line,
-			e3d.getTokenString(vm.token)
+			getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -1483,18 +1606,18 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			local size: uint16 = 1
 			if op == e3d.Opcode.GET_G or op == e3d.Opcode.GET_L or op == e3d.Opcode.GET_A then
 				vm.bytecode_len = vm.bytecode_len - 3
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 			elseif op == e3d.Opcode.GET_GX or op == e3d.Opcode.GET_LX or op == e3d.Opcode.GET_AX then
 				vm.bytecode_len = vm.bytecode_len - 5
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
-				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
+				size = ((@uint16)(vm.bytecode[vm.bytecode_len + 3]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 4])
 			elseif op == e3d.Opcode.GET_M then
 				vm.bytecode_len = vm.bytecode_len - 3
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
 			elseif op == e3d.Opcode.GET_MX then
 				vm.bytecode_len = vm.bytecode_len - 5
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
-				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
+				size = ((@uint16)(vm.bytecode[vm.bytecode_len + 3]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 4])
 			elseif op == e3d.Opcode.GET_S then
 				vm.bytecode_len = vm.bytecode_len - 1
 			else
@@ -1523,7 +1646,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp)
+					getTypeName(temp)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1549,8 +1672,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 						vm.line,
-						e3d.getTypeName(vm.expr_type),
-						e3d.getTypeName(temp)
+						getTypeName(vm.expr_type),
+						getTypeName(temp)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -1593,8 +1716,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 							vm:emit16(size)
 					end
 				elseif temp.type_id == e3d.EVMType.STRUCT or temp.type_id == e3d.EVMType.STRING then
-					if id.type_info.structref ~= vm.expr_type.structref then
-						vm.error = string.format("COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n", vm.line, id.type_info.structref.name, vm.expr_type.structref.name)
+					if temp.structref ~= vm.expr_type.structref then
+						vm.error = string.format("COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n", vm.line, temp.structref.name, vm.expr_type.structref.name)
 						vm.compile_err = true
 						coroutine.yield()
 					end
@@ -1664,7 +1787,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid lvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1678,7 +1801,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid rvalue type for operator '||', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1713,7 +1836,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid lvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1727,7 +1850,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid rvalue type for operator '&&', expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1755,8 +1878,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `|` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1780,8 +1903,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `^` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1805,8 +1928,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `&` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1942,8 +2065,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `<<` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1967,8 +2090,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `>>` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -1992,8 +2115,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `>>>` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2018,7 +2141,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				else
 					if temp.type_id > e3d.EVMType.POINTER then
 						vm:emitOp(e3d.Opcode.ADDP)
-						vm:emit16(e3d.sizePointedTo(temp))
+						vm:emit16(sizePointedTo(temp))
 					end
 			end
 			
@@ -2041,7 +2164,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				else
 					if temp.type_id > e3d.EVMType.POINTER then
 						vm:emitOp(e3d.Opcode.SUBP)
-						vm:emit16(e3d.sizePointedTo(temp))
+						vm:emit16(sizePointedTo(temp))
 					end
 			end
 			
@@ -2161,8 +2284,8 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use operator `%` on types `%s` and `%s`\n",
 					vm.line,
-					e3d.getTypeName(temp),
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(temp),
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2171,7 +2294,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			if not (vm.expr_type.type_id >= (e3d.EVMType.VEC2 + e3d.EVMType.POINTER) and vm.expr_type.type_id <= (e3d.EVMType.STRING + e3d.EVMType.POINTER)) then
 				vm.error = string.format("COMPILE ERROR: line %d: cannot index members of type `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2206,7 +2329,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot index members of type `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2221,13 +2344,13 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			if (vm.prev_token == e3d.Token.ID) and (op == e3d.Opcode.GET_GX or op == e3d.Opcode.GET_LX or op == e3d.Opcode.GET_AX) then
 				valid_lvalue = true
 				vm.bytecode_len = vm.bytecode_len - 5
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
-				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
+				size = ((@uint16)(vm.bytecode[vm.bytecode_len + 3]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 4])
 			elseif op == e3d.Opcode.GET_MX then
 				valid_lvalue = true
 				vm.bytecode_len = vm.bytecode_len - 5
-				index = (vm.bytecode[vm.bytecode_len + 1] << 8) | (vm.bytecode[vm.bytecode_len + 2])
-				size = (vm.bytecode[vm.bytecode_len + 3] << 8) | (vm.bytecode[vm.bytecode_len + 4])
+				index = ((@uint16)(vm.bytecode[vm.bytecode_len + 1]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 2])
+				size = ((@uint16)(vm.bytecode[vm.bytecode_len + 3]) << 8) | (@uint16)(vm.bytecode[vm.bytecode_len + 4])
 			end
 
 			if not valid_lvalue then
@@ -2252,7 +2375,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			match(vm, e3d.Token.ID)
 	
 			-- lookup member
-			vm.has_id, vm.current_id = id.type_info.structref:getMember(vm.current_id_name)
+			vm.has_id, vm.current_id = temp.structref:getMember(vm.current_id_name)
 			if not vm.has_id then
 				vm.error = string.format("COMPILE ERROR: line %d: cannot index member `%s` of symbol `%s`\n", vm.line, vm.current_id_name, id.name)
 				vm.compile_err = true
@@ -2305,7 +2428,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			local size: uint16
 
 			if vm.expr_type.type_id > e3d.EVMType.POINTER then
-				size = e3d.sizePointedTo(vm.expr_type)
+				size = sizePointedTo(vm.expr_type)
 				vm.expr_type.type_id = vm.expr_type.type_id - e3d.EVMType.POINTER
 				temp = vm.expr_type
 			elseif vm.expr_type.type_id == e3d.EVMType.STRING then
@@ -2315,7 +2438,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot subscript expression of type `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2329,7 +2452,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: cannot use type `%s` as an array index\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2358,7 +2481,7 @@ local function expression(vm: *e3d.EVM, level: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: unexpected token `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2416,7 +2539,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2440,7 +2563,7 @@ local function statement(vm: *e3d.EVM): void
 		vm.current_id.index = vm.local_index
 		vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
-		local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
+		local type_size: uinteger = sizeOfType(vm.current_id.type_info)
 		
 		if vm.token == e3d.Token.BRAK then
 			vm.current_id.is_array = true
@@ -2471,7 +2594,7 @@ local function statement(vm: *e3d.EVM): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 					vm.line,
-					e3d.getTokenString(vm.token)
+					getTokenString(vm.token)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -2504,7 +2627,7 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 						vm.line,
-						e3d.getTypeName({var_type, structref})
+						getTypeName({var_type, structref})
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -2529,8 +2652,8 @@ local function statement(vm: *e3d.EVM): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 							vm.line,
-							e3d.getTypeName(vm.expr_type),
-							e3d.getTypeName({var_type, structref})
+							getTypeName(vm.expr_type),
+							getTypeName({var_type, structref})
 						)
 						vm.compile_err = true
 						coroutine.yield()
@@ -2602,7 +2725,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: invalid type for if statement condition. expected `int` or pointer, got `%s`\n",
 				vm.line,
-				e3d.getTypeName(vm.expr_type)
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -2702,7 +2825,7 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 						vm.line,
-						e3d.getTokenString(vm.token)
+						getTokenString(vm.token)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -2726,7 +2849,7 @@ local function statement(vm: *e3d.EVM): void
 				vm.current_id.index = vm.local_index
 				vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
-				local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
+				local type_size: uinteger = sizeOfType(vm.current_id.type_info)
 				
 				if vm.token == e3d.Token.BRAK then
 					vm.current_id.is_array = true
@@ -2757,7 +2880,7 @@ local function statement(vm: *e3d.EVM): void
 						vm.error = string.format(
 							"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 							vm.line,
-							e3d.getTokenString(vm.token)
+							getTokenString(vm.token)
 						)
 						vm.compile_err = true
 						coroutine.yield()
@@ -2790,7 +2913,7 @@ local function statement(vm: *e3d.EVM): void
 							vm.error = string.format(
 								"COMPILE ERROR: line %d: cannot assign expression of type `void` to symbol of type `%s`\n",
 								vm.line,
-								e3d.getTypeName({var_type, structref})
+								getTypeName({var_type, structref})
 							)
 							vm.compile_err = true
 							coroutine.yield()
@@ -2816,7 +2939,7 @@ local function statement(vm: *e3d.EVM): void
 									"COMPILE ERROR: line %d: cannot assign `%s` to symbol of type `%s`\n",
 									vm.line,
 									vm.expr_type.type_id,
-									e3d.getTypeName({var_type, structref})
+									getTypeName({var_type, structref})
 								)
 								vm.compile_err = true
 								coroutine.yield()
@@ -2890,7 +3013,7 @@ local function statement(vm: *e3d.EVM): void
 				vm.error = string.format(
 					"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
 					vm.line,
-					e3d.getTypeName(vm.expr_type)
+					getTypeName(vm.expr_type)
 				)
 				vm.compile_err = true
 				coroutine.yield()
@@ -3030,7 +3153,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: invalid type for loop condition. expected `int` or pointer, got `%s`\n",
 				vm.line,
-				e3d.getTypeName(vm.expr_type)
+				getTypeName(vm.expr_type)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3089,8 +3212,8 @@ local function statement(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: cannot return `%s` from function of type `%s`\n",
 						vm.line,
-						e3d.getTypeName(vm.expr_type),
-						e3d.getTypeName(target_info)
+						getTypeName(vm.expr_type),
+						getTypeName(target_info)
 					)
 					vm.compile_err = true
 					coroutine.yield()
@@ -3106,7 +3229,7 @@ local function statement(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: function of type `%s` must return a value\n",
 				vm.line,
-				e3d.getTypeName(vm.current_func_id.type_info)
+				getTypeName(vm.current_func_id.type_info)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3283,7 +3406,7 @@ local function functionParameters(vm: *e3d.EVM, hook_index: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3303,7 +3426,7 @@ local function functionParameters(vm: *e3d.EVM, hook_index: integer): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3327,7 +3450,7 @@ local function functionParameters(vm: *e3d.EVM, hook_index: integer): void
 			coroutine.yield()
 		end
 
-		arg_index = arg_index + e3d.sizeOfType(vm.current_id.type_info)
+		arg_index = arg_index + sizeOfType(vm.current_id.type_info)
 
 		vm.current_func_id.argdata:push(vm.current_id.type_info)
 
@@ -3420,7 +3543,7 @@ local function structDeclaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 			vm.line,
-			e3d.getTokenString(vm.token)
+			getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3480,7 +3603,7 @@ local function structDeclaration(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3503,7 +3626,7 @@ local function structDeclaration(vm: *e3d.EVM): void
 			vm.error = string.format(
 				"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 				vm.line,
-				e3d.getTokenString(vm.token)
+				getTokenString(vm.token)
 			)
 			vm.compile_err = true
 			coroutine.yield()
@@ -3528,7 +3651,7 @@ local function structDeclaration(vm: *e3d.EVM): void
 			coroutine.yield()
 		end
 		
-		member_index = member_index + e3d.sizeOfType(member.type_info)
+		member_index = member_index + sizeOfType(member.type_info)
 		
 		struct:addMember(member)
 		
@@ -3590,7 +3713,7 @@ local function globalDeclaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected type identifier, got `%s`\n",
 			vm.line,
-			e3d.getTokenString(vm.token)
+			getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3607,7 +3730,7 @@ local function globalDeclaration(vm: *e3d.EVM): void
 		vm.error = string.format(
 			"COMPILE ERROR: line %d: expected token `identifier`, got `%s`\n",
 			vm.line,
-			e3d.getTokenString(vm.token)
+			getTokenString(vm.token)
 		)
 		vm.compile_err = true
 		coroutine.yield()
@@ -3666,7 +3789,7 @@ local function globalDeclaration(vm: *e3d.EVM): void
 				coroutine.yield()
 			end
 
-			local type_size: uinteger = e3d.sizeOfType(vm.current_id.type_info)
+			local type_size: uinteger = sizeOfType(vm.current_id.type_info)
 
 			if vm.token == e3d.Token.BRAK then
 				vm.current_id.is_array = true
@@ -3697,7 +3820,7 @@ local function globalDeclaration(vm: *e3d.EVM): void
 					vm.error = string.format(
 						"COMPILE ERROR: line %d: expected tokens `int literal` or `constant identifier`, got `%s`\n",
 						vm.line,
-						e3d.getTokenString(vm.token)
+						getTokenString(vm.token)
 					)
 					vm.compile_err = true
 					coroutine.yield()

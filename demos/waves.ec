@@ -4,7 +4,7 @@
 enum {
     QUADS = 2,
 
-    OMEM_ADDR = 0x00C00000,
+    OBJMEM_ADDR = 0x00C00000,
 
     BLACK = 0x000000FF
 };

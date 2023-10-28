@@ -1,20 +1,20 @@
 require("blipkit")
 require("raylib")
 
--- TODO: implement playback from SBANK
+-- TODO: implement playback from SEQBANK
 
 global SoundchipBank = @enum {
 	SYSTEM = 0,
-	WBANK0 = 1,
-	WBANK1,
-	SBANK0 = 1,
-	SBANK1,
-	SBANK2,
-	SBANK3,
-	SBANK4,
-	SBANK5,
-	SBANK6,
-	SBANK7
+	WAVBANK0 = 1,
+	WAVBANK1,
+	SEQBANK0 = 1,
+	SEQBANK1,
+	SEQBANK2,
+	SEQBANK3,
+	SEQBANK4,
+	SEQBANK5,
+	SEQBANK6,
+	SEQBANK7
 }
 
 global SOUNDCHIP_TRACK_COUNT <comptime> = 8
@@ -39,9 +39,9 @@ global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
 global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
 global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
-global SOUNDCHIP_WMEM_SIZE <comptime> = ((7*1024*1024)///2) -- 7 MiB of 16 bit audio samples
-global SOUNDCHIP_SMEM_SIZE <comptime> = 256*1024 -- 256 KiB
-global SOUNDCHIP_AMEM_SIZE <comptime> = SOUNDCHIP_FRAMES_PER_UPDATE*2 -- 8 KiB
+global SOUNDCHIP_WAVMEM_SIZE <comptime> = ((7*1024*1024)///2) -- 7 MiB of 16 bit audio samples
+global SOUNDCHIP_SEQMEM_SIZE <comptime> = 256*1024 -- 256 KiB
+global SOUNDCHIP_AOBMEM_SIZE <comptime> = SOUNDCHIP_FRAMES_PER_UPDATE*2 -- 8 KiB
 
 global SoundChip <forwarddecl> = @record {}
 
@@ -58,7 +58,7 @@ global TrackContext = @record {
 	track_index: uint8
 }
 
--- track state object, stored in rmem
+-- track state object, stored in sysmem
 global TrackState = @record {
 	bpm: uint8,
 	volume: uint8,
@@ -72,22 +72,22 @@ global TrackState = @record {
 }
 
 SoundChip = @record {
-	smem: [SOUNDCHIP_SMEM_SIZE]uint8, -- song, chain, phrase, instrument, and state data
-	wmem: [SOUNDCHIP_WMEM_SIZE]BKFrame, -- sample wave data
-	amem: [SOUNDCHIP_AMEM_SIZE]BKFrame, -- working audio buffer
+	seqmem: [SOUNDCHIP_SEQMEM_SIZE]uint8, -- song, chain, phrase, instrument, and state data
+	wavmem: [SOUNDCHIP_WAVMEM_SIZE]BKFrame, -- sample wave data
+	aobmem: [SOUNDCHIP_AOBMEM_SIZE]BKFrame, -- working audio buffer
 	track_contexts: [SOUNDCHIP_TRACK_COUNT]TrackContext,
 	preview_bk_track: BKTrack,
 	bk_context: BKContext,
 	bk_data: BKData,
 	audio_stream: rl.audioStream,
-	current_wbank: uint8, -- which region of memory to use for sample data
-	current_sbank: uint8, -- which region of memory to use for sequencer data
+	current_wavbank: uint8, -- which region of memory to use for sample data
+	current_seqbank: uint8, -- which region of memory to use for sequencer data
 	bk_data_flags: BKEnum, -- flags describing sample data format
 
 	-- memory pointers
-	rmem_ptr: *[0]uint8,
-	wbank_ptr: *[0]BKFrame,
-	sbank_ptr: *[0]uint8,
+	sysmem_ptr: *[0]uint8,
+	wavbank_ptr: *[0]BKFrame,
+	seqbank_ptr: *[0]uint8,
 	song_data: *[0]uint8,
 	pattern_data: *[0]uint8,
 	instrument_data: *[0]uint8,
@@ -129,7 +129,7 @@ function SoundChip:setInstrument(track: uint8, instrument: uint8): void
 	local range: [2]BKInt = {sample_start, sample_end}
 
 	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
-	BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & 0b10000000) and 1 or 0)
+	BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & 0b10000000 ~= 0) and BK_REPEAT or BK_NO_REPEAT)
 	local percentage: float32 = (@float32)(sustain) / 255.0
 	local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
 	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, attack, decay, value, release)
@@ -167,7 +167,7 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 	
 	-- is track playing?
 	if (sc.audio_state.playing_flags & (0x80 >> track_index)) ~= 0 then
-		-- get track state pointer from smem
+		-- get track state pointer from seqmem
 		local state: *TrackState = sc:getTrackState(track_index)
 
 		if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
@@ -261,8 +261,8 @@ end
 
 function SoundChip:updateAudio(): void
 	if rl.isAudioStreamProcessed(self.audio_stream) then
-		BKContextGenerate(&self.bk_context, &self.amem[0], SOUNDCHIP_FRAMES_PER_UPDATE)
-		rl.updateAudioStream(self.audio_stream, &self.amem[0], SOUNDCHIP_FRAMES_PER_UPDATE)
+		BKContextGenerate(&self.bk_context, &self.aobmem[0], SOUNDCHIP_FRAMES_PER_UPDATE)
+		rl.updateAudioStream(self.audio_stream, &self.aobmem[0], SOUNDCHIP_FRAMES_PER_UPDATE)
 	end
 end
 
@@ -295,29 +295,73 @@ end
 
 function SoundChip:updateBankPointers(): void
 	local wp: pointer
-	if self.current_wbank == SoundchipBank.SYSTEM then
-		wp = &self.wmem
+	if self.current_wavbank == SoundchipBank.SYSTEM then
+		wp = &self.wavmem
 	else
-		local index: uinteger = self.current_wbank - SoundchipBank.WBANK0
-		wp = &self.wbank_ptr[(7*1024*1024) * index]
+		local index: uinteger = self.current_wavbank - SoundchipBank.WAVBANK0
+		wp = &self.wavbank_ptr[(7*1024*1024) * index]
 	end
 
 	setBKDataPointer(&self.bk_data, wp, 7*1024*1024, 2, self.bk_data_flags)
 	BKSetAttr(&self.bk_data, BK_SAMPLE_PITCH, 0)
 
-	if self.current_sbank == SoundchipBank.SYSTEM then
-		self.song_data = (@*[0]uint8)(&self.smem[0])
-		self.pattern_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_PATTERN_DATA_START])
-		self.instrument_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_INSTRUMENT_DATA_START])
-		self.groove_data = (@*[0]uint8)(&self.smem[SOUNDCHIP_GROOVE_DATA_START])
+	if self.current_seqbank == SoundchipBank.SYSTEM then
+		self.song_data = (@*[0]uint8)(&self.seqmem[0])
+		self.pattern_data = (@*[0]uint8)(&self.seqmem[SOUNDCHIP_PATTERN_DATA_START])
+		self.instrument_data = (@*[0]uint8)(&self.seqmem[SOUNDCHIP_INSTRUMENT_DATA_START])
+		self.groove_data = (@*[0]uint8)(&self.seqmem[SOUNDCHIP_GROOVE_DATA_START])
 	else
-		local index: uint64 = self.current_sbank - SoundchipBank.SBANK0
-		index = index * SOUNDCHIP_SMEM_SIZE
-		self.song_data = (@*[0]uint8)(&self.sbank_ptr[index])
-		self.pattern_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_PATTERN_DATA_START])
-		self.instrument_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_INSTRUMENT_DATA_START])
-		self.groove_data = (@*[0]uint8)(&self.sbank_ptr[index + SOUNDCHIP_GROOVE_DATA_START])
+		local index: uint64 = self.current_seqbank - SoundchipBank.SEQBANK0
+		index = index * SOUNDCHIP_SEQMEM_SIZE
+		self.song_data = (@*[0]uint8)(&self.seqbank_ptr[index])
+		self.pattern_data = (@*[0]uint8)(&self.seqbank_ptr[index + SOUNDCHIP_PATTERN_DATA_START])
+		self.instrument_data = (@*[0]uint8)(&self.seqbank_ptr[index + SOUNDCHIP_INSTRUMENT_DATA_START])
+		self.groove_data = (@*[0]uint8)(&self.seqbank_ptr[index + SOUNDCHIP_GROOVE_DATA_START])
 	end
+end
+
+function SoundChip:loadWavBank(bank: uint8): void
+	local src: *[0]BKFrame = &self.wavbank_ptr[SOUNDCHIP_WAVMEM_SIZE * bank]
+	memory.copy(&self.wavmem, src, SOUNDCHIP_WAVMEM_SIZE * 2)
+end
+
+function SoundChip:loadSeqBank(bank: uint8): void
+	local src: *[0]uint8 = &self.seqbank_ptr[SOUNDCHIP_SEQMEM_SIZE * bank]
+	memory.copy(&self.seqmem, src, SOUNDCHIP_SEQMEM_SIZE)
+end
+
+function SoundChip:loadAudioSample(filename: string, bank_index: uint32, start_index: uint32): (boolean, uint32)
+	local wave: rl.wave = rl.loadWave(filename)
+
+	if not rl.isWaveReady(wave) then
+		return false, 0
+	end
+
+	start_index = start_index * 2
+
+	print(wave.channels, wave.sampleSize, wave.sampleRate, wave.frameCount)
+
+	local frames: *[0]BKFrame = (@*[0]BKFrame)(wave.data)
+	local frame_count: uint32
+
+	if wave.channels == 1 then
+		for i: uint64 = 0, < wave.frameCount do
+			local frame: BKFrame = frames[i]
+			self.wavbank_ptr[start_index + (i * 2)] = frame
+			self.wavbank_ptr[start_index + (i * 2) + 1] = frame
+		end
+		frame_count = wave.frameCount
+	elseif wave.channels == 2 then
+		for i: uint64 = 0, < wave.frameCount * 2 do
+			local frame: BKFrame = frames[i]
+			self.wavbank_ptr[start_index + i] = frame
+		end
+		frame_count = wave.frameCount
+	end
+
+	rl.unloadWave(wave)
+
+	return true, frame_count
 end
 
 function SoundChip:resetSoundchip(): void
@@ -341,10 +385,10 @@ function SoundChip:resetSoundchip(): void
 	self:stopPreviewNote()
 end
 
-function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: *[0]uint8): void
-	self.rmem_ptr = rmem_ptr
-	self.wbank_ptr = wbank_ptr
-	self.sbank_ptr = sbank_ptr
+function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank_ptr: *[0]uint8): void
+	self.sysmem_ptr = sysmem_ptr
+	self.wavbank_ptr = wavbank_ptr
+	self.seqbank_ptr = seqbank_ptr
 
 	rl.initAudioDevice()
 
@@ -363,37 +407,29 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 	else
 		self.bk_data_flags = self.bk_data_flags | BK_BIG_ENDIAN
 	end
-	self.current_wbank = SoundchipBank.WBANK0
-	self.current_sbank = SoundchipBank.WBANK1
+	self.current_wavbank = SoundchipBank.WAVBANK0
+	self.current_seqbank = SoundchipBank.WAVBANK1
 	self:updateBankPointers()
-	self.audio_state = (@*AudioState)(&self.rmem_ptr[0])
-	self.track_state = (@*[0]uint8)(&self.rmem_ptr[1])
+	self.audio_state = (@*AudioState)(&self.sysmem_ptr[0])
+	self.track_state = (@*[0]uint8)(&self.sysmem_ptr[1])
 
-	local i1_start: uint32 = 0
-	local i1_end: uint32 = 0
-	local i2_start: uint32 = 0
-	local i2_end: uint32 = 0
-	local w: rl.wave = rl.loadWave("test_data/173_amen.wav")
-	local wframes: *[0]BKFrame = (@*[0]BKFrame)(w.data)
-	i1_end = w.frameCount - 1
-	for i: uint64 = 0, < w.frameCount do
-		local frame: BKFrame = wframes[i]
-		self.wbank_ptr[i * 2] = frame
-		self.wbank_ptr[(i * 2) + 1] = frame
-	end
-	i1_end = w.frameCount - 1
-	rl.unloadWave(w)
-	
-	i2_start = i1_end + 1
-	w = rl.loadWave("test_data/m1_c.wav")
-	wframes = (@*[0]BKFrame)(w.data)
-	i2_end = i2_start + w.frameCount - 1
-	for i: uint64 = i2_start, <= i2_end do
-		local frame: BKFrame = wframes[i - i2_start]
-		self.wbank_ptr[i * 2] = frame
-		self.wbank_ptr[(i * 2) + 1] = frame
-	end
-	rl.unloadWave(w)
+	--local success: boolean
+	--local i0_start: uint32 = 0
+	--local i0_count: uint32 = 0
+	--local i1_start: uint32 = 0
+	--local i1_count: uint32 = 0
+	--local i2_start: uint32 = 0
+	--local i2_count: uint32 = 0
+	--local i3_start: uint32 = 0
+	--local i3_count: uint32 = 0
+
+	--success, i0_count = self:loadAudioSample("test_data/175_thebasix.wav", 0, i0_start)
+	--i1_start = i0_start + i0_count
+	--success, i1_count = self:loadAudioSample("test_data/bd.wav", 0, i1_start)
+	--i2_start = i1_start + i1_count
+	--success, i2_count = self:loadAudioSample("test_data/recog.wav", 0, i2_start)
+	--i3_start = i2_start + i2_count
+	--success, i3_count = self:loadAudioSample("test_data/pluck.wav", 0, i3_start)
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -421,7 +457,7 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 		tc.soundchip = self
 		tc.track_index = i
 
-		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((173.0 * 4.0 * 6.0) / 60.0)), nilptr)
+		BKClockInit(&tc.bk_clock, BKTimeFromSeconds(&self.bk_context, 1.0 / ((175.0 * 4.0 * 6.0) / 60.0)), nilptr)
 
 		BKTrackInit(&tc.bk_track, BK_SQUARE)
 		BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4) -- mix volume
@@ -458,32 +494,58 @@ function SoundChip:init(rmem_ptr: *[0]uint8, wbank_ptr: *[0]BKFrame, sbank_ptr: 
 	-- reset instruments
 	-- ...
 
-	local instr0: *[0]uint8 = self:getInstrument(0)
-	local instr1: *[0]uint8 = self:getInstrument(1)
+	--local instr0: *[0]uint8 = self:getInstrument(0)
+	--local instr1: *[0]uint8 = self:getInstrument(1)
+	--local instr2: *[0]uint8 = self:getInstrument(2)
+	--local instr3: *[0]uint8 = self:getInstrument(3)
 
-	instr0[0] = 0
-	instr0[1] = (i1_start >> 16) & 0xFF
-	instr0[2] = (i1_start >> 8) & 0xFF
-	instr0[3] = (i1_start) & 0xFF
-	instr0[4] = (i1_end >> 16) & 0xFF
-	instr0[5] = (i1_end >> 8) & 0xFF
-	instr0[6] = (i1_end) & 0xFF
-	instr0[7] = 0
-	instr0[8] = 0
-	instr0[9] = 255
-	instr0[10] = 4
+	--instr0[0] = 0
+	--instr0[1] = (i0_start >> 16) & 0xFF
+	--instr0[2] = (i0_start >> 8) & 0xFF
+	--instr0[3] = (i0_start) & 0xFF
+	--instr0[4] = ((i0_start + i0_count) >> 16) & 0xFF
+	--instr0[5] = ((i0_start + i0_count) >> 8) & 0xFF
+	--instr0[6] = ((i0_start + i0_count)) & 0xFF
+	--instr0[7] = 0
+	--instr0[8] = 0
+	--instr0[9] = 255
+	--instr0[10] = 4
 
-	instr1[0] = 0
-	instr1[1] = (i2_start >> 16) & 0xFF
-	instr1[2] = (i2_start >> 8) & 0xFF
-	instr1[3] = (i2_start) & 0xFF
-	instr1[4] = (i2_end >> 16) & 0xFF
-	instr1[5] = (i2_end >> 8) & 0xFF
-	instr1[6] = (i2_end) & 0xFF
-	instr1[7] = 0
-	instr1[8] = 0
-	instr1[9] = 255
-	instr1[10] = 4
+	--instr1[0] = 0
+	--instr1[1] = (i1_start >> 16) & 0xFF
+	--instr1[2] = (i1_start >> 8) & 0xFF
+	--instr1[3] = (i1_start) & 0xFF
+	--instr1[4] = ((i1_start + i1_count) >> 16) & 0xFF
+	--instr1[5] = ((i1_start + i1_count) >> 8) & 0xFF
+	--instr1[6] = ((i1_start + i1_count)) & 0xFF
+	--instr1[7] = 0
+	--instr1[8] = 0
+	--instr1[9] = 255
+	--instr1[10] = 4
+
+	--instr2[0] = 0
+	--instr2[1] = (i2_start >> 16) & 0xFF
+	--instr2[2] = (i2_start >> 8) & 0xFF
+	--instr2[3] = (i2_start) & 0xFF
+	--instr2[4] = ((i2_start + i2_count) >> 16) & 0xFF
+	--instr2[5] = ((i2_start + i2_count) >> 8) & 0xFF
+	--instr2[6] = ((i2_start + i2_count)) & 0xFF
+	--instr2[7] = 0
+	--instr2[8] = 0
+	--instr2[9] = 255
+	--instr2[10] = 4
+
+	--instr3[0] = 0
+	--instr3[1] = (i3_start >> 16) & 0xFF
+	--instr3[2] = (i3_start >> 8) & 0xFF
+	--instr3[3] = (i3_start) & 0xFF
+	--instr3[4] = ((i3_start + i3_count) >> 16) & 0xFF
+	--instr3[5] = ((i3_start + i3_count) >> 8) & 0xFF
+	--instr3[6] = ((i3_start + i3_count)) & 0xFF
+	--instr3[7] = 0
+	--instr3[8] = 0
+	--instr3[9] = 255
+	--instr3[10] = 4
 
 	rl.playAudioStream(self.audio_stream)
 end

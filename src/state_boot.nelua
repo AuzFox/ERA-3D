@@ -1,5 +1,9 @@
 require("statemachine")
 
+-- TODO: boot animation
+
+local m: rl.model
+
 global function stateBootInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
 end
 

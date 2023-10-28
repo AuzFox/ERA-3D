@@ -22,8 +22,8 @@ enum {
     BLUE  = 0x0000FFFF,
 
     // screen and font dimentions
-    SCREEN_WIDTH = 320,
-    SCREEN_HEIGHT = 240,
+    SCREEN_WIDTH = 480,
+    SCREEN_HEIGHT = 360,
     CHAR_WIDTH = 6,
     CHAR_HEIGHT = 9,
 };
@@ -108,16 +108,16 @@ void draw() {
             // for this demo, we will ignore everything except for the colors and positions
             
             // establish a vertex color of red for the next vertex
-            vertColor(RED);
+            meshColor(RED);
 
 
-            vertex((vec3){0.0, 1.0, 0.0});
+            meshVertex((vec3){0.0, 1.0, 0.0});
 
-            vertColor(GREEN);
-            vertex((vec3){-1.0, -1.0, 0.0});
+            meshColor(GREEN);
+            meshVertex((vec3){-1.0, -1.0, 0.0});
 
-            vertColor(BLUE);
-            vertex((vec3){1.0, -1.0, 0.0});
+            meshColor(BLUE);
+            meshVertex((vec3){1.0, -1.0, 0.0});
 
         // finalize the mesh
         endMesh();
@@ -135,7 +135,7 @@ void draw() {
     // each character is 6x9 pixels
     string text = "HELLO ERA-3D!";
 
-    int x = (SCREEN_WIDTH / 2) - ((text.len * CHAR_WIDTH) / 2); // x screen position
-    int y = (SCREEN_HEIGHT / 2) - (CHAR_HEIGHT / 2);            // y screen position
+    int x = (SCREEN_WIDTH / 2) - ((text.length * CHAR_WIDTH) / 2); // x screen position
+    int y = (SCREEN_HEIGHT / 2) - (CHAR_HEIGHT / 2);               // y screen position
     print2D(x, y, WHITE, text);
 }

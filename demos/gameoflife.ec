@@ -26,8 +26,8 @@ enum {
 	RED_NO_ALPHA = 0xFF000000,
 	WHITE        = 0xFFFFFFFF,
 
-	TMEM_START = 0x00800000, // TMEM start address
-	TMEM_W = 1024,         // each row in TMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
+	TEXMEM_START = 0x00800000, // TEXMEM start address
+	TEXMEM_W = 1024,           // each row in TEXMEM is 1024 pixels wide (1 pixel = 32-bit RGBA)
 	GRID_W = 64,
 	GRID_H = 64,
 	OFFSETS_SIZE = 8
@@ -49,14 +49,14 @@ int getCell(int* grid, int x, int y) {
 	x = wrapi(x, 0, GRID_W - 1);
 	y = wrapi(y, 0, GRID_H - 1);
 	
-	return grid[TMEM_W * y + x];
+	return grid[TEXMEM_W * y + x];
 }
 
 void setCell(int* grid, int x, int y, int val) {
 	x = wrapi(x, 0, GRID_W - 1);
 	y = wrapi(y, 0, GRID_H - 1);
 	
-	grid[TMEM_W * y + x] = val;
+	grid[TEXMEM_W * y + x] = val;
 }
 
 void clearGrids() {
@@ -81,11 +81,11 @@ int getNeighbours(int* grid, int x, int y) {
 }
 
 void init() {
-	// start first grid at (0, 0) in TMEM
-	current_grid = (int*)TMEM_START;
+	// start first grid at (0, 0) in TEXMEM
+	current_grid = (int*)TEXMEM_START;
 
-	// start second grid at (0, GRID_H) in TMEM
-	next_grid = (int*)TMEM_START + (GRID_H * TMEM_W);
+	// start second grid at (0, GRID_H) in TEXMEM
+	next_grid = (int*)TEXMEM_START + (GRID_H * TEXMEM_W);
 
 	// fill offsets table
 	offsets[0] = (vec2){-1, -1};
@@ -214,15 +214,15 @@ void draw() {
 
 	// get y texturesheet coordinate of the current grid
 	int srcy = 0;
-	if (current_grid != TMEM_START) {
+	if (current_grid != TEXMEM_START) {
 		srcy = GRID_H;
 	}
 	
 	// draw the current grid
 	//
 	// the grid is drawn in the center of the screen at 2x scale
-	int gridx = (320 / 2) - GRID_W; // x screen coordinate of the grid
-	int gridy = (240 / 2) - GRID_H; // y screen coordinate of the grid
+	int gridx = (480 / 2) - GRID_W; // x screen coordinate of the grid
+	int gridy = (360 / 2) - GRID_H; // y screen coordinate of the grid
 	sprite2DEx(0, srcy, GRID_W, GRID_H, gridx, gridy, GRID_W * 2, GRID_H * 2);
 	
 	// draw the cursor
@@ -241,19 +241,19 @@ void draw() {
 		setTextureMode(2);
 		beginMesh(QUADS);
 			// ping-pong between 25% and 100% transparency, no tinting
-			vertColor(RED_NO_ALPHA | (int)(((1.0 + sin(cursor_anim)) * 0.375 + 0.25) * 255.0));
+			meshColor(RED_NO_ALPHA | (int)(((1.0 + sin(cursor_anim)) * 0.375 + 0.25) * 255.0));
 			
-			vertUV((vec2){0.0, 0.0});
-			vertex2D(cursorpos);
+			meshUV((vec2){0.0, 0.0});
+			meshVertex2D(cursorpos);
 
-			vertUV((vec2){0.0, 1.0});
-			vertex2D(cursorpos + (vec2){0.0, 2.0});
+			meshUV((vec2){0.0, 1.0});
+			meshVertex2D(cursorpos + (vec2){0.0, 2.0});
 
-			vertUV((vec2){1.0, 1.0});
-			vertex2D(cursorpos + (vec2){2.0, 2.0});
+			meshUV((vec2){1.0, 1.0});
+			meshVertex2D(cursorpos + (vec2){2.0, 2.0});
 
-			vertUV((vec2){1.0, 0.0});
-			vertex2D(cursorpos + (vec2){2.0, 0.0});
+			meshUV((vec2){1.0, 0.0});
+			meshVertex2D(cursorpos + (vec2){2.0, 0.0});
 		endMesh();
 		setTextureMode(0);
 	}

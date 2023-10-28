@@ -1,9 +1,9 @@
 enum {
-    SCREEN_W = 320,
-    SCREEN_H = 240,
+    SCREEN_W = 480,
+    SCREEN_H = 360,
 
-    SUBSCREEN_W = 160,
-    SUBSCREEN_H = 120,
+    SUBSCREEN_W = 240,
+    SUBSCREEN_H = 180,
 
     // ERA-3D has 4 built-in cameras
     //
@@ -31,14 +31,14 @@ subscreen subscreens[SUBSCREEN_COUNT];
 
 // draw a quad, used by draw_cube()
 void draw_cube_face() {
-    vertUV((vec2){0.0, 0.0});
-    vertex((vec3){-0.5, 0.5, 0.5});
-    vertUV((vec2){0.0, 1.0});
-    vertex((vec3){-0.5, -0.5, 0.5});
-    vertUV((vec2){1.0, 1.0});
-    vertex((vec3){0.5, -0.5, 0.5});
-    vertUV((vec2){1.0, 0.0});
-    vertex((vec3){0.5, 0.5, 0.5});
+    meshUV((vec2){0.0, 0.0});
+    meshVertex((vec3){-0.5, 0.5, 0.5});
+    meshUV((vec2){0.0, 1.0});
+    meshVertex((vec3){-0.5, -0.5, 0.5});
+    meshUV((vec2){1.0, 1.0});
+    meshVertex((vec3){0.5, -0.5, 0.5});
+    meshUV((vec2){1.0, 0.0});
+    meshVertex((vec3){0.5, 0.5, 0.5});
 }
 
 // draw a rotated cube
@@ -49,7 +49,7 @@ void draw_cube(vec3 rotation) {
         rotate(rotation);
 		
 		beginMesh(2);
-			vertColor(0xFFFFFFFF);
+			meshColor(0xFFFFFFFF);
 
             // draw faces
             for (int i = 0; i < 6; i = i + 1) {
@@ -83,7 +83,7 @@ void init() {
 
     // init subscreen cameras
     for (int i = 0; i < SUBSCREEN_COUNT; i = i + 1) {
-        setCam3DPos(i, (vec3){0, 0, 2.5});
+        setCam3DPosition(i, (vec3){0, 0, 2.5});
     }
 }
 

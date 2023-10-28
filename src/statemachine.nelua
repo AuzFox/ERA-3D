@@ -5,6 +5,7 @@ global StateID = @enum {
     MAIN,
     CODE,
     TEXTURE,
+    MODEL,
     TRACKER,
     RUN,
     COUNT

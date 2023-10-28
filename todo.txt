@@ -16,19 +16,14 @@ COMPILER:
 VM:
 - complete wrapi() and wrapf() negative ranges
 - implement debug opcodes
-- implement vertex-lighting mode and api
 - implement memory allocator and api for vm heap
 - implement memory card system and api
 - implement cartridge data loading api
-- implement sound/music api
-- implement physics api
-- implement model api
 - implement triangle rendering limit
 - implement cycle limit (how to deal with incomplete calls?)
 
 HOST:
 - implement debugger
 - implement boot animation
-- implement model loading
 - implement ui (terminal?, editors?. etc.)
 - implement cartridge format and saving/loading

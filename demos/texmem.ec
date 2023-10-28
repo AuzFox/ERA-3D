@@ -10,26 +10,26 @@ enum {
 	BLUE  = 0x0000FFFF,
 	WHITE = 0xFFFFFFFF,
 	
-	TMEM_ADDR = 0x00800000
+	TEXMEM_ADDR = 0x00800000
 };
 
-int* tmem;
+int* texmem;
 
-void setTMEMPixel(int x, int y, int col) {
+void setTEXMEMPixel(int x, int y, int col) {
 	x = midi(0, x, 1023);
 	y = midi(0, y, 1023);
-	tmem[y * 1024 + x] = col;
+	texmem[y * 1024 + x] = col;
 }
 
 void init() {
-	tmem = (int*)TMEM_ADDR; // get pointer to the start of TMEM
+	texmem = (int*)TEXMEM_ADDR; // get pointer to the start of TEXMEM
 }
 
 void update(float delta_time) {
 	if (pressed(5, 0)) {
-		setTMEMPixel(0, 0, RED);
-		setTMEMPixel(0, 2, GREEN);
-		setTMEMPixel(0, 4, BLUE);
+		setTEXMEMPixel(0, 0, RED);
+		setTEXMEMPixel(0, 2, GREEN);
+		setTEXMEMPixel(0, 4, BLUE);
 	}
 }
 

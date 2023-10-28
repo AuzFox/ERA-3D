@@ -18,6 +18,133 @@ function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean <forwarddecl> end
 function e3d.EVM:getMem32(addr: uint32): uint32 <forwarddecl> end
 function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 
+function e3d.EVM:getMemColAABB(addr: uint32, box: *e3d.ColAABB): boolean <forwarddecl> end
+
+local CollisionFunction: type = @function(*e3d.EVM, uint32, uint32): (boolean, uint32)
+
+local function checkPointPoint(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkPointAABB(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkPointSphere(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkPointCylinder(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkAABBPoint(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkAABBAABB(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	local a: e3d.ColAABB
+	local b: e3d.ColAABB
+	if not vm:getMemColAABB(a_addr, &a) then return false, 0 end
+	if not vm:getMemColAABB(b_addr, &b) then return false, 0 end
+
+	local half_a_width: float32 = a.width / 2
+	local half_a_height: float32 = a.height / 2
+	local half_a_depth: float32 = a.depth / 2
+	local min_a: rl.vector3 = {
+		a.position.x - half_a_width,
+		a.position.y - half_a_height,
+		a.position.z - half_a_depth
+	}
+	local max_a: rl.vector3 = {
+		a.position.x + half_a_width,
+		a.position.y + half_a_height,
+		a.position.z + half_a_depth
+	}
+
+	local half_b_width: float32 = b.width / 2
+	local half_b_height: float32 = b.height / 2
+	local half_b_depth: float32 = b.depth / 2
+	local min_b: rl.vector3 = {
+		b.position.x - half_b_width,
+		b.position.y - half_b_height,
+		b.position.z - half_b_depth
+	}
+	local max_b: rl.vector3 = {
+		b.position.x + half_b_width,
+		b.position.y + half_b_height,
+		b.position.z + half_b_depth
+	}
+
+	if (min_a.x <= max_b.x) and (max_a.x >= min_b.x) and (min_a.y <= max_b.y) and (max_a.y >= min_b.y) and (min_a.z <= max_b.z) and (max_a.z >= min_b.z) then
+		return true, 1
+	else
+		return true, 0
+	end
+end
+
+local function checkAABBSphere(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkAABBCylinder(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkSpherePoint(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkSphereAABB(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkSphereSphere(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkSphereCylinder(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkCylinderPoint(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkCylinderAABB(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkCylinderSphere(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkCylinderCylinder(vm: *e3d.EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local ColType = @enum {
+	POINT = 0,
+	AABB,
+	SPHERE,
+	CYLINDER
+}
+
+local collision_type_names: []string = {
+	"colpoint",
+	"colaabb",
+	"colsphere",
+	"colcylinder"
+}
+
+local collision_functions: [4][4]CollisionFunction = {
+	-- point             AABB               sphere               cylinder
+	{checkPointPoint   , checkPointAABB   , checkPointSphere   , checkPointCylinder   }, -- point
+	{checkAABBPoint    , checkAABBAABB    , checkAABBSphere    , checkAABBCylinder    }, -- AABB
+	{checkSpherePoint  , checkSphereAABB  , checkSphereSphere  , checkSphereCylinder  }, -- sphere
+	{checkCylinderPoint, checkCylinderAABB, checkCylinderSphere, checkCylinderCylinder}  -- cylinder
+}
+
 --[[
 	API FUNCTIONS TO IMPLEMENT:
 	
@@ -31,14 +158,6 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	// advanced graphics
 	lookat(),
 	mulmatrix(), ...
-	get/setBlendMode()
-
-	void normal(vec3 norm);
-	
-	// lighting
-	void lightmode(int mode);
-	void light(???);
-	void ambient(???);
 	
 	// memory
 	void* alloc(int size);
@@ -50,14 +169,14 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 	string strfmt(string fmt, ...);
 	
 	// i/o
-	initMemoryCard()
+	initMemoryCard(string id);
 	swapCart()?
 ]]
 
 -- DEBUG API FUNCTIONS (TODO: remove)
 
 local function apiHalt(vm: *e3d.EVM): boolean
-	vm.error = "- PROGRAM HALTED -\n"
+	vm.error = "PROGRAM HALTED -\n"
 	return false
 end
 
@@ -122,9 +241,9 @@ local function apiPrint2D(vm: *e3d.EVM): boolean
 	local start_addr: uint32 = fmt.data
 	local arg_addr: uint32
 	local addr: uint32
-	local arg_val0: e3d.EVMValue
-	local arg_val1: e3d.EVMValue
-	local arg_val2: e3d.EVMValue
+	local arg_val0: util.IntFloat
+	local arg_val1: util.IntFloat
+	local arg_val2: util.IntFloat
 	local ray_col: rl.color = {
 		(@cuchar)(col >> 24),
 		(@cuchar)((col & 0xFF0000) >> 16),
@@ -720,9 +839,9 @@ local function apiTime(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec2Len(vm: *e3d.EVM): boolean
+local function apiVec2Length(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec2Len(vec2 v);
+	-- float vec2Length(vec2 v);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 
@@ -731,9 +850,9 @@ local function apiVec2Len(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec2LenSq(vm: *e3d.EVM): boolean
+local function apiVec2LengthSq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec2LenSq(vec2 v);
+	-- float vec2LengthSq(vec2 v);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 
@@ -742,9 +861,9 @@ local function apiVec2LenSq(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec2Norm(vm: *e3d.EVM): boolean
+local function apiVec2Normalize(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec2 vec2Norm(vec2 v);
+	-- vec2 vec2Normalize(vec2 v);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 
@@ -785,9 +904,9 @@ local function apiVec2Cross(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec2Dist(vm: *e3d.EVM): boolean
+local function apiVec2Distance(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec2Dist(vec2 a, vec2 b);
+	-- float vec2Distance(vec2 a, vec2 b);
 
 	local a: rl.vector2 = vm:getArgV2(0)
 	local b: rl.vector2 = vm:getArgV2(2)
@@ -797,9 +916,9 @@ local function apiVec2Dist(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec2DistSq(vm: *e3d.EVM): boolean
+local function apiVec2DistanceSq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec2DistSq(vec2 a, vec2 b);
+	-- float vec2DistanceSq(vec2 a, vec2 b);
 
 	local a: rl.vector2 = vm:getArgV2(0)
 	local b: rl.vector2 = vm:getArgV2(2)
@@ -934,9 +1053,9 @@ local function apiVec2Invert(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec3Len(vm: *e3d.EVM): boolean
+local function apiVec3Length(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec3Len(vec3 v);
+	-- float vec3Length(vec3 v);
 	
 	local v: rl.vector3 = vm:getArgV3(0)
 
@@ -949,9 +1068,9 @@ local function apiVec3Len(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec3LenSq(vm: *e3d.EVM): boolean
+local function apiVec3LengthSq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec3LenSq(vec3 v);
+	-- float vec3LengthSq(vec3 v);
 
 	local v: rl.vector3 = vm:getArgV3(0)
 
@@ -964,9 +1083,9 @@ local function apiVec3LenSq(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec3Norm(vm: *e3d.EVM): boolean
+local function apiVec3Normalize(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 vec3Norm(vec3 v);
+	-- vec3 vec3Normalize(vec3 v);
 
 	local v: rl.vector3 = vm:getArgV3(0)
 
@@ -1017,9 +1136,9 @@ local function apiVec3Cross(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec3Dist(vm: *e3d.EVM): boolean
+local function apiVec3Distance(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec3Dist(vec3 a, vec3 b);
+	-- float vec3Distance(vec3 a, vec3 b);
 
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
@@ -1035,9 +1154,9 @@ local function apiVec3Dist(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVec3DistSq(vm: *e3d.EVM): boolean
+local function apiVec3DistanceSq(vm: *e3d.EVM): boolean
 	-- signature:
-	-- float vec3DistSq(vec3 a, vec3 b);
+	-- float vec3DistanceSq(vec3 a, vec3 b);
 
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
@@ -1281,9 +1400,9 @@ local function apiCamera3D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiGetCam3DPos(vm: *e3d.EVM): boolean
+local function apiGetCam3DPosition(vm: *e3d.EVM): boolean
 	-- signature:
-	-- vec3 getCam3DPos(int id);
+	-- vec3 getCam3DPosition(int id);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1292,9 +1411,9 @@ local function apiGetCam3DPos(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiSetCam3DPos(vm: *e3d.EVM): boolean
+local function apiSetCam3DPosition(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCam3DPos(int id, vec3 pos);
+	-- void setCam3DPosition(int id, vec3 pos);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	local pos: rl.vector3 = vm:getArgV3(1)
@@ -1373,9 +1492,9 @@ local function apiSetCam3DFOV(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiGetCam3DProj(vm: *e3d.EVM): boolean
+local function apiGetCam3DProjection(vm: *e3d.EVM): boolean
 	-- signature:
-	-- int getCam3DProj(int id);
+	-- int getCam3DProjection(int id);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 
@@ -1384,9 +1503,9 @@ local function apiGetCam3DProj(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiSetCam3DProj(vm: *e3d.EVM): boolean
+local function apiSetCam3DProjection(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void setCam3DProj(int id, int mode);
+	-- void setCam3DProjection(int id, int mode);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	local proj: float32 = vm:getArgI(1)
@@ -1477,7 +1596,7 @@ local function apiSetTextureMode(vm: *e3d.EVM): boolean
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode > 2 then
-		vm.error = string.format("RUNTIME ERROR: attempt to set invalid texture mode `%d`", mode)
+		vm.error = string.format("RUNTIME ERROR: attempt to set invalid texture mode `%d`\n", mode)
 		return false
 	end
 
@@ -1503,6 +1622,7 @@ local function apiSetCullMode(vm: *e3d.EVM): boolean
 
 	local mode: uint32 = vm:getArgU(0)
 
+	vm.gpu:updateVertexShaderMatrices()
 	rlgl.drawRenderBatchActive()
 
 	switch mode do
@@ -1515,7 +1635,7 @@ local function apiSetCullMode(vm: *e3d.EVM): boolean
 		case 2 then
 			rlgl.disableBackfaceCulling()
 		else
-			vm.error = string.format("RUNTIME ERROR: attempt to set invalid cull mode `%d`", mode)
+			vm.error = string.format("RUNTIME ERROR: attempt to set invalid cull mode `%d`\n", mode)
 			return false
 	end
 
@@ -1539,6 +1659,7 @@ local function apiSetWireMode(vm: *e3d.EVM): boolean
 	
 	local enable: boolean = vm:getArgU(0) ~= 0
 	
+	vm.gpu:updateVertexShaderMatrices()
 	rlgl.drawRenderBatchActive()
 	
 	if enable then
@@ -1657,6 +1778,228 @@ local function apiSetFogColor(vm: *e3d.EVM): boolean
 	vm.gpu.fog_color = rl.colorNormalize(ray_col)
 	
 	rl.setShaderValue(vm.gpu.gfx_shader, vm.gpu.fog_color_loc, &vm.gpu.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
+
+	return true
+end
+
+local function apiGetBlendMode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getBlendMode();
+	
+	vm:pushU(vm.gpu.blend_mode)
+
+	return true
+end
+
+local function apiSetBlendMode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setBlendMode(int mode);
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode > rl.blendMode.SUBTRACT_colorS then
+		vm.error = string.format("RUNTIME ERROR: attempt to set invalid blend mode `%d`\n", mode)
+		return false
+	end
+
+	vm.gpu:setBlendMode(mode)
+
+	return true
+end
+
+local function apiGetLightingMode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightingMode();
+	
+	vm:pushU(vm.gpu.lighting_mode)
+
+	return true
+end
+
+local function apiSetLightingMode(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightingMode(int mode);
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode ~= 0 then
+		mode = 1
+	end
+
+	vm.gpu:updateVertexShaderMatrices()
+	vm.gpu:setLightingMode(mode)
+
+	return true
+end
+
+local function apiGetAmbientFactor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- float getAmbientFactor();
+	
+	vm:pushF(vm.gpu.ambient_factor * 100.0)
+
+	return true
+end
+
+local function apiSetAmbientFactor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setAmbientFactor(float factor);
+
+	local factor: float32 = vm:getArgF(0)
+
+	if factor < 0.0 or factor > 100.0 then
+		vm.error = "RUNTIME ERROR: attempt to set invalid ambient factor\n"
+		return false
+	end
+
+	vm.gpu:setAmbientFactor(factor)
+
+	return true
+end
+
+local function apiGetAmbientColor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getAmbientColor();
+	
+	local v3col = vm.gpu.ambient_color
+	local r: uint8 = (@uint8)(v3col.x * 255.0)
+	local g: uint8 = (@uint8)(v3col.y * 255.0)
+	local b: uint8 = (@uint8)(v3col.z * 255.0)
+	local col: uint32 = ((@uint32)(r) << 24) | ((@uint32)(g) << 16) | ((@uint32)(b) << 8)
+
+	vm:pushU(col)
+
+	return true
+end
+
+local function apiSetAmbientColor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setAmbientColor(int color);
+
+	local col: uint32 = vm:getArgU(0)
+
+	vm.gpu:setAmbientColor(col)
+
+	return true
+end
+
+local function apiGetLightEnabled(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightEnabled(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	vm:pushU(vm.gpu.lights[id].enabled)
+
+	return true
+end
+
+local function apiSetLightEnabled(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightEnabled(int id, int enabled);
+
+	local id: uint32 = vm:getArgU(0)
+	local enabled: uint32 = vm:getArgU(1)
+
+	vm.gpu:setLightEnabled(id, enabled)
+
+	return true
+end
+
+local function apiGetLightType(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightType(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	vm:pushU(vm.gpu.lights[id].light_type)
+
+	return true
+end
+
+local function apiSetLightType(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightType(int id, int type);
+
+	local id: uint32 = vm:getArgU(0)
+	local light_type: uint32 = vm:getArgU(1)
+
+	vm.gpu:setLightType(id, light_type)
+
+	return true
+end
+
+local function apiGetLightRadius(vm: *e3d.EVM): boolean
+	-- signature:
+	-- float getLightRadius(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	vm:pushF(vm.gpu.lights[id].radius)
+
+	return true
+end
+
+local function apiSetLightRadius(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightRadius(int id, float radius);
+
+	local id: uint32 = vm:getArgU(0)
+	local radius: float32 = vm:getArgF(1)
+
+	vm.gpu:setLightRadius(id, radius)
+
+	return true
+end
+
+local function apiGetLightPosition(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightPosition(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	vm:pushV3(vm.gpu.lights[id].position)
+
+	return true
+end
+
+local function apiSetLightPosition(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightPosition(int id, vec3 pos);
+
+	local id: uint32 = vm:getArgU(0)
+	local pos: rl.vector3 = vm:getArgV3(1)
+
+	vm.gpu:setLightPosition(id, pos)
+
+	return true
+end
+
+local function apiGetLightColor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightColor(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	local v3col = vm.gpu.lights[id].color
+	local r: uint8 = (@uint8)(v3col.x * 255.0)
+	local g: uint8 = (@uint8)(v3col.y * 255.0)
+	local b: uint8 = (@uint8)(v3col.z * 255.0)
+	local col: uint32 = ((@uint32)(r) << 24) | ((@uint32)(g) << 16) | ((@uint32)(b) << 8)
+
+	vm:pushU(col)
+
+	return true
+end
+
+local function apiSetLightColor(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightColor(int id, int color);
+
+	local id: uint32 = vm:getArgU(0)
+	local col: uint32 = vm:getArgU(1)
+
+	vm.gpu:setLightColor(id, col)
 
 	return true
 end
@@ -1816,9 +2159,9 @@ local function apiEndMesh(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVertex(vm: *e3d.EVM): boolean
+local function apiMeshVertex(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void vertex(vec3 v);
+	-- void meshVertex(vec3 v);
 
 	local v: rl.vector3 = vm:getArgV3(0)
 
@@ -1827,9 +2170,9 @@ local function apiVertex(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVertex2D(vm: *e3d.EVM): boolean
+local function apiMeshVertex2D(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void vertex2D(vec2 v);
+	-- void meshVertex2D(vec2 v);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 
@@ -1838,9 +2181,20 @@ local function apiVertex2D(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVertUV(vm: *e3d.EVM): boolean
+local function apiMeshNormal(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void vertUV(vec2 uv);
+	-- void meshNormal(vec3 normal);
+
+	local v: rl.vector3 = vm:getArgV3(0)
+	
+	vm.gpu:vertNormal(v)
+	
+	return true
+end
+
+local function apiMeshUV(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void meshUV(vec2 uv);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 	
@@ -1849,9 +2203,9 @@ local function apiVertUV(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiVertColor(vm: *e3d.EVM): boolean
+local function apiMeshColor(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void vertColor(int col);
+	-- void meshColor(int col);
 
 	local col: uint32 = vm:getArgU(0)
 	
@@ -2010,6 +2364,249 @@ local function apiOrtho(vm: *e3d.EVM): boolean
 	end
 
 	rlgl.ortho(left, right, bottom, top, near, far)
+
+	return true
+end
+
+local function apiPlaySong(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void playSong(int row);
+
+	local row: uint32 = vm:getArgU(0)
+
+	vm.soundchip:playSongRow((@uint8)(row))
+
+	return true
+end
+
+local function apiPlayTrack(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void playTrack();
+
+	return true
+end
+
+local function apiPlayPattern(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void playPattern(int track, int pattern);
+
+	local track: uint32 = vm:getArgU(0)
+	local pattern: uint32 = vm:getArgU(1)
+
+	vm.soundchip:playPattern((@uint8)(track), (@uint8)(pattern))
+
+	return true
+end
+
+local function apiPlaySample(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void playSample();
+
+	return true
+end
+
+local function apiPauseTracks(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void pauseTracks(int mask);
+
+	local mask: uint32 = vm:getArgU(0)
+
+	vm.soundchip.audio_state.playing_flags = ~((@uint8)(mask))
+
+	return true
+end
+
+local function apiResumeTracks(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void resumeTracks(int mask);
+
+	local mask: uint32 = vm:getArgU(0)
+
+	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags | (@uint8)(mask)
+
+	return true
+end
+
+local function apiStopTracks(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void stopTracks(int mask);
+
+	local mask: uint32 = vm:getArgU(0)
+
+	for i = 0, < SOUNDCHIP_TRACK_COUNT do
+		if mask & (0x80 >> i) ~= 0 then
+			vm.soundchip:stopTrack(i)
+		end
+	end
+
+	return true
+end
+
+local function apiMuteTracks(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void muteTracks();
+
+	return true
+end
+
+local function apiUnmuteTracks(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void unmuteTracks();
+
+	return true
+end
+
+local function apiCheckCollision(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int checkCollision(void* a, void* b);
+
+	local a_addr: uint32 = vm:getArgU(0)
+	local b_addr: uint32 = vm:getArgU(1)
+	local a_type: uint32
+	local b_type: uint32
+
+	if not getMem32(vm, a_addr, &a_type) then
+		return false
+	end
+
+	if not getMem32(vm, b_addr, &b_type) then
+		return false
+	end
+
+	if a_type > ColType.CYLINDER or a_type > ColType.CYLINDER then
+		vm.error = "RUNTIME ERROR: attempt to call checkCollision() on invalid collision shape type(s)\n"
+		return false
+	end
+
+	local cfunc: CollisionFunction = collision_functions[a_type][b_type]
+	if cfunc == nilptr then
+		vm.error = string.format(
+			"RUNTIME ERROR: no collision function for types `%s` and `%s`\n",
+			collision_type_names[a_type],
+			collision_type_names[b_type]
+		)
+		return false
+	end
+
+	local success: boolean
+	local collision: int32
+	success, collision = cfunc(vm, a_addr, b_addr)
+
+	if success then
+		vm:pushI(collision)
+		return true
+	else
+		return false
+	end
+end
+
+local function apiCheckAABBPoint(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int checkAABBPoint(box b, vec3 p);
+
+	local b_position: rl.vector3 = vm:getArgV3(0)
+	local b_width: float32 = vm:getArgF(3)
+	local b_height: float32 = vm:getArgF(4)
+	local b_depth: float32 = vm:getArgF(5)
+	local p: rl.vector3 = vm:getArgV3(6)
+
+	local half_width: float32 = b_width / 2
+	local half_height: float32 = b_height / 2
+	local half_depth: float32 = b_depth / 2
+	local min_x: float32 = b_position.x - half_width
+	local max_x: float32 = b_position.x + half_width
+	local min_y: float32 = b_position.y - half_height 
+	local max_y: float32 = b_position.y + half_height 
+	local min_z: float32 = b_position.z - half_depth
+	local max_z: float32 = b_position.z + half_depth
+
+	if p.x < min_x or p.x > max_x then
+		vm:pushI(0)
+	elseif p.y < min_y or p.y > max_y then
+		vm:pushI(0)
+	elseif p.z < min_z or p.z > max_z then
+		vm:pushI(0)
+	else
+		vm:pushI(1)
+	end
+
+	return true
+end
+
+local function apiGetCollisionPoint(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec3 getCollisionPoint();
+
+	return true
+end
+
+local function apiGetCollisionNormal(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec3 getCollisionNormal();
+
+	return true
+end
+
+local function apiLoadTexBank(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void loadTexBank(int bank);
+
+	local bank: uint32 = vm:getArgU(0)
+
+	if bank > 3 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid texture bank `%d`", bank)
+		return false
+	end
+
+	vm.gpu:loadTexBank(bank)
+
+	return true
+end
+
+local function apiLoadObjBank(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void loadObjBank(int bank);
+
+	local bank: uint32 = vm:getArgU(0)
+
+	if bank > 3 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid object bank `%d`", bank)
+		return false
+	end
+
+	vm.gpu:loadObjBank(bank)
+
+	return true
+end
+
+local function apiLoadWavBank(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void loadWavBank(int bank);
+
+	local bank: uint32 = vm:getArgU(0)
+
+	if bank > 1 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid wave bank `%d`", bank)
+		return false
+	end
+
+	vm.soundchip:loadWavBank(bank)
+
+	return true
+end
+
+local function apiLoadSeqBank(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void loadSeqBank(int bank);
+
+	local bank: uint32 = vm:getArgU(0)
+
+	if bank > 7 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid sequencer bank `%d`", bank)
+		return false
+	end
+
+	vm.soundchip:loadSeqBank(bank)
 
 	return true
 end
@@ -2187,6 +2784,129 @@ local function apiMemset(vm: *e3d.EVM): boolean
 end
 
 function e3d.EVM:registerBuiltins(): void
+	-- define vec2 struct
+	local sid: *e3d.Struct = new(@e3d.Struct)
+	local vec2_x: *e3d.Identifier = new(@e3d.Identifier)
+	local vec2_y: *e3d.Identifier = new(@e3d.Identifier)
+	sid.name = "vec2"
+	$vec2_x = {name="x", index=0, type_info={e3d.EVMType.FLOAT}}
+	$vec2_y = {name="y", index=1, type_info={e3d.EVMType.FLOAT}}
+	sid:addMember(vec2_x)
+	sid:addMember(vec2_y)
+	sid.is_complete = true
+	self.struct_vec2 = sid
+
+	-- define vec3 struct
+	sid = new(@e3d.Struct)
+	local vec3_x: *e3d.Identifier = new(@e3d.Identifier)
+	local vec3_y: *e3d.Identifier = new(@e3d.Identifier)
+	local vec3_z: *e3d.Identifier = new(@e3d.Identifier)
+	sid.name = "vec3"
+	$vec3_x = {name="x", index=0, type_info={e3d.EVMType.FLOAT}}
+	$vec3_y = {name="y", index=1, type_info={e3d.EVMType.FLOAT}}
+	$vec3_z = {name="z", index=2, type_info={e3d.EVMType.FLOAT}}
+	sid:addMember(vec3_x)
+	sid:addMember(vec3_y)
+	sid:addMember(vec3_z)
+	sid.is_complete = true
+	self.struct_vec3 = sid
+
+	-- define string struct
+	sid = new(@e3d.Struct)
+	local string_length: *e3d.Identifier = new(@e3d.Identifier)
+	local string_data: *e3d.Identifier = new(@e3d.Identifier)
+	sid.name = "string"
+	$string_length = {name="length", index=0, type_info={e3d.EVMType.INT}}
+	$string_data = {name="data", index=1, type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}}
+	sid:addMember(string_length)
+	sid:addMember(string_data)
+	sid.is_complete = true
+	self.struct_string = sid
+
+	-- define vertex struct
+	local vertex_struct: *e3d.Struct = new(@e3d.Struct)
+	local vertex_position: *e3d.Identifier = new(@e3d.Identifier)
+	local vertex_normal: *e3d.Identifier = new(@e3d.Identifier)
+	local vertex_uv: *e3d.Identifier = new(@e3d.Identifier)
+	local vertex_color: *e3d.Identifier = new(@e3d.Identifier)
+	vertex_struct.name = "vertex"
+	$vertex_position = {name="position", index=0, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$vertex_normal = {name="normal", index=3, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$vertex_uv = {name="uv", index=6, type_info={e3d.EVMType.VEC2, self.struct_vec2}}
+	$vertex_color = {name="color", index=8, type_info={e3d.EVMType.INT}}
+	vertex_struct:addMember(vertex_position)
+	vertex_struct:addMember(vertex_normal)
+	vertex_struct:addMember(vertex_uv)
+	vertex_struct:addMember(vertex_color)
+	vertex_struct.is_complete = true
+
+	-- define colsphere struct
+	local colsphere_struct: *e3d.Struct = new(@e3d.Struct)
+	local colsphere_position: *e3d.Identifier = new(@e3d.Identifier)
+	local colsphere_radius: *e3d.Identifier = new(@e3d.Identifier)
+	colsphere_struct.name = "colsphere"
+	$colsphere_position = {name="position", index=0, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$colsphere_radius = {name="radius", index=3, type_info={e3d.EVMType.FLOAT}}
+	colsphere_struct:addMember(colsphere_position)
+	colsphere_struct:addMember(colsphere_radius)
+	colsphere_struct.is_complete = true
+
+	-- define colaabb struct
+	local colaabb_struct: *e3d.Struct = new(@e3d.Struct)
+	local colaabb_type: *e3d.Identifier = new(@e3d.Identifier)
+	local colaabb_position: *e3d.Identifier = new(@e3d.Identifier)
+	local colaabb_width: *e3d.Identifier = new(@e3d.Identifier)
+	local colaabb_height: *e3d.Identifier = new(@e3d.Identifier)
+	local colaabb_depth: *e3d.Identifier = new(@e3d.Identifier)
+	colaabb_struct.name = "colaabb"
+	$colaabb_type = {name="type", index=0, type_info={e3d.EVMType.INT}}
+	$colaabb_position = {name="position", index=1, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$colaabb_width = {name="width", index=4, type_info={e3d.EVMType.FLOAT}}
+	$colaabb_height = {name="height", index=5, type_info={e3d.EVMType.FLOAT}}
+	$colaabb_depth = {name="depth", index=6, type_info={e3d.EVMType.FLOAT}}
+	colaabb_struct:addMember(colaabb_type)
+	colaabb_struct:addMember(colaabb_position)
+	colaabb_struct:addMember(colaabb_width)
+	colaabb_struct:addMember(colaabb_height)
+	colaabb_struct:addMember(colaabb_depth)
+	colaabb_struct.is_complete = true
+
+	-- define colcylinder struct
+	local colcylinder_struct: *e3d.Struct = new(@e3d.Struct)
+	local colcylinder_position: *e3d.Identifier = new(@e3d.Identifier)
+	local colcylinder_height: *e3d.Identifier = new(@e3d.Identifier)
+	local colcylinder_radius: *e3d.Identifier = new(@e3d.Identifier)
+	colcylinder_struct.name = "colcylinder"
+	$colcylinder_position = {name="position", index=0, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$colcylinder_height = {name="height", index=3, type_info={e3d.EVMType.FLOAT}}
+	$colcylinder_radius = {name="radius", index=4, type_info={e3d.EVMType.FLOAT}}
+	colcylinder_struct:addMember(colcylinder_position)
+	colcylinder_struct:addMember(colcylinder_height)
+	colcylinder_struct:addMember(colcylinder_radius)
+	colcylinder_struct.is_complete = true
+
+	-- define coltriangle struct
+	local coltriangle_struct: *e3d.Struct = new(@e3d.Struct)
+	local coltriangle_point1: *e3d.Identifier = new(@e3d.Identifier)
+	local coltriangle_point2: *e3d.Identifier = new(@e3d.Identifier)
+	local coltriangle_point3: *e3d.Identifier = new(@e3d.Identifier)
+	coltriangle_struct.name = "coltriangle"
+	$coltriangle_point1 = {name="point1", index=0, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$coltriangle_point2 = {name="point2", index=3, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	$coltriangle_point3 = {name="point3", index=6, type_info={e3d.EVMType.VEC3, self.struct_vec3}}
+	coltriangle_struct:addMember(coltriangle_point1)
+	coltriangle_struct:addMember(coltriangle_point2)
+	coltriangle_struct:addMember(coltriangle_point3)
+	coltriangle_struct.is_complete = true
+
+	local builtin_structs: []e3d.Identifier = {
+		{name="vertex",      type_info={e3d.EVMType.STRUCT, vertex_struct}},
+		{name="colsphere",   type_info={e3d.EVMType.STRUCT, colsphere_struct}},
+		{name="colaabb",     type_info={e3d.EVMType.STRUCT, colaabb_struct}},
+		{name="colcylinder", type_info={e3d.EVMType.STRUCT, colcylinder_struct}},
+		{name="coltriangle", type_info={e3d.EVMType.STRUCT, coltriangle_struct}}
+	}
+	
 	local keyword_ids: []e3d.Identifier = {
 		{name="void",     token=e3d.Token.VOID},
 		{name="int",      token=e3d.Token.INT},
@@ -2213,8 +2933,8 @@ function e3d.EVM:registerBuiltins(): void
 	}
 
 	local constructor_ids: []e3d.Identifier = {
-		{name="vec2Zero", type_info={e3d.EVMType.VEC2}},
-		{name="vec3Zero", type_info={e3d.EVMType.VEC3}}
+		{name="vec2Zero", type_info={e3d.EVMType.VEC2, self.struct_vec2}},
+		{name="vec3Zero", type_info={e3d.EVMType.VEC3, self.struct_vec3}}
 	}
 
 	self.keywords:reserve(#keyword_ids)
@@ -2244,83 +2964,40 @@ function e3d.EVM:registerBuiltins(): void
 		self.api_ids[id.name] = id
 	end
 
-	-- define vec2 struct
-	local sid: *e3d.Struct = new(@e3d.Struct)
-	local v2x: *e3d.Identifier = new(@e3d.Identifier)
-	local v2y: *e3d.Identifier = new(@e3d.Identifier)
-
-	sid.name = "vec2"
-	v2x.name = "x"
-	v2x.index = 0
-	v2x.type_info = {e3d.EVMType.FLOAT}
-
-	v2y.name = "y"
-	v2y.index = 1
-	v2y.type_info = {e3d.EVMType.FLOAT}
-
-	sid:addMember(v2x)
-	sid:addMember(v2y)
-	sid.is_complete = true
-	self.struct_vec2 = sid
-
-	-- define vec3 struct
-	sid = new(@e3d.Struct)
-	local v3x: *e3d.Identifier = new(@e3d.Identifier)
-	local v3y: *e3d.Identifier = new(@e3d.Identifier)
-	local v3z: *e3d.Identifier = new(@e3d.Identifier)
-
-	sid.name = "vec3"
-	v3x.name = "x"
-	v3x.index = 0
-	v3x.type_info = {e3d.EVMType.FLOAT}
-
-	v3y.name = "y"
-	v3y.index = 1
-	v3y.type_info = {e3d.EVMType.FLOAT}
-
-	v3z.name = "z"
-	v3z.index = 2
-	v3z.type_info = {e3d.EVMType.FLOAT}
-
-	sid:addMember(v3x)
-	sid:addMember(v3y)
-	sid:addMember(v3z)
-	sid.is_complete = true
-	self.struct_vec3 = sid
-
-	-- define string struct
-	sid = new(@e3d.Struct)
-	local string_len: *e3d.Identifier = new(@e3d.Identifier)
-	local string_data: *e3d.Identifier = new(@e3d.Identifier)
-
-	sid.name = "string"
-	string_len.name = "len"
-	string_len.index = 0
-	string_len.type_info = {e3d.EVMType.INT}
-
-	string_data.name = "data"
-	string_data.index = 1
-	string_data.type_info = {e3d.EVMType.VOID + e3d.EVMType.POINTER}
-
-	sid:addMember(string_len)
-	sid:addMember(string_data)
-	sid.is_complete = true
-	self.struct_string = sid
+	self.builtin_struct_ids:reserve(#builtin_structs)
+	for i = 0, < #builtin_structs do
+		local id: *e3d.Identifier = new(@e3d.Identifier)
+		$id = builtin_structs[i]
+		id.token = e3d.Token.STRUCT_ID
+		id.class = e3d.Class.STRUCT
+		self.builtin_struct_ids[id.name] = id
+	end
 end
 
 function e3d.EVM:registerAPI(): void
 	local api_ids: []e3d.Identifier = {
-		{name="halt", type_info={e3d.EVMType.VOID}, func=apiHalt},
-
-		{name="vargc", type_info={e3d.EVMType.INT},                                                             func=apiVargc},
-		{name="vargv", type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER}, argdata={{type_id=e3d.EVMType.INT}}, func=apiVargv},
-		
+		{
+			name="halt",
+			type_info={e3d.EVMType.VOID},
+			func=apiHalt
+		},
+		{
+			name="vargc",
+			type_info={e3d.EVMType.INT},
+			func=apiVargc
+		},
+		{
+			name="vargv",
+			type_info={e3d.EVMType.VOID + e3d.EVMType.POINTER},
+			argdata={{e3d.EVMType.INT}},
+			func=apiVargv
+		},
 		{
 			name="pressed",
 			type_info={e3d.EVMType.INT},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiPressed
 		},
@@ -2328,8 +3005,8 @@ function e3d.EVM:registerAPI(): void
 			name="released",
 			type_info={e3d.EVMType.INT},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiReleased
 		},
@@ -2337,277 +3014,600 @@ function e3d.EVM:registerAPI(): void
 			name="held",
 			type_info={e3d.EVMType.INT},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiHeld
 		},
-		
-		{name="mini",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=apiMini},
-		{name="maxi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},                            func=apiMaxi},
-		{name="midi",  type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=apiMidi},
-		{name="wrapi", type_info={e3d.EVMType.INT}, argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}}, func=apiWrapi},
-
-		{name="minf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=apiMinf},
-		{name="maxf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}},                              func=apiMaxf},
-		{name="midf",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiMidf},
-		{name="wrapf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiWrapf},
-		
-		{name="signi", type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}},   func=apiSigni},
-		{name="signf", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apisignf},
-		{name="fract", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiFract},
-
-		{name="deg",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiDeg},
-		{name="rad",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiRad},
-		{name="sin",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSin},
-		{name="cos",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiCos},
-		{name="floor",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiFloor},
-		{name="ceil",   type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiCeil},
-		{name="round",  type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiRound},
-
-		{name="randomize",   type_info={e3d.EVMType.VOID},                                                                      func=apiRandomize},
-		{name="randomizeEx", type_info={e3d.EVMType.VOID},  argdata={{type_id=e3d.EVMType.INT}},                                func=apiRandomizeEx},
-		{name="randi",       type_info={e3d.EVMType.INT},   argdata={{type_id=e3d.EVMType.INT}, {type_id=e3d.EVMType.INT}},     func=apiRandi},
-		{name="randiEx",     type_info={e3d.EVMType.INT},                                                                       func=apiRandiEx},
-		{name="randf",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.FLOAT}, {type_id=e3d.EVMType.FLOAT}}, func=apiRandf},
-		{name="randfEx",     type_info={e3d.EVMType.FLOAT},                                                                     func=apiRandfEx},
-		
-		{name="time", type_info={e3d.EVMType.FLOAT}, func=apiTime},
-		
-		{name="vec2Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2Len},
-		{name="vec2LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2LenSq},
-		{name="vec2Norm",      type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}},                             func=apiVec2Norm},
-		{name="vec2Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Dot},
-		{name="vec2Cross",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Cross},
-		{name="vec2Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Dist},
-		{name="vec2DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2DistSq},
-		{name="vec2Direction", type_info={e3d.EVMType.VEC2},  argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Direction},
-		{name="vec2Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2Angle},
-		{name="vec2LineAngle", type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}}, func=apiVec2LineAngle},
+		{
+			name="mini",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiMini
+		},
+		{
+			name="maxi",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiMaxi
+		},
+		{
+			name="midi",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiMidi
+		},
+		{
+			name="wrapi",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiWrapi
+		},
+		{
+			name="minf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiMinf
+		},
+		{
+			name="maxf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiMaxf
+		},
+		{
+			name="midf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiMidf
+		},
+		{
+			name="wrapf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiWrapf
+		},
+		{
+			name="signi",
+			type_info={e3d.EVMType.INT},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSigni
+		},
+		{
+			name="signf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apisignf
+		},
+		{
+			name="fract",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiFract
+		},
+		{
+			name="deg",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiDeg
+		},
+		{
+			name="rad",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiRad
+		},
+		{
+			name="sin",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiSin
+		},
+		{
+			name="cos",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiCos
+		},
+		{
+			name="floor",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiFloor
+		},
+		{
+			name="ceil",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiCeil
+		},
+		{
+			name="round",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiRound
+		},
+		{
+			name="randomize",
+			type_info={e3d.EVMType.VOID},
+			func=apiRandomize
+		},
+		{
+			name="randomizeEx",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiRandomizeEx
+		},
+		{
+			name="randi",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiRandi
+		},
+		{
+			name="randiEx",
+			type_info={e3d.EVMType.INT},
+			func=apiRandiEx
+		},
+		{
+			name="randf",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiRandf
+		},
+		{
+			name="randfEx",
+			type_info={e3d.EVMType.FLOAT},
+			func=apiRandfEx
+		},
+		{
+			name="time",
+			type_info={e3d.EVMType.FLOAT},
+			func=apiTime
+		},
+		{
+			name="vec2Length",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiVec2Length
+		},
+		{
+			name="vec2LengthSq",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiVec2LengthSq
+		},
+		{
+			name="vec2Normalize",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiVec2Normalize
+		},
+		{
+			name="vec2Dot",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Dot
+		},
+		{
+			name="vec2Cross",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Cross
+		},
+		{
+			name="vec2Distance",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Distance
+		},
+		{
+			name="vec2DistanceSq",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2DistanceSq
+		},
+		{
+			name="vec2Direction",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Direction
+		},
+		{
+			name="vec2Angle",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Angle
+		},
+		{
+			name="vec2LineAngle",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2LineAngle
+		},
 		{
 			name="vec2Lerp",
-			type_info={e3d.EVMType.VEC2},
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
 			argdata={
-				{type_id=e3d.EVMType.VEC2},
-				{type_id=e3d.EVMType.VEC2},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiVec2Lerp
 		},
-		{name="vec2Reflect", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.VEC2}},  func=apiVec2Reflect},
-		{name="vec2Rotate",  type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}, {type_id=e3d.EVMType.FLOAT}}, func=apiVec2Rotate},
+		{
+			name="vec2Reflect",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2}
+			},
+			func=apiVec2Reflect
+		},
+		{
+			name="vec2Rotate",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiVec2Rotate
+		},
 		{
 			name="vec2MoveToward",
-			type_info={e3d.EVMType.VEC2},
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
 			argdata={
-				{type_id=e3d.EVMType.VEC2},
-				{type_id=e3d.EVMType.VEC2},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.VEC2, self.struct_vec2},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiVec2MoveToward
 		},
-		{name="vec2Invert", type_info={e3d.EVMType.VEC2}, argdata={{type_id=e3d.EVMType.VEC2}}, func=apiVec2Invert},
-		
-		{name="vec3Len",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3Len},
-		{name="vec3LenSq",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3LenSq},
-		{name="vec3Norm",      type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}},                             func=apiVec3Norm},
-		{name="vec3Dot",       type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Dot},
-		{name="vec3Cross",     type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Cross},
-		{name="vec3Dist",      type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Dist},
-		{name="vec3DistSq",    type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3DistSq},
-		{name="vec3Direction", type_info={e3d.EVMType.VEC3},  argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Direction},
-		{name="vec3Angle",     type_info={e3d.EVMType.FLOAT}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}}, func=apiVec3Angle},
+		{
+			name="vec2Invert",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiVec2Invert
+		},
+		{
+			name="vec3Length",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiVec3Length
+		},
+		{
+			name="vec3LengthSq",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiVec3LengthSq
+		},
+		{
+			name="vec3Normalize",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiVec3Normalize
+		},
+		{
+			name="vec3Dot",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Dot
+		},
+		{
+			name="vec3Cross",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Cross
+		},
+		{
+			name="vec3Distance",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Distance
+		},
+		{
+			name="vec3DistanceSq",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3DistanceSq
+		},
+		{
+			name="vec3Direction",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Direction
+		},
+		{
+			name="vec3Angle",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Angle
+		},
 		{
 			name="vec3Lerp",
-			type_info={e3d.EVMType.VEC3},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
 			argdata={
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiVec3Lerp
 		},
-		{name="vec3Reflect", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}, {type_id=e3d.EVMType.VEC3}},  func=apiVec3Reflect},
+		{
+			name="vec3Reflect",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiVec3Reflect
+		},
 		{
 			name="vec3Rotate",
-			type_info={e3d.EVMType.VEC3},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
 			argdata={
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiVec3Rotate
 		},
 		{
 			name="vec3MoveToward",
-			type_info={e3d.EVMType.VEC3},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
 			argdata={
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.VEC3},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiVec3MoveToward
 		},
-		{name="vec3Invert", type_info={e3d.EVMType.VEC3}, argdata={{type_id=e3d.EVMType.VEC3}}, func=apiVec3Invert},
-		
-		{name="camera2D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=apiCamera2D},
+		{
+			name="vec3Invert",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiVec3Invert
+		},
+		{
+			name="camera2D",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiCamera2D
+		},
 		{
 			name="getCam2DOrigin",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam2DOrigin
 		},
 		{
 			name="setCam2DOrigin",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC2, self.struct_vec2}
 			},
 			func=apiSetCam2DOrigin
 		},
 		{
 			name="getCam2DTarget",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam2DTarget
 		},
 		{
 			name="setCam2DTarget",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC2, self.struct_vec2}
 			},
 			func=apiSetCam2DTarget
 		},
 		{
 			name="getCam2DAngle",
 			type_info={e3d.EVMType.FLOAT},
-			argdata={{type_id=e3d.EVMType.INT}},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam2DAngle
 		},
 		{
 			name="setCam2DAngle",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiSetCam2DAngle
 		},
 		{
 			name="getCam2DZoom",
 			type_info={e3d.EVMType.FLOAT},
-			argdata={{type_id=e3d.EVMType.INT}},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam2DZoom
 		},
 		{
 			name="setCam2DZoom",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiSetCam2DZoom
 		},
-		{name="camera3D", type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}}, func=apiCamera3D},
 		{
-			name="getCam3DPos",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
-			func=apiGetCam3DPos
+			name="camera3D",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiCamera3D
 		},
 		{
-			name="setCam3DPos",
+			name="getCam3DPosition",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetCam3DPosition
+		},
+		{
+			name="setCam3DPosition",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC3, self.struct_vec3}
 			},
-			func=apiSetCam3DPos
+			func=apiSetCam3DPosition
 		},
 		{
 			name="getCam3DTarget",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam3DTarget
 		},
 		{
 			name="setCam3DTarget",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC3, self.struct_vec3}
 			},
 			func=apiSetCam3DTarget
 		},
 		{
 			name="getCam3DUp",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam3DUp
 		},
 		{
 			name="setCam3DUp",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VEC3}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC3, self.struct_vec3}
 			},
 			func=apiSetCam3DUp
 		},
 		{
 			name="getCam3DFOV",
 			type_info={e3d.EVMType.FLOAT},
-			argdata={{type_id=e3d.EVMType.INT}},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam3DFOV
 		},
 		{
 			name="setCam3DFOV",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiSetCam3DFOV
 		},
 		{
-			name="getCam3DProj",
+			name="getCam3DProjection",
 			type_info={e3d.EVMType.INT},
-			argdata={{type_id=e3d.EVMType.INT}},
-			func=apiGetCam3DProj
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetCam3DProjection
 		},
 		{
-			name="setCam3DProj",
+			name="setCam3DProjection",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
-			func=apiSetCam3DProj
+			func=apiSetCam3DProjection
 		},
 		{
 			name="getCam3DRight",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam3DRight
 		},
 		{
 			name="getCam3DForward",
-			type_info={e3d.EVMType.VEC3},
-			argdata={{type_id=e3d.EVMType.INT}},
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
 			func=apiGetCam3DForward
 		},
-		
 		{
 			name="viewport",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiViewport
 		},
@@ -2615,45 +3615,264 @@ function e3d.EVM:registerAPI(): void
 			name="texture",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiTexture
 		},
-		{name="getTextureMode",  type_info={e3d.EVMType.INT},                                         func=apiGetTextureMode},
-		{name="setTextureMode",  type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetTextureMode},
-		{name="getCullMode",     type_info={e3d.EVMType.INT},                                         func=apiGetCullMode},
-		{name="setCullMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetCullMode},
-		{name="getWireMode",     type_info={e3d.EVMType.INT},                                         func=apiGetWireMode},
-		{name="setWireMode",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetWireMode},
-		{name="getFogMode",      type_info={e3d.EVMType.INT},                                         func=apiGetFogMode},
-		{name="setFogMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetFogMode},
-		{name="getFogStart",     type_info={e3d.EVMType.FLOAT},                                       func=apiGetFogStart},
-		{name="setFogStart",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSetFogStart},
-		{name="getFogEnd",       type_info={e3d.EVMType.FLOAT},                                       func=apiGetFogEnd},
-		{name="setFogEnd",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.FLOAT}}, func=apiSetFogEnd},
-		{name="getFogColor",     type_info={e3d.EVMType.INT},                                         func=apiGetFogColor},
-		{name="setFogColor",     type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiSetFogColor},
-		{name="clear",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiClear},
-		{name="matrixMode",      type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiMatrixMode},
-		{name="pushMatrix",      type_info={e3d.EVMType.VOID},                                        func=apiPushMatrix},
-		{name="popMatrix",       type_info={e3d.EVMType.VOID},                                        func=apiPopMatrix},
-		{name="identity",        type_info={e3d.EVMType.VOID},                                        func=apiIdentity},
-		{name="translate",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiTranslate},
-		{name="rotate",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiRotate},
-		{name="scale",           type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiScale},
+		{
+			name="getTextureMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetTextureMode
+		},
+		{
+			name="setTextureMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetTextureMode
+		},
+		{
+			name="getCullMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetCullMode
+		},
+		{
+			name="setCullMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetCullMode
+		},
+		{
+			name="getWireMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetWireMode
+		},
+		{
+			name="setWireMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetWireMode
+		},
+		{
+			name="getFogMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetFogMode
+		},
+		{
+			name="setFogMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetFogMode
+		},
+		{
+			name="getFogStart",
+			type_info={e3d.EVMType.FLOAT},
+			func=apiGetFogStart
+		},
+		{
+			name="setFogStart",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiSetFogStart
+		},
+		{
+			name="getFogEnd",
+			type_info={e3d.EVMType.FLOAT},
+			func=apiGetFogEnd
+		},
+		{
+			name="setFogEnd",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiSetFogEnd
+		},
+		{
+			name="getFogColor",
+			type_info={e3d.EVMType.INT},
+			func=apiGetFogColor
+		},
+		{
+			name="setFogColor",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetFogColor
+		},
+		{
+			name="getBlendMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetBlendMode
+		},
+		{
+			name="setBlendMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetBlendMode
+		},
+		{
+			name="getLightingMode",
+			type_info={e3d.EVMType.INT},
+			func=apiGetLightingMode
+		},
+		{
+			name="setLightingMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetLightingMode
+		},
+		{
+			name="getAmbientFactor",
+			type_info={e3d.EVMType.FLOAT},
+			func=apiGetAmbientFactor
+		},
+		{
+			name="setAmbientFactor",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.FLOAT}},
+			func=apiSetAmbientFactor
+		},
+		{
+			name="getAmbientColor",
+			type_info={e3d.EVMType.INT},
+			func=apiGetAmbientColor
+		},
+		{
+			name="setAmbientColor",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiSetAmbientColor
+		},
+		{
+			name="getLightEnabled",
+			type_info={e3d.EVMType.INT},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightEnabled
+		},
+		{
+			name="setLightEnabled",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiSetLightEnabled
+		},
+		{
+			name="getLightType",
+			type_info={e3d.EVMType.INT},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightType
+		},
+		{
+			name="setLightType",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiSetLightType
+		},
+		{
+			name="getLightRadius",
+			type_info={e3d.EVMType.FLOAT},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightRadius
+		},
+		{
+			name="setLightRadius",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.FLOAT}
+			},
+			func=apiSetLightRadius
+		},
+		{
+			name="getLightPosition",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightPosition
+		},
+		{
+			name="setLightPosition",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiSetLightPosition
+		},
+		{
+			name="getLightColor",
+			type_info={e3d.EVMType.INT},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightColor
+		},
+		{
+			name="setLightColor",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiSetLightColor
+		},
+		{
+			name="clear",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiClear
+		},
+		{
+			name="matrixMode",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiMatrixMode
+		},
+		{
+			name="pushMatrix",
+			type_info={e3d.EVMType.VOID},
+			func=apiPushMatrix
+		},
+		{
+			name="popMatrix",
+			type_info={e3d.EVMType.VOID},
+			func=apiPopMatrix
+		},
+		{
+			name="identity",
+			type_info={e3d.EVMType.VOID},
+			func=apiIdentity
+		},
+		{
+			name="translate",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiTranslate
+		},
+		{
+			name="rotate",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiRotate
+		},
+		{
+			name="scale",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiScale
+		},
 		{
 			name="frustum",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiFrustum
 		},
@@ -2661,29 +3880,64 @@ function e3d.EVM:registerAPI(): void
 			name="ortho",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT},
-				{type_id=e3d.EVMType.FLOAT}
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT},
+				{e3d.EVMType.FLOAT}
 			},
 			func=apiOrtho
 		},
-		{name="vertex",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC3}},  func=apiVertex},
-		{name="vertex2D",        type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertex2D},
-		{name="vertUV",          type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.VEC2}},  func=apiVertUV},
-		{name="vertColor",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiVertColor},
-		{name="beginMesh",       type_info={e3d.EVMType.VOID}, argdata={{type_id=e3d.EVMType.INT}},   func=apiBeginMesh},
-		{name="endMesh",         type_info={e3d.EVMType.VOID},                                        func=apiEndMesh},
+		{
+			name="meshVertex",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiMeshVertex
+		},
+		{
+			name="meshVertex2D",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiMeshVertex2D
+		},
+		{
+			name="meshUV",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC2, self.struct_vec2}},
+			func=apiMeshUV
+		},
+		{
+			name="meshNormal",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
+			func=apiMeshNormal
+		},
+		{
+			name="meshColor",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiMeshColor
+		},
+		{
+			name="beginMesh",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiBeginMesh
+		},
+		{
+			name="endMesh",
+			type_info={e3d.EVMType.VOID},
+			func=apiEndMesh
+		},
 		{
 			name="print2D",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.STRING}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.STRING, self.struct_string}
 			},
 			is_varargs=true,
 			varargs_index=4,
@@ -2693,12 +3947,12 @@ function e3d.EVM:registerAPI(): void
 			name="sprite2D",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiSprite2D
 		},
@@ -2706,14 +3960,14 @@ function e3d.EVM:registerAPI(): void
 			name="sprite2DEx",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiSprite2DEx
 		},
@@ -2721,8 +3975,8 @@ function e3d.EVM:registerAPI(): void
 			name="drawModel",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiDrawModel
 		},
@@ -2730,40 +3984,148 @@ function e3d.EVM:registerAPI(): void
 			name="drawModelEx",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiDrawModelEx
 		},
-
+		{
+			name="playSong",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiPlaySong
+		},
+		{
+			name="playTrack",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiPlayTrack
+		},
+		{
+			name="playPattern",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiPlayPattern
+		},
+		{
+			name="playSample",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
+			},
+			func=apiPlaySample
+		},
+		{
+			name="pauseTracks",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiPauseTracks
+		},
+		{
+			name="resumeTracks",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiResumeTracks
+		},
+		{
+			name="stopTracks",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiStopTracks
+		},
+		{
+			name="muteTracks",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiMuteTracks
+		},
+		{
+			name="unmuteTracks",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiUnmuteTracks
+		},
+		{
+			name="checkCollision",
+			type_info={e3d.EVMType.INT},
+			argdata={
+				{e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{e3d.EVMType.VOID + e3d.EVMType.POINTER}
+			},
+			func=apiCheckCollision
+		},
+		{
+			name="getCollisionPoint",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			func=apiGetCollisionPoint
+		},
+		{
+			name="getCollisionNormal",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			func=apiGetCollisionNormal
+		},
+		{
+			name="loadTexBank",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiLoadTexBank
+		},
+		{
+			name="loadObjBank",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiLoadObjBank
+		},
+		{
+			name="loadWavBank",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiLoadWavBank
+		},
+		{
+			name="loadSeqBank",
+			type_info={e3d.EVMType.VOID},
+			argdata={{e3d.EVMType.INT}},
+			func=apiLoadSeqBank
+		},
 		{
 			name="peek8",
 			type_info={e3d.EVMType.INT},
-			argdata={{type_id=e3d.EVMType.INT}},
+			argdata={{e3d.EVMType.INT}},
 			func=apiPeek8
 		},
 		{
 			name="poke8",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiPoke8
 		},
 		{
 			name="peek32",
 			type_info={e3d.EVMType.INT},
-			argdata={{type_id=e3d.EVMType.INT}},
+			argdata={{e3d.EVMType.INT}},
 			func=apiPeek32
 		},
 		{
 			name="poke32",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.INT},
-				{type_id=e3d.EVMType.INT}
+				{e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiPoke32
 		},
@@ -2771,9 +4133,9 @@ function e3d.EVM:registerAPI(): void
 			name="memcpy",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
+				{e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{e3d.EVMType.INT}
 			},
 			func=apiMemcpy
 		},
@@ -2781,9 +4143,9 @@ function e3d.EVM:registerAPI(): void
 			name="memset",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.POINTER},
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT},
-				{type_id=e3d.EVMType.VOID + e3d.EVMType.INT}
+				{e3d.EVMType.VOID + e3d.EVMType.POINTER},
+				{e3d.EVMType.VOID + e3d.EVMType.INT},
+				{e3d.EVMType.INT}
 			},
 			func=apiMemset
 		},

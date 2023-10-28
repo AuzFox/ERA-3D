@@ -26,14 +26,14 @@ global e3d = @record{}
 
 	SYSTEM MEMORY:
 		HEAP                (8MiB         ) 0x00000000 - 0x007FFFFF (general purpose RAM)
-		TMEM                (4MiB         ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
-		OMEM                (3MiB + 384KiB) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		AMEM                (8KiB         ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
-		RMEM                (632KiB       ) 0x00F62000 - 0x00FFFFFF (system state registers)
+		TEXMEM              (4MiB         ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
+		OBJMEM              (3MiB + 384KiB) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		AOBMEM              (8KiB         ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
+		SYSMEM              (632KiB       ) 0x00F62000 - 0x00FFFFFF (system state registers)
 			audio state     (1B           )                         (1 byte (track playing flags))
 			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
-		WMEM                (7MiB         ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
-		SMEM                (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
+		WAVMEM              (7MiB         ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
+		SEQMEM              (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
 			song data       (2KiB         )                         (256 * 8 bytes)
 			pattern data    (80KiB        )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
 			instrument data (2KiB + 768B  )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
@@ -43,10 +43,10 @@ global e3d = @record{}
 		LOCALS              (256KiB       ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
 		ARGS                (256KiB       ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
 	CART ROM:
-		TBANK[0-3]          (16MiB        ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
-		OBANK[0-3]          (16MiB        ) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		WBANK[0-1]          (14MiB        ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
-		SBANK[0-7]          (2MiB         ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
+		TEXBANK[0-3]        (16MiB        ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
+		OBJBANK[0-3]        (16MiB        ) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		WAVBANK[0-1]        (14MiB        ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
+		SEQBANK[0-7]        (2MiB         ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
 		ROM                 (16MiB        ) 0x04800000 - 0x057FFFFF (string data + user ROM)
 	MEMORY CARD:
 		MEMCARD             (256KiB       ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
@@ -59,14 +59,14 @@ global e3d.VER_PATCH <comptime> = 0
 -- memory size and address constants
 global e3d.SRC_SIZE            <comptime> = 1024*1024
 global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
-global e3d.RMEM_SIZE           <comptime> = (632*1024) -- 632KiB
+global e3d.SYSMEM_SIZE         <comptime> = (632*1024) -- 632KiB
 global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.TBANK_SIZE          <comptime> = (4*1024*1024)  --  16MiB
-global e3d.OBANK_SIZE          <comptime> = ((16*1024*1024)///4) --  16MiB
-global e3d.WBANK_SIZE          <comptime> = ((14*1024*1024)///2) --  14MiB
-global e3d.SBANK_SIZE          <comptime> = (2*1024*1024)  --  2MiB
+global e3d.TEXBANK_SIZE        <comptime> = (4*1024*1024)  --  16MiB
+global e3d.OBJBANK_SIZE        <comptime> = ((16*1024*1024)///4) --  16MiB
+global e3d.WAVBANK_SIZE        <comptime> = ((14*1024*1024)///2) --  14MiB
+global e3d.SEQBANK_SIZE        <comptime> = (2*1024*1024)  --  2MiB
 global e3d.ROM_SIZE            <comptime> = (16*1024*1024) --  16MiB
 global e3d.OPSTACK_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.BYTECODE_SIZE       <comptime> = 65536 --  64KiB (65536 bytes)
@@ -78,22 +78,22 @@ global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
 local mem_regions = {
 	-- system memory
 	{name='HEAP',    size=8 * 1024 * 1024},
-	{name='TMEM',    size=GPU_TMEM_SIZE.value * 4},
-	{name='OMEM',    size=GPU_OMEM_SIZE.value * 4},
-	{name='AMEM',    size=SOUNDCHIP_AMEM_SIZE.value * 2},
-	{name='RMEM',    size=632 * 1024},
-	{name='WMEM',    size=SOUNDCHIP_WMEM_SIZE.value * 2},
-	{name='SMEM',    size=SOUNDCHIP_SMEM_SIZE.value},
+	{name='TEXMEM',  size=GPU_TEXMEM_SIZE.value * 4},
+	{name='OBJMEM',  size=GPU_OBJMEM_SIZE.value * 4},
+	{name='AOBMEM',  size=SOUNDCHIP_AOBMEM_SIZE.value * 2},
+	{name='SYSMEM',  size=632 * 1024},
+	{name='WAVMEM',  size=SOUNDCHIP_WAVMEM_SIZE.value * 2},
+	{name='SEQMEM',  size=SOUNDCHIP_SEQMEM_SIZE.value},
 	{name='GLOBALS', size=65536 * 4},
 	{name='LOCALS',  size=65536 * 4},
 	{name='ARGS',    size=65536 * 4},
 
 	-- cart data
-	{name='TBANK', size=16 * 1024 * 1024},
-	{name='OBANK', size=16 * 1024 * 1024},
-	{name='WBANK', size=14 * 1024 * 1024},
-	{name='SBANK', size= 2 * 1024 * 1024},
-	{name='ROM',   size=16 * 1024 * 1024},
+	{name='TEXBANK', size=16 * 1024 * 1024},
+	{name='OBJBANK', size=16 * 1024 * 1024},
+	{name='WAVBANK', size=14 * 1024 * 1024},
+	{name='SEQBANK', size= 2 * 1024 * 1024},
+	{name='ROM',     size=16 * 1024 * 1024},
 
 	-- memory card
 	{name='MEMCARD', size=256 * 1024}
@@ -364,17 +364,19 @@ global e3d.Identifier <forwarddecl> = @record {}
 
 global e3d.APIFunction: type = @function(vm: *e3d.EVM): boolean
 
--- union used internally by the vm to store values of different types
-global e3d.EVMValue = @union {
-	i: int32,
-	u: uint32,
-	f: float32
-}
-
 -- record used to represet an ERA-C string struct
 global e3d.EVMString = @record {
 	len: uint32, -- string length
 	data: uint32 -- string data virtual address
+}
+
+-- record used to represet an ERA-C colaabb struct
+global e3d.ColAABB = @record {
+	type: uint32,
+	position: rl.vector3,
+	width: float32,
+	height: float32,
+	depth: float32
 }
 
 -- record that tracks data used by the vm when calling functions
@@ -428,24 +430,24 @@ e3d.Identifier = @record {
 }
 
 global e3d.Cart = @record {
-	tbank: [e3d.TBANK_SIZE]rl.color,
-	obank: [e3d.OBANK_SIZE]e3d.EVMValue,
-	wbank: [e3d.WBANK_SIZE]BKFrame,
-	sbank: [e3d.SBANK_SIZE]uint8,
+	texbank: [e3d.TEXBANK_SIZE]rl.color,
+	objbank: [e3d.OBJBANK_SIZE]util.IntFloat,
+	wavbank: [e3d.WAVBANK_SIZE]BKFrame,
+	seqbank: [e3d.SEQBANK_SIZE]uint8,
 	rom: [e3d.ROM_SIZE]uint8,
 }
 
 e3d.EVM = @record {
 	-- vm vars
 	heap: [e3d.HEAP_SIZE]uint8,
-	globals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
-	locals: [e3d.GLOBALS_SIZE]e3d.EVMValue,
-	args: [e3d.ARGS_SIZE]e3d.EVMValue,
-	opstack: [e3d.OPSTACK_SIZE]e3d.EVMValue,
+	globals: [e3d.GLOBALS_SIZE]util.IntFloat,
+	locals: [e3d.GLOBALS_SIZE]util.IntFloat,
+	args: [e3d.ARGS_SIZE]util.IntFloat,
+	opstack: [e3d.OPSTACK_SIZE]util.IntFloat,
 	bytecode: [e3d.BYTECODE_SIZE]uint8,
 	callstack: [e3d.CALLSTACK_SIZE]e3d.CallFrame,
 	api_funcs: [e3d.API_FUNCS_SIZE]e3d.APIFunction,
-	rmem: [e3d.RMEM_SIZE]uint8,
+	sysmem: [e3d.SYSMEM_SIZE]uint8,
 	cf: e3d.CallFrame,
 	rom_len: uinteger,
 	bytecode_len: uinteger,
@@ -488,6 +490,7 @@ e3d.EVM = @record {
 	keywords: hashmap(string, *e3d.Identifier),
 	constants: hashmap(string, *e3d.Identifier),
 	api_ids: hashmap(string, *e3d.Identifier),
+	builtin_struct_ids: hashmap(string, *e3d.Identifier),
 	struct_ids: hashmap(string, *e3d.Identifier),
 	sym_tables: sequence(*hashmap(string, *e3d.Identifier)),
 	scope_sizes: sequence(uinteger),
@@ -506,77 +509,6 @@ e3d.EVM = @record {
 }
 
 global e3d.btnmap: [e3d.ControllerButtons.COUNT * e3d.INPUT_PLAYERS_COUNT]cint
-
-global e3d._type_names: []string = {
-	"void",
-	"int",
-	"float",
-	"vec2",
-	"vec3",
-	"struct",
-	"string",
-	"function",
-	"unmapped type (8)",
-	"unmapped type (9)",
-	"unmapped type (10)",
-	"unmapped type (11)",
-	"unmapped type (12)",
-	"unmapped type (13)",
-	"unmapped type (14)",
-	"unmapped type (15)"
-}
-
-global e3d._token_names: []string = {
-	"int literal",
-	"float literal",
-	"string literal",
-	"void",
-	"int",
-	"float",
-	"vec2",
-	"vec3",
-	"struct identifier",
-	"string",
-	"struct",
-	"function",
-	"enum",
-	"identifier",
-	"else",
-	"if",
-	"return",
-	"break",
-	"continue",
-	"sizeof",
-	"for",
-	"while",
-	"...",
-	"!",
-	"~",
-	"=",
-	"?",
-	"||",
-	"&&",
-	"|",
-	"^",
-	"&",
-	"==",
-	"!=",
-	"<",
-	">",
-	"<=",
-	">=",
-	"<<",
-	">>",
-	">>>",
-	"+",
-	"-",
-	"*",
-	"/",
-	"%",
-	"->",
-	".",
-	"["
-}
 
 ---------------------------------------
 --                                   --
@@ -607,53 +539,4 @@ end
 
 function e3d.setBtnKeycode(btn: integer, keycode: cint): void
 	e3d.btnmap[btn] = keycode
-end
-
-function e3d.getTypeName(info: e3d.TypeInfo): string
-	local sb: stringbuilder
-	local full_type: uinteger = info.type_id
-	local base_type: uinteger = info.type_id & (e3d.EVMType.POINTER - 1)
-
-	if base_type < e3d.EVMType.VEC3 then
-		sb:write(e3d._type_names[base_type])
-	else
-		sb:write(info.structref.name)
-	end
-
-	while full_type >= e3d.EVMType.POINTER do
-		sb:writebyte('*'_u8)
-		full_type = full_type - e3d.EVMType.POINTER
-	end
-
-	return sb:__tostring()
-end
-
-function e3d.getTokenString(token: uinteger): string
-	if token == 0 then
-		return "EOF"
-	elseif token < e3d.Token.INT_LITERAL then
-		return string.format("%c", token)
-	else
-		return e3d._token_names[token - e3d.Token.INT_LITERAL]
-	end
-end
-
-function e3d.sizeOfType(info: e3d.TypeInfo): uint16
-	-- returns size in words
-	if (info.type_id >= e3d.EVMType.VEC2) and (info.type_id <= e3d.EVMType.STRING) then
-		return info.structref.size
-	end
-	
-	return 1
-end
-
-function e3d.sizePointedTo(info: e3d.TypeInfo): uint16
-	-- returns size in words
-	local type_pointed_to: uinteger = info.type_id - e3d.EVMType.POINTER
-	
-	if (type_pointed_to >= e3d.EVMType.VEC2) and (type_pointed_to <= e3d.EVMType.STRING) then
-		return info.structref.size
-	end
-	
-	return 1
 end
