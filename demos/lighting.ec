@@ -1,5 +1,7 @@
 enum {
     LIGHT_COUNT = 4,
+    LIGHT_POINT = 0,
+    LIGHT_DIRECTIONAL,
 
     RED   = 0xFF0000FF,
     GREEN = 0x00FF00FF,
@@ -13,6 +15,7 @@ struct Light {
     int type;
     float radius;
     vec3 position;
+    vec3 direction;
     int color;
 
     // additional data
@@ -27,8 +30,16 @@ void updateLights() {
         Light* light = lights + i;
 
         setLightEnabled(i, light->enabled);
-        setLightRadius(i, light->radius);
-        setLightPosition(i, light->position);
+        setLightType(i, light->type);
+
+        if (light->type == LIGHT_POINT) {
+            setLightRadius(i, light->radius);
+            setLightPosition(i, light->position);
+        }
+        else {
+            setLightDirection(i, light->direction);
+        }
+
         setLightColor(i, light->color);
     }
 }
@@ -50,10 +61,10 @@ void init() {
     setAmbientFactor(10.0);
     setAmbientColor(WHITE);
 
-    lights[0] = (Light){true, 0, 4.0, (vec3){0.0, 1.0, 0.0}, RED  ,   0.0, 2.0};
-    lights[1] = (Light){true, 0, 4.0, (vec3){0.0, 1.0, 0.0}, GREEN,  90.0, 2.0};
-    lights[2] = (Light){true, 0, 4.0, (vec3){0.0, 1.0, 0.0}, BLUE , 180.0, 2.0};
-    lights[3] = (Light){true, 0, 4.0, (vec3){0.0, 1.0, 0.0}, WHITE, 270.0, 2.0};
+    lights[0] = (Light){true, LIGHT_POINT, 4.0, (vec3){0.0, 1.0, 0.0}, vec3Zero(), RED  ,   0.0, 2.0};
+    lights[1] = (Light){true, LIGHT_POINT, 4.0, (vec3){0.0, 1.0, 0.0}, vec3Zero(), GREEN,  90.0, 2.0};
+    lights[2] = (Light){true, LIGHT_POINT, 4.0, (vec3){0.0, 1.0, 0.0}, vec3Zero(), BLUE , 180.0, 2.0};
+    lights[3] = (Light){true, LIGHT_POINT, 4.0, (vec3){0.0, 1.0, 0.0}, vec3Zero(), WHITE, 270.0, 2.0};
     
     setCam3DPosition(0, (vec3){6.0, 3.0, 6.0});
 }

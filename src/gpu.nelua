@@ -40,6 +40,7 @@ local lightAttribute = @enum {
 	TYPE,
 	RADIUS,
 	POSITION,
+	DIRECTION,
 	COLOR,
 	COUNT -- not an actual attribute, used to count the number of attributes
 }
@@ -71,6 +72,7 @@ struct Light {
 	int type;
 	float radius;
 	vec3 position;
+	vec3 direction;
 	vec3 color;
 };
 
@@ -100,16 +102,27 @@ vec4 calculateLighting() {
 		if (lights[i].enabled == 1) {
 			lightPos = lights[i].position;
 
-			// get direction to light
-			lightDirection = normalize(lightPos - vertex);
-
-			// get facing factor
-			diffuseFactor = max(dot(normal, lightDirection), 0.0f);
-
-			// get attenuation based on light radius 
-			attenuation = smoothstep(lights[i].radius, 0.0f, length(lightPos - vertex));
-
-			diffuseColor += lights[i].color * (diffuseFactor * attenuation);
+			if (lights[i].type == LIGHT_POINT) {
+				// get direction to light
+				lightDirection = normalize(lightPos - vertex);
+	
+				// get facing factor
+				diffuseFactor = max(dot(normal, lightDirection), 0.0f);
+	
+				// get attenuation based on light radius 
+				attenuation = smoothstep(lights[i].radius, 0.0f, length(lightPos - vertex));
+	
+				diffuseColor += lights[i].color * (diffuseFactor * attenuation);
+			}
+			else {
+				// get direction of light
+				lightDirection = normalize(-lights[i].direction);
+	
+				// get facing factor
+				diffuseFactor = max(dot(normal, lightDirection), 0.0f);
+	
+				diffuseColor += lights[i].color * diffuseFactor;
+			}
 		}
 	}
 
@@ -218,6 +231,7 @@ global Light = @record {
 	light_type: cint,
 	radius: float32,
 	position: rl.vector3,
+	direction: rl.vector3,
 	color: rl.vector3
 }
 
@@ -706,6 +720,11 @@ function GPU:setLightPosition(id: uint32, pos: rl.vector3): void
 	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.POSITION], &self.lights[id].position, rl.shaderUniformDataType.UNIFORM_VEC3)
 end
 
+function GPU:setLightDirection(id: uint32, dir: rl.vector3): void
+	self.lights[id].direction = dir
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.DIRECTION], &self.lights[id].direction, rl.shaderUniformDataType.UNIFORM_VEC3)
+end
+
 function GPU:setLightColor(id: uint32, col: uint32): void
 	self.lights[id].color = {
 		(@float32)(col >> 24) / 255.0,
@@ -929,6 +948,7 @@ function GPU:resetGPU(): void
 			0,
 			0.0,
 			{0,0,0},
+			{0,-1,0},
 			{0,0,0}
 		}
 	end
@@ -1016,11 +1036,12 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 
 	-- get light attribute locs
 	for i = 0, < GPU_LIGHTS_COUNT do
-		light_attrib_locs[i][lightAttribute.ENABLED]  = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].enabled", i))
-		light_attrib_locs[i][lightAttribute.TYPE]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].type", i))
-		light_attrib_locs[i][lightAttribute.RADIUS]   = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].radius", i))
-		light_attrib_locs[i][lightAttribute.POSITION] = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].position", i))
-		light_attrib_locs[i][lightAttribute.COLOR]    = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
+		light_attrib_locs[i][lightAttribute.ENABLED]   = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].enabled", i))
+		light_attrib_locs[i][lightAttribute.TYPE]      = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].type", i))
+		light_attrib_locs[i][lightAttribute.RADIUS]    = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].radius", i))
+		light_attrib_locs[i][lightAttribute.POSITION]  = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].position", i))
+		light_attrib_locs[i][lightAttribute.DIRECTION] = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].direction", i))
+		light_attrib_locs[i][lightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
 	end
 
 	self:resetGPU()

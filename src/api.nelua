@@ -1975,6 +1975,29 @@ local function apiSetLightPosition(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function apiGetLightDirection(vm: *e3d.EVM): boolean
+	-- signature:
+	-- int getLightDirection(int id);
+
+	local id: uint32 = vm:getArgU(0)
+
+	vm:pushV3(vm.gpu.lights[id].direction)
+
+	return true
+end
+
+local function apiSetLightDirection(vm: *e3d.EVM): boolean
+	-- signature:
+	-- void setLightDirection(int id, vec3 dir);
+
+	local id: uint32 = vm:getArgU(0)
+	local dir: rl.vector3 = vm:getArgV3(1)
+
+	vm.gpu:setLightDirection(id, dir)
+
+	return true
+end
+
 local function apiGetLightColor(vm: *e3d.EVM): boolean
 	-- signature:
 	-- int getLightColor(int id);
@@ -3802,6 +3825,21 @@ function e3d.EVM:registerAPI(): void
 				{e3d.EVMType.VEC3, self.struct_vec3}
 			},
 			func=apiSetLightPosition
+		},
+		{
+			name="getLightDirection",
+			type_info={e3d.EVMType.VEC3, self.struct_vec3},
+			argdata={{e3d.EVMType.INT}},
+			func=apiGetLightDirection
+		},
+		{
+			name="setLightDirection",
+			type_info={e3d.EVMType.VOID},
+			argdata={
+				{e3d.EVMType.INT},
+				{e3d.EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiSetLightDirection
 		},
 		{
 			name="getLightColor",
