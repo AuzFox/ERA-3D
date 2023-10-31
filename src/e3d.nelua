@@ -352,6 +352,12 @@ global e3d.Hook = @enum {
 	COUNT
 }
 
+global e3d.IOState = @enum {
+	IDLE = 0,
+	SAVING,
+	LOADING
+}
+
 -------------------------
 --                     --
 --        TYPES        --
@@ -437,6 +443,8 @@ global e3d.Cart = @record {
 	rom: [e3d.ROM_SIZE]uint8,
 }
 
+global e3d.IOCallback: type = @function(*e3d.EVM, boolean): void
+
 e3d.EVM = @record {
 	-- vm vars
 	heap: [e3d.HEAP_SIZE]uint8,
@@ -505,7 +513,11 @@ e3d.EVM = @record {
 	soundchip: SoundChip,
 	gpu: GPU,
 	error: string,
-	init_time: float64
+	init_time: float64,
+	io_callback: e3d.IOCallback,
+	io_co: coroutine,
+	io_state: uint8,
+	io_result: boolean
 }
 
 global e3d.btnmap: [e3d.ControllerButtons.COUNT * e3d.INPUT_PLAYERS_COUNT]cint

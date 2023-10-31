@@ -1,4 +1,6 @@
 require("C.stdio")
+require("zip")
+
 require("api")
 
 function e3d.EVM:getGlobal(i: uint16): util.IntFloat
@@ -1889,210 +1891,412 @@ local function byteSwapCartData(cart: *e3d.Cart): void
 	end
 end
 
-function e3d.EVM:saveCart(filename: string): boolean
-	local header: [16]uint8 = {
-		'E'_u8,
-		'R'_u8,
-		'A'_u8,
-		'3'_u8,
-		'D'_u8,
-		'R'_u8,
-		'O'_u8,
-		'M'_u8,
-		(@uint8)(e3d.VER_MAJOR >> 8),
-		(@uint8)(e3d.VER_MAJOR & 0xFF),
-		(@uint8)(e3d.VER_MINOR),
-		(@uint8)(e3d.VER_PATCH),
-		(@uint8)(self.src_len >> 24),
-		(@uint8)(self.src_len >> 16),
-		(@uint8)(self.src_len >> 8),
-		(@uint8)(self.src_len & 0xFF),
-	}
-	local result: csize
-	local file: *C.FILE = C.fopen(filename, "wb")
-	if file == nilptr then
-		self.error = "failed to open file\n"
-		return false
+local function saveCartInternal(vm: *e3d.EVM, filename: string): void
+	local close_entry: boolean = false
+	local err: cint
+	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'w'_u8, &err)
+	if zip == nilptr then
+		vm.error = string.format("ERROR: failed to save cart `%s`. (error code %d)\n", filename, err)
+		vm.io_result = false
+		return
 	end
 	defer
-		C.fclose(file)
+		if close_entry then
+			zip_entry_close(zip)
+		end
+
+		zip_close(zip)
 	end
 
 	-- memcpy cart data to temp_cart
-	memory.copy(&self.temp_cart.texbank, &self.cart.texbank, 16*1024*1024)
-	memory.copy(&self.temp_cart.objbank, &self.cart.objbank, 16*1024*1024)
-	memory.copy(&self.temp_cart.wavbank, &self.cart.wavbank, 14*1024*1024)
-	memory.copy(&self.temp_cart.seqbank, &self.cart.seqbank, 2*1024*1024)
-	memory.copy(&self.temp_cart.rom, &self.cart.rom, 16*1024*1024)
+	memory.copy(&vm.temp_cart.texbank, &vm.cart.texbank, 16*1024*1024)
+	memory.copy(&vm.temp_cart.objbank, &vm.cart.objbank, 16*1024*1024)
+	memory.copy(&vm.temp_cart.wavbank, &vm.cart.wavbank, 14*1024*1024)
+	memory.copy(&vm.temp_cart.seqbank, &vm.cart.seqbank, 2*1024*1024)
+	memory.copy(&vm.temp_cart.rom, &vm.cart.rom, 16*1024*1024)
 
 	-- byteswap data if little endian
 	if isLittleEndian() then
-		byteSwapCartData(&self.temp_cart)
+		byteSwapCartData(&vm.temp_cart)
 	end
 
-	-- write data to file
-	result = C.fwrite(&header, 1, 16, file)
-	if result ~= 16 then
-		self.error = "failed to write header\n"
-		return false
+	coroutine.yield()
+
+	local size: isize
+	
+	-- write src.ec
+	err = zip_entry_open(zip, "src.ec")
+	if err == ZIP_OK then
+		close_entry = true
+
+		err = zip_entry_write(zip, &vm.src, vm.src_len)
+		if err == ZIP_OK then
+			zip_entry_close(zip)
+			close_entry = false
+		else
+			vm.error = string.format("ERROR: failed to save src.ec to cart `%s`. (error code %d)\n", filename, err)
+			vm.io_result = false
+			return
+		end
+	else
+		vm.error = string.format("ERROR: failed to save src.ec to cart `%s`. (error code %d)\n", filename, err)
+		vm.io_result = false
+		return
 	end
 
-	result = C.fwrite(&self.src, 1, self.src_len, file)
-	if result ~= self.src_len then
-		self.error = "failed to write src\n"
-		return false
+	coroutine.yield()
+
+	-- read texbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("texbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.texbank[i*1024*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, 4*1024*1024)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fwrite(&self.temp_cart.texbank, 4, 4*1024*1024, file)
-	if result ~= 4*1024*1024 then
-		self.error = "failed to write texbank data\n"
-		return false
+	-- write objbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("objbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.objbank[i*1024*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, 4*1024*1024)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fwrite(&self.temp_cart.objbank, 4, 4*1024*1024, file)
-	if result ~= 4*1024*1024 then
-		self.error = "failed to write objbank data\n"
-		return false
+	-- read wavbank[0-1].bin
+	for i = 0, < 2 do
+		local bank_filename: string = string.format("wavbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.wavbank[i*((7*1024*1024)///2)])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, 7*1024*1024)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fwrite(&self.temp_cart.wavbank, 2, 7*1024*1024, file)
-	if result ~= 7*1024*1024 then
-		self.error = "failed to write wavbank data\n"
-		return false
+	-- write seqbank[0-7].bin
+	for i = 0, < 8 do
+		local bank_filename: string = string.format("seqbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.wavbank[i*256*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, 256*1024)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fwrite(&self.temp_cart.seqbank, 1, 2*1024*1024, file)
-	if result ~= 2*1024*1024 then
-		self.error = "failed to write seqbank data\n"
-		return false
-	end
+	-- write rom.bin
+	err = zip_entry_open(zip, "rom.bin")
+	if err == ZIP_OK then
+		close_entry = true
 
-	result = C.fwrite(&self.temp_cart.rom, 1, 16*1024*1024, file)
-	if result ~= 16*1024*1024 then
-		self.error = "failed to write rom data\n"
-		return false
+		err = zip_entry_write(zip, &vm.temp_cart.rom, 16*1024*1024)
+		if err == ZIP_OK then
+			zip_entry_close(zip)
+			close_entry = false
+		else
+			vm.error = string.format("ERROR: failed to save rom.bin to cart `%s`. (error code %d)\n", filename, err)
+			vm.io_result = false
+			return
+		end
+	else
+		vm.error = string.format("ERROR: failed to save rom.bin to cart `%s`. (error code %d)\n", filename, err)
+		vm.io_result = false
+		return
 	end
-
-	return true
 end
 
-function e3d.EVM:loadCart(filename: string): boolean
-	--[[ .E3D CART FORMAT
-		HEADER:
-			"ERA3DROM" magic header  (8 bytes)
-			version number           (4 bytes)
-				major (uint16)
-				minor (uint8)
-				patch (uint8)
-			src length               (4 bytes)
-		ROM DATA:
-			source code (plain text) (??? bytes)
-			ROM banks                (64 MiB)
-	]]
-
-	local expected_header: [8]uint8 = {
-		'E'_u8,
-		'R'_u8,
-		'A'_u8,
-		'3'_u8,
-		'D'_u8,
-		'R'_u8,
-		'O'_u8,
-		'M'_u8
-	}
-	local header: [16]uint8
-	local result: csize
-	local file: *C.FILE = C.fopen(filename, "rb")
-	if file == nilptr then
-		self.error = "failed to open file\n"
-		return false
+local function loadCartInternal(vm: *e3d.EVM, filename: string): void
+	local close_entry: boolean = false
+	local err: cint
+	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'r'_u8, &err)
+	if zip == nilptr then
+		vm.error = string.format("ERROR: failed to load cart `%s`. (error code %d)\n", filename, err)
+		vm.io_result = false
+		return
 	end
 	defer
-		C.fclose(file)
-	end
-
-	-- read data
-
-	result = C.fread(&header, 1, 16, file)
-	if result ~= 16 then
-		self.error = "failed to read header\n"
-		return false
-	end
-
-	for i = 0, < 8 do
-		if header[i] ~= expected_header[i] then
-			self.error = "invalid header\n"
-			return false
+		if close_entry then
+			zip_entry_close(zip)
 		end
+
+		zip_close(zip)
 	end
 
-	-- check version
-	local ver_major: uint16 = ((@uint16)(header[8]) << 8) | (@uint16)(header[9])
-	if ver_major < e3d.VER_MAJOR then
-		self.error = "cannot load cart made using incompatible past version of ERA-3D\n"
-		return false
-	elseif ver_major > e3d.VER_MAJOR then
-		self.error = "cannot load cart made using incompatible future version of ERA-3D\n"
-		return false
+	local size: isize
+	
+	-- read src.ec
+	err = zip_entry_open(zip, "src.ec")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
+
+		if size < 0 then
+			vm.error = string.format("ERROR: failed to load src.ec from cart `%s`. (error code %d)\n", filename, err)
+			vm.io_result = false
+			return
+		elseif size > e3d.SRC_SIZE then
+			vm.error = string.format("ERROR: failed to load src.ec from cart `%s`. 1 MiB limit exceeded.\n", filename)
+			vm.io_result = false
+			return
+		else
+			local bytes_read: clong = zip_entry_noallocread(zip, &vm.src, size)
+			vm.src_len = bytes_read
+
+			zip_entry_close(zip)
+			close_entry = false
+		end
+	else
+		vm.src_len = 0
 	end
 
-	self.src_len = ((@uint32)(header[12]) << 24) | ((@uint32)(header[13]) << 16) | ((@uint32)(header[14]) << 8) | (@uint32)(header[15])
+	coroutine.yield()
 
-	if self.src_len > e3d.SRC_SIZE then
-		self.error = "invalid src length\n"
-		return false
+	-- read texbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("texbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.texbank[i*1024*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > 4*1024*1024 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 4 MiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, 4*1024*1024)
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fread(&self.src, 1, self.src_len, file)
-	if result ~= self.src_len then
-		self.error = "failed to read src\n"
-		return false
+	-- read objbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("objbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.objbank[i*1024*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > 4*1024*1024 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 4 MiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, 4*1024*1024)
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fread(&self.cart.texbank, 4, 4*1024*1024, file)
-	if result ~= 4*1024*1024 then
-		self.error = "failed to read texbank data\n"
-		return false
+	-- read wavbank[0-1].bin
+	for i = 0, < 2 do
+		local bank_filename: string = string.format("wavbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.wavbank[i*((7*1024*1024)///2)])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > 7*1024*1024 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 7 MiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, 7*1024*1024)
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fread(&self.cart.objbank, 4, 4*1024*1024, file)
-	if result ~= 4*1024*1024 then
-		self.error = "failed to read objbank data\n"
-		return false
+	-- read seqbank[0-7].bin
+	for i = 0, < 8 do
+		local bank_filename: string = string.format("seqbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.wavbank[i*256*1024])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > 256*1024 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 256 KiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, 256*1024)
+		end
+
+		coroutine.yield()
 	end
 
-	result = C.fread(&self.cart.wavbank, 2, 7*1024*1024, file)
-	if result ~= 7*1024*1024 then
-		self.error = "failed to read wavbank data\n"
-		return false
+	-- read rom.bin
+	err = zip_entry_open(zip, "rom.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
+
+		if size < 0 then
+			vm.error = string.format("ERROR: failed to load rom.bin from cart `%s`. (error code %d)\n", filename, err)
+			vm.io_result = false
+			return
+		elseif size > 16*1024*1024 then
+			vm.error = string.format("ERROR: failed to load rom.bin from cart `%s`. 16 MiB limit exceeded.\n", filename)
+			vm.io_result = false
+			return
+		else
+			local bytes_read: clong = zip_entry_noallocread(zip, &vm.cart.rom, size)
+			vm.rom_len = bytes_read
+
+			zip_entry_close(zip)
+			close_entry = false
+		end
+	else
+		-- clear ROM
+		memory.set(&vm.cart.rom, 0, 256*1024)
+		vm.rom_len = 0
 	end
 
-	result = C.fread(&self.cart.seqbank, 1, 2*1024*1024, file)
-	if result ~= 2*1024*1024 then
-		self.error = "failed to read seqbank data\n"
-		return false
-	end
+	coroutine.yield()
 
-	result = C.fread(&self.cart.rom, 1, 16*1024*1024, file)
-	if result ~= 16*1024*1024 then
-		self.error = "failed to read rom data\n"
-		return false
-	end
-
-	-- swap bytes
 	if isLittleEndian() then
-		byteSwapCartData(&self.cart)
+		byteSwapCartData(&vm.cart)
 	end
+end
 
-	-- load cart ROM banks into system memory
-	memory.copy(&self.gpu.texmem, &self.cart.texbank, 4*1024*1024)
-	memory.copy(&self.gpu.objmem, &self.cart.objbank, (3*1024*1024) + (384*1024))
-	memory.copy(&self.soundchip.wavmem, &self.cart.wavbank, 7*1024*1024)
-	memory.copy(&self.soundchip.seqmem, &self.cart.seqbank, 256*1024)
+function e3d.EVM:saveCart(filename: string, callback: e3d.IOCallback): void
+	local errmsg: string
+	
+	self.io_result = true
+	self.io_state = e3d.IOState.SAVING
+	self.io_callback = callback
+	
+	self.io_co, errmsg = coroutine.create(saveCartInternal)
 
-	rl.updateTexture(self.gpu.gfx_texture, &self.gpu.texmem)
+	coroutine.push(self.io_co, self, filename)
+end
 
-	return true
+function e3d.EVM:loadCart(filename: string, callback: e3d.IOCallback): void
+	local errmsg: string
+	
+	self.io_result = true
+	self.io_state = e3d.IOState.LOADING
+	self.io_callback = callback
+	
+	self.io_co, errmsg = coroutine.create(loadCartInternal)
+
+	coroutine.push(self.io_co, self, filename)
 end
 
 function e3d.EVM:loadData(src_file: string, tex_file: string): boolean
@@ -2117,6 +2321,21 @@ function e3d.EVM:loadData(src_file: string, tex_file: string): boolean
 	return true
 end
 
+function e3d.EVM:updateIOState(): void
+	local success: boolean
+	local errmsg: string
+	local status: string
+	
+	status = coroutine.status(self.io_co)
+	
+	if status == "suspended" then
+		success, errmsg = coroutine.resume(self.io_co)
+	elseif status == "dead" then
+		self.io_state = e3d.IOState.IDLE
+		self.io_callback(self, self.io_result)
+	end
+end
+
 function e3d.EVM:__gc(): void
 	self.soundchip:cleanup()
 	self.gpu:cleanup()
@@ -2130,6 +2349,10 @@ function e3d.newVM(): *e3d.EVM
 	
 	vm.gpu:init(&vm.sysmem, &vm.cart.texbank, &vm.cart.objbank)
 	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank)
+
+	vm.io_state = e3d.IOState.IDLE
+
 	vm:resetVM(false)
+
 	return vm
 end

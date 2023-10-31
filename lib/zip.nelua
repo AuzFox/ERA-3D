@@ -1,0 +1,71 @@
+## cinclude "zip.h"
+
+## linklib "zip"
+
+global ZIP_DEFAULT_COMPRESSION_LEVEL <comptime> = 6
+global ZIP_OK <comptime> = 0
+global ZIP_ENOINIT <comptime> = -1      -- not initialized
+global ZIP_EINVENTNAME <comptime> = -2  -- invalid entry name
+global ZIP_ENOENT <comptime> = -3       -- entry not found
+global ZIP_EINVMODE <comptime> = -4     -- invalid zip mode
+global ZIP_EINVLVL <comptime> = -5      -- invalid compression level
+global ZIP_ENOSUP64 <comptime> = -6     -- no zip 64 support
+global ZIP_EMEMSET <comptime> = -7      -- memset error
+global ZIP_EWRTENT <comptime> = -8      -- cannot write data to entry
+global ZIP_ETDEFLINIT <comptime> = -9   -- cannot initialize tdefl compressor
+global ZIP_EINVIDX <comptime> = -10     -- invalid index
+global ZIP_ENOHDR <comptime> = -11      -- header not found
+global ZIP_ETDEFLBUF <comptime> = -12   -- cannot flush tdefl buffer
+global ZIP_ECRTHDR <comptime> = -13     -- cannot create entry header
+global ZIP_EWRTHDR <comptime> = -14     -- cannot write entry header
+global ZIP_EWRTDIR <comptime> = -15     -- cannot write to central dir
+global ZIP_EOPNFILE <comptime> = -16    -- cannot open file
+global ZIP_EINVENTTYPE <comptime> = -17 -- invalid entry type
+global ZIP_EMEMNOALLOC <comptime> = -18 -- extracting data using no memory allocation
+global ZIP_ENOFILE <comptime> = -19     -- file not found
+global ZIP_ENOPERM <comptime> = -20     -- no permission
+global ZIP_EOOMEM <comptime> = -21      -- out of memory
+global ZIP_EINVZIPNAME <comptime> = -22 -- invalid zip archive name
+global ZIP_EMKDIR <comptime> = -23      -- make dir error
+global ZIP_ESYMLINK <comptime> = -24    -- symlink error
+global ZIP_ECLSZIP <comptime> = -25     -- close archive error
+global ZIP_ECAPSIZE <comptime> = -26    -- capacity size too small
+global ZIP_EFSEEK <comptime> = -27      -- fseek error
+global ZIP_EFREAD <comptime> = -28      -- fread error
+global ZIP_EFWRITE <comptime> = -29     -- fwrite error
+global ZIP_ERINIT <comptime> = -30      -- cannot initialize reader
+global ZIP_EWINIT <comptime> = -31      -- cannot initialize writer
+global ZIP_EWRINIT <comptime> = -32     -- cannot initialize writer from reader
+
+global zip_t: type <cimport,nodecl,ctypedef'zip_t',forwarddecl> = @record{}
+global function zip_strerror(errnum: cint): cstring <cimport,nodecl> end
+global function zip_open(zipname: cstring, level: cint, mode: cchar): *zip_t <cimport,nodecl> end
+global function zip_openwitherror(zipname: cstring, level: cint, mode: cchar, errnum: *cint): *zip_t <cimport,nodecl> end
+global function zip_close(zip: *zip_t): void <cimport,nodecl> end
+global function zip_is64(zip: *zip_t): cint <cimport,nodecl> end
+global function zip_entry_open(zip: *zip_t, entryname: cstring): cint <cimport,nodecl> end
+global function zip_entry_opencasesensitive(zip: *zip_t, entryname: cstring): cint <cimport,nodecl> end
+global function zip_entry_openbyindex(zip: *zip_t, index: csize): cint <cimport,nodecl> end
+global function zip_entry_close(zip: *zip_t): cint <cimport,nodecl> end
+global function zip_entry_name(zip: *zip_t): cstring <cimport,nodecl> end
+global function zip_entry_index(zip: *zip_t): clong <cimport,nodecl> end
+global function zip_entry_isdir(zip: *zip_t): cint <cimport,nodecl> end
+global function zip_entry_size(zip: *zip_t): culonglong <cimport,nodecl> end
+global function zip_entry_uncomp_size(zip: *zip_t): culonglong <cimport,nodecl> end
+global function zip_entry_comp_size(zip: *zip_t): culonglong <cimport,nodecl> end
+global function zip_entry_crc32(zip: *zip_t): cuint <cimport,nodecl> end
+global function zip_entry_write(zip: *zip_t, buf: pointer, bufsize: csize): cint <cimport,nodecl> end
+global function zip_entry_fwrite(zip: *zip_t, filename: cstring): cint <cimport,nodecl> end
+global function zip_entry_read(zip: *zip_t, buf: *pointer, bufsize: *csize): clong <cimport,nodecl> end
+global function zip_entry_noallocread(zip: *zip_t, buf: pointer, bufsize: csize): clong <cimport,nodecl> end
+global function zip_entry_fread(zip: *zip_t, filename: cstring): cint <cimport,nodecl> end
+global function zip_entry_extract(zip: *zip_t, on_extract: function(arg: pointer, offset: uint64, data: pointer, size: csize): csize, arg: pointer): cint <cimport,nodecl> end
+global function zip_entries_total(zip: *zip_t): clong <cimport,nodecl> end
+global function zip_entries_delete(zip: *zip_t, entries: *[0]cstring, len: csize): clong <cimport,nodecl> end
+global function zip_stream_extract(stream: cstring, size: csize, dir: cstring, on_extract: function(filename: cstring, arg: pointer): cint, arg: pointer): cint <cimport,nodecl> end
+global function zip_stream_open(stream: cstring, size: csize, level: cint, mode: cchar): *zip_t <cimport,nodecl> end
+global function zip_stream_openwitherror(stream: cstring, size: csize, level: cint, mode: cchar, errnum: *cint): *zip_t <cimport,nodecl> end
+global function zip_stream_copy(zip: *zip_t, buf: *pointer, bufsize: *csize): clong <cimport,nodecl> end
+global function zip_stream_close(zip: *zip_t): void <cimport,nodecl> end
+global function zip_create(zipname: cstring, filenames: *[0]cstring, len: csize): cint <cimport,nodecl> end
+global function zip_extract(zipname: cstring, dir: cstring, on_extract_entry: function(filename: cstring, arg: pointer): cint, arg: pointer): cint <cimport,nodecl> end

@@ -62,29 +62,46 @@ end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		sm:updateState(vm)
+		switch vm.io_state do
+			case e3d.IOState.IDLE then
+				sm:updateState(vm)
 		
-		-- update audio stream
-		vm.soundchip:updateAudio()
+				vm.soundchip:updateAudio()
 
-		-- update render settings
-		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
-			rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.texmem)
-			vm.gpu.update_tex = false
+				if sm.state_id == StateID.RUN and vm.gpu.update_tex then
+					rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.texmem)
+					vm.gpu.update_tex = false
+				end
+
+				rl.beginTextureMode(vm.gpu.gfx_rendertex)
+					sm:drawState(vm)
+					vm.gpu:resetMatrixStack()
+				rl.endTextureMode()
+
+				rl.beginDrawing()
+					rl.clearBackground(rl.BLACK)
+					rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+					rl.drawFPS(0, 0)
+				rl.endDrawing()
+
+				sm:setQueuedState()
+			case e3d.IOState.LOADING, e3d.IOState.SAVING then
+				vm:updateIOState()
+
+				rl.beginTextureMode(vm.gpu.gfx_rendertex)
+					vm.gpu:clear(0)
+					vm.gpu:camera2D(0)
+					vm.gpu:drawRect2D(195, 176, 90, 9, 0xFF0000FF)
+					vm.gpu:print2D(195, 176, 0xFFFFFFFF, (vm.io_state == e3d.IOState.SAVING) and "SAVING CART..." or "LOADING CART...")
+					vm.gpu:resetMatrixStack()
+				rl.endTextureMode()
+
+				rl.beginDrawing()
+					rl.clearBackground(rl.BLACK)
+					rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+					rl.drawFPS(0, 0)
+				rl.endDrawing()
 		end
-
-		rl.beginTextureMode(vm.gpu.gfx_rendertex)
-			sm:drawState(vm)
-			vm.gpu:resetMatrixStack()
-		rl.endTextureMode()
-
-		rl.beginDrawing()
-			rl.clearBackground(rl.BLACK)
-			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
-			rl.drawFPS(0, 0)
-		rl.endDrawing()
-
-		sm:setQueuedState()
 	end
 end
 

@@ -25,28 +25,32 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
     elseif rl.isKeyPressed(rl.keyboardKey.M) then
         sm.queued_state = StateID.TRACKER -- switch to tracker state next frame
     elseif rl.isKeyPressed(rl.keyboardKey.P) then
-        io.printf('HEAP:     0x%08X - 0x%08X\n', e3d.HEAP_START_ADDR, e3d.HEAP_MAX_ADDR)
-        io.printf('TEXMEM:     0x%08X - 0x%08X\n', e3d.TEXMEM_START_ADDR, e3d.TEXMEM_MAX_ADDR)
-        io.printf('OBJMEM:     0x%08X - 0x%08X\n', e3d.OBJMEM_START_ADDR, e3d.OBJMEM_MAX_ADDR)
-        io.printf('AOBMEM:     0x%08X - 0x%08X\n', e3d.AOBMEM_START_ADDR, e3d.AOBMEM_MAX_ADDR)
-        io.printf('SYSMEM:     0x%08X - 0x%08X\n', e3d.SYSMEM_START_ADDR, e3d.SYSMEM_MAX_ADDR)
-        io.printf('WAVMEM:     0x%08X - 0x%08X\n', e3d.WAVMEM_START_ADDR, e3d.WAVMEM_MAX_ADDR)
-        io.printf('SEQMEM:     0x%08X - 0x%08X\n', e3d.SEQMEM_START_ADDR, e3d.SEQMEM_MAX_ADDR)
-        io.printf('GLOBALS:  0x%08X - 0x%08X\n', e3d.GLOBALS_START_ADDR, e3d.GLOBALS_MAX_ADDR)
-        io.printf('LOCALS:   0x%08X - 0x%08X\n', e3d.LOCALS_START_ADDR, e3d.LOCALS_MAX_ADDR)
-        io.printf('ARGS:     0x%08X - 0x%08X\n', e3d.ARGS_START_ADDR, e3d.ARGS_MAX_ADDR)
-        io.printf('TEXBANK:    0x%08X - 0x%08X\n', e3d.TEXBANK_START_ADDR, e3d.TEXBANK_MAX_ADDR)
-        io.printf('OBJBANK:    0x%08X - 0x%08X\n', e3d.OBJBANK_START_ADDR, e3d.OBJBANK_MAX_ADDR)
-        io.printf('WAVBANK:    0x%08X - 0x%08X\n', e3d.WAVBANK_START_ADDR, e3d.WAVBANK_MAX_ADDR)
-        io.printf('SEQBANK:    0x%08X - 0x%08X\n', e3d.SEQBANK_START_ADDR, e3d.SEQBANK_MAX_ADDR)
-        io.printf('ROM:      0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
-        io.printf('MEMCARD:  0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
+        io.printf('HEAP:    0x%08X - 0x%08X\n', e3d.HEAP_START_ADDR, e3d.HEAP_MAX_ADDR)
+        io.printf('TEXMEM:  0x%08X - 0x%08X\n', e3d.TEXMEM_START_ADDR, e3d.TEXMEM_MAX_ADDR)
+        io.printf('OBJMEM:  0x%08X - 0x%08X\n', e3d.OBJMEM_START_ADDR, e3d.OBJMEM_MAX_ADDR)
+        io.printf('AOBMEM:  0x%08X - 0x%08X\n', e3d.AOBMEM_START_ADDR, e3d.AOBMEM_MAX_ADDR)
+        io.printf('SYSMEM:  0x%08X - 0x%08X\n', e3d.SYSMEM_START_ADDR, e3d.SYSMEM_MAX_ADDR)
+        io.printf('WAVMEM:  0x%08X - 0x%08X\n', e3d.WAVMEM_START_ADDR, e3d.WAVMEM_MAX_ADDR)
+        io.printf('SEQMEM:  0x%08X - 0x%08X\n', e3d.SEQMEM_START_ADDR, e3d.SEQMEM_MAX_ADDR)
+        io.printf('GLOBALS: 0x%08X - 0x%08X\n', e3d.GLOBALS_START_ADDR, e3d.GLOBALS_MAX_ADDR)
+        io.printf('LOCALS:  0x%08X - 0x%08X\n', e3d.LOCALS_START_ADDR, e3d.LOCALS_MAX_ADDR)
+        io.printf('ARGS:    0x%08X - 0x%08X\n', e3d.ARGS_START_ADDR, e3d.ARGS_MAX_ADDR)
+        io.printf('TEXBANK: 0x%08X - 0x%08X\n', e3d.TEXBANK_START_ADDR, e3d.TEXBANK_MAX_ADDR)
+        io.printf('OBJBANK: 0x%08X - 0x%08X\n', e3d.OBJBANK_START_ADDR, e3d.OBJBANK_MAX_ADDR)
+        io.printf('WAVBANK: 0x%08X - 0x%08X\n', e3d.WAVBANK_START_ADDR, e3d.WAVBANK_MAX_ADDR)
+        io.printf('SEQBANK: 0x%08X - 0x%08X\n', e3d.SEQBANK_START_ADDR, e3d.SEQBANK_MAX_ADDR)
+        io.printf('ROM:     0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
+        io.printf('MEMCARD: 0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
     elseif rl.isKeyPressed(rl.keyboardKey.S) then
-        if vm:saveCart(arg[2]) then
-            print("save OK!")
-        else
-            io.printf(vm.error)
-        end
+        vm:saveCart(arg[2],
+            function(vm: *e3d.EVM, success: boolean): void
+                if success then
+                    print("save OK!")
+                else
+                    io.printf(vm.error)
+                end
+            end
+        )
     elseif rl.isKeyPressed(rl.keyboardKey.L) then
         if is_ctrl_down then
             if vm:loadData(arg[3], arg[4]) then
@@ -55,11 +59,15 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
                 io.printf(vm.error)
             end
         else
-            if vm:loadCart(arg[1]) then
-                print("load OK!")
-            else
-                io.printf(vm.error)
-            end
+            vm:loadCart(arg[1],
+                function(vm: *e3d.EVM, success: boolean): void
+                    if success then
+                        print("load OK!")
+                    else
+                        io.printf(vm.error)
+                    end
+                end
+            )
         end
     end
 

@@ -3879,43 +3879,6 @@ local function program(vm: *e3d.EVM): void
 	vm:popScope()
 end
 
---[[
-function e3d.EVM:compileFile(filename: string): boolean
-	local fs, err, errcode = filestream.open(filename)
-	if not fs:isopen() then
-		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", filename, err, errcode)
-		return false
-	end
-
-	self.src, err, errcode = fs:read("a")
-
-	fs:close()
-
-	local success: boolean
-	local co: coroutine
-	local errmsg: string
-
-	self.compile_err = false
-	co, errmsg = coroutine.create(program)
-	success, errmsg = coroutine.resume(co, self)
-	self:resetCompiler()
-	return success and not self.compile_err
-end
-
-function e3d.EVM:compileSrc(src: string): boolean
-	self.src = src
-	
-	local success: boolean
-	local co: coroutine
-	local errmsg: string
-
-	self.compile_err = false
-	co, errmsg = coroutine.create(program)
-	success, errmsg = coroutine.resume(co, self)
-	self:resetCompiler()
-	return success and not self.compile_err
-end
-]]
 function e3d.EVM:compile(): boolean
 	local success: boolean
 	local co: coroutine
