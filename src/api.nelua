@@ -1286,6 +1286,18 @@ local function apiVec3Invert(vm: *e3d.EVM): boolean
 	return true
 end
 
+local function apiVec3ToScreen(vm: *e3d.EVM): boolean
+	-- signature:
+	-- vec2 vec3ToScreen(vec pos, int camera_id);
+
+	local pos: rl.vector3 = vm:getArgV3(0)
+	local camera_id: uinteger = math.clamp(vm:getArgU(3), 0, GPU_CAMERAS_COUNT - 1)
+
+	vm:pushV2(rl.getWorldToScreenEx(pos, vm.gpu.cameras[camera_id], vm.gpu.viewport_w, vm.gpu.viewport_h))
+
+	return true
+end
+
 local function apiCamera2D(vm: *e3d.EVM): boolean
 	-- signature:
 	-- void camera2D(int id);
@@ -3463,6 +3475,15 @@ function e3d.EVM:registerAPI(): void
 			type_info={e3d.EVMType.VEC3, self.struct_vec3},
 			argdata={{e3d.EVMType.VEC3, self.struct_vec3}},
 			func=apiVec3Invert
+		},
+		{
+			name="vec3ToScreen",
+			type_info={e3d.EVMType.VEC2, self.struct_vec2},
+			argdata={
+				{e3d.EVMType.VEC3, self.struct_vec3},
+				{e3d.EVMType.INT}
+			},
+			func=apiVec3ToScreen
 		},
 		{
 			name="camera2D",

@@ -26,4 +26,3 @@ HOST:
 - implement debugger
 - implement boot animation
 - implement ui (terminal?, editors?. etc.)
-- implement cartridge format and saving/loading
