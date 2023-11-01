@@ -26,7 +26,7 @@ void init() {
 }
 
 void update(float delta_time) {
-	if (pressed(5, 0)) {
+	if (pressed(0, 5)) {
 		setTEXMEMPixel(0, 0, RED);
 		setTEXMEMPixel(0, 2, GREEN);
 		setTEXMEMPixel(0, 4, BLUE);

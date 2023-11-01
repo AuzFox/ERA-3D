@@ -530,8 +530,11 @@ local function apiVargv(vm: *e3d.EVM): boolean
 end
 
 local function apiPressed(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:getArgU(0)
-	local p: uint32 = vm:getArgU(1)
+	-- signature:
+	-- int pressed(int player, int btn);
+
+	local p: uint32 = vm:getArgU(0)
+	local b: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b
@@ -548,8 +551,11 @@ local function apiPressed(vm: *e3d.EVM): boolean
 end
 
 local function apiReleased(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:getArgU(0)
-	local p: uint32 = vm:getArgU(1)
+	-- signature:
+	-- int released(int player, int btn);
+
+	local p: uint32 = vm:getArgU(0)
+	local b: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b
@@ -566,8 +572,11 @@ local function apiReleased(vm: *e3d.EVM): boolean
 end
 
 local function apiHeld(vm: *e3d.EVM): boolean
-	local b: uint32 = vm:getArgU(0)
-	local p: uint32 = vm:getArgU(1)
+	-- signature:
+	-- int held(int player, int btn);
+
+	local p: uint32 = vm:getArgU(0)
+	local b: uint32 = vm:getArgU(1)
 
 	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
 	b = (p * e3d.ControllerButtons.COUNT) + b

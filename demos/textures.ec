@@ -55,16 +55,16 @@ void update(float delta_time) {
 	right_scroll = wrapf(right_scroll + 0.25 * delta_time, 0.0, 1.0);
 
 	// toggle fog
-	if (pressed(BTN_CROSS, 0)) {
+	if (pressed(0, BTN_CROSS)) {
 		setFogMode(!getFogMode());
 	}
 
 	// rotate camera around cube
 	float delta_angle = 0.0;
-	if (held(BTN_LEFT, 0)) {
+	if (held(0, BTN_LEFT)) {
 		delta_angle = delta_angle + 45.0;
 	}
-	if (held(BTN_RIGHT, 0)) {
+	if (held(0, BTN_RIGHT)) {
 		delta_angle = delta_angle - 45.0;
 	}
 
