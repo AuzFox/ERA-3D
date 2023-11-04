@@ -248,6 +248,7 @@ global GPU = @record {
 	gfx_font_texture: rl.texture,
 	texbank_ptr: *[0]rl.color,
 	objbank_ptr: *[0]util.IntFloat,
+	ompbank_ptr: *[0]uint8,
 	sysmem_ptr: *[0]uint8,
 	
 	-- shader uniform locations
@@ -621,7 +622,7 @@ function GPU:uploadOBJMEMVertex(index: uint32): void
 	self:vertex({self.objmem[word_index].f, self.objmem[word_index + 1].f, self.objmem[word_index + 2].f})
 end
 
-function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
+function GPU:drawModelEx(mode: uint32, start: uint32, n: uint32): void
 	if n == 0 then
 		return
 	end
@@ -652,6 +653,13 @@ function GPU:drawModel(mode: uint32, start: uint32, n: uint32): void
 				end
 		end
 	self:endMesh()
+end
+
+function GPU:drawModel(id: uint8): void
+	-- get data from objmap
+	-- ...
+
+	--self:drawModelEx(mode, start, n)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
@@ -741,8 +749,10 @@ function GPU:loadTexBank(bank: uint8): void
 end
 
 function GPU:loadObjBank(bank: uint8): void
-	local src: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE * #util.IntFloat) * bank]
+	local src: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE) * bank]
 	memory.copy(&self.objmem, src, GPU_OBJMEM_SIZE * #util.IntFloat)
+
+	-- load ompbank
 	self.update_tex = true
 end
 
@@ -772,7 +782,7 @@ function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32
 	end
 
 	local vertex_count: uint32
-	local bank_ptr: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE * #util.IntFloat) * bank_index]
+	local bank_ptr: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE) * bank_index]
 
 	for i = 0, < model.meshCount do
 		local mesh: rl.mesh = (@*[0]rl.mesh)(model.meshes)[i]
@@ -982,10 +992,11 @@ function GPU:resetGPU(): void
 	self.view_matrix_count = 0
 end
 
-function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr: *[0]util.IntFloat): void
+function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr: *[0]util.IntFloat, ompbank_ptr: *[0]uint8): void
 	self.sysmem_ptr = sysmem_ptr
 	self.texbank_ptr = texbank_ptr
 	self.objbank_ptr = objbank_ptr
+	self.ompbank_ptr = ompbank_ptr
 
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
 	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors

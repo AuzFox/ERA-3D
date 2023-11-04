@@ -101,6 +101,7 @@ SoundChip = @record {
 
 	-- memory pointers
 	sysmem_ptr: *[0]uint8,
+	wmpbank_ptr: *[0]uint8,
 	wavbank_ptr: *[0]BKFrame,
 	seqbank_ptr: *[0]uint8,
 	song_data: *[0]uint8,
@@ -305,15 +306,18 @@ function SoundChip:playPattern(track: uint8, pattern: uint8): void
 	end
 end
 
-function SoundChip:playSampleEx(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8, flags: uint8): void
+function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8, flags: uint8): void
 	local tc: *TrackContext = &self.track_contexts[track]
 	local state: *TrackState = self:getTrackState(track)
 
 	
 end
 
-function SoundChip:playSample(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8): void
-	self:playSampleEx(track, start, send, note, volume, 0)
+function SoundChip:playWav(track: uint8, id: uint8, volume: uint8): void
+	-- get entry from wavmap
+	-- ...
+
+	--self:playSampleEx(track, start, send, BK_C_4, volume, 0)
 end
 
 function SoundChip:muteTrack(track: uint8): void
@@ -394,6 +398,8 @@ end
 function SoundChip:loadWavBank(bank: uint8): void
 	local src: *[0]BKFrame = &self.wavbank_ptr[SOUNDCHIP_WAVMEM_SIZE * bank]
 	memory.copy(&self.wavmem, src, SOUNDCHIP_WAVMEM_SIZE * 2)
+
+	-- load wmpbank
 end
 
 function SoundChip:loadSeqBank(bank: uint8): void
@@ -457,8 +463,9 @@ function SoundChip:resetSoundchip(): void
 	self:stopPreviewNote()
 end
 
-function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank_ptr: *[0]uint8): void
+function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank_ptr: *[0]uint8, wmpbank_ptr: *[0]uint8): void
 	self.sysmem_ptr = sysmem_ptr
+	self.wmpbank_ptr = wmpbank_ptr
 	self.wavbank_ptr = wavbank_ptr
 	self.seqbank_ptr = seqbank_ptr
 

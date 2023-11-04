@@ -358,6 +358,10 @@ function e3d.EVM:getMem8(addr: uint32): uint8
 		end
 	elseif addr <= e3d.OBJBANK_MAX_ADDR then
 		return util.getIntFloatBtye(&self.cart.objbank, e3d.OBJBANK_START_ADDR, addr)
+	elseif addr <= e3d.OMPBANK_MAX_ADDR then
+		return self.cart.ompbank[addr - e3d.OMPBANK_START_ADDR]
+	elseif addr <= e3d.WMPBANK_MAX_ADDR then
+		return self.cart.wmpbank[addr - e3d.WMPBANK_START_ADDR]
 	elseif addr <= e3d.WAVBANK_MAX_ADDR then
 		local frame: uint16 = self.cart.wavbank[(addr - e3d.WAVBANK_START_ADDR) /// 2]
 		return (@uint8)((frame >> (8 * (addr & 1))) & 0xFF)
@@ -412,6 +416,10 @@ function e3d.EVM:setMem8(addr: uint32, val: uint8): boolean
 		util.setIntFloatByte(&self.args, e3d.ARGS_START_ADDR, addr, val)
 	elseif addr <= e3d.TEXBANK_MAX_ADDR then
 		return false
+	elseif addr <= e3d.OMPBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.WMPBANK_MAX_ADDR then
+		return false
 	elseif addr <= e3d.OBJBANK_MAX_ADDR then
 		return false
 	elseif addr <= e3d.WAVBANK_MAX_ADDR then
@@ -465,6 +473,12 @@ function e3d.EVM:getMem32(addr: uint32): uint32
 		return (((@uint32)(col.r) << 24) | ((@uint32)(col.g) << 16) | ((@uint32)(col.b) << 8) | (@uint32)(col.a))
 	elseif addr <= e3d.OBJBANK_MAX_ADDR then
 		return self.cart.objbank[(addr - e3d.OBJBANK_START_ADDR) /// 4].u
+	elseif addr <= e3d.OMPBANK_MAX_ADDR then
+		addr = addr - e3d.OMPBANK_START_ADDR
+		return ((@uint32)(self.cart.ompbank[addr]) << 24) | ((@uint32)(self.cart.ompbank[addr + 1]) << 16) | ((@uint32)(self.cart.ompbank[addr + 2]) << 8) | (@uint32)(self.cart.ompbank[addr + 3])
+	elseif addr <= e3d.WMPBANK_MAX_ADDR then
+		addr = addr - e3d.WMPBANK_START_ADDR
+		return ((@uint32)(self.cart.wmpbank[addr]) << 24) | ((@uint32)(self.cart.wmpbank[addr + 1]) << 16) | ((@uint32)(self.cart.wmpbank[addr + 2]) << 8) | (@uint32)(self.cart.wmpbank[addr + 3])
 	elseif addr <= e3d.WAVBANK_MAX_ADDR then
 		local index: uinteger = (addr - e3d.WAVBANK_START_ADDR) /// 2
 		local frame0: uint32 = (@uint32)(self.cart.wavbank[index])
@@ -534,6 +548,10 @@ function e3d.EVM:setMem32(addr: uint32, val: uint32): boolean
 	elseif addr <= e3d.TEXBANK_MAX_ADDR then
 		return false
 	elseif addr <= e3d.OBJBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.OMPBANK_MAX_ADDR then
+		return false
+	elseif addr <= e3d.WMPBANK_MAX_ADDR then
 		return false
 	elseif addr <= e3d.WAVBANK_MAX_ADDR then
 		return false
@@ -1914,17 +1932,25 @@ end
 
 local function byteSwapCartData(cart: *e3d.Cart): void
 	local p: *[0]uint8 = (@*[0]uint8)(&cart.texbank)
-	local p2: *[0]uint8 = (@*[0]uint8)(&cart.objbank)
+
+	-- byteswap texbank
 	for i: uint64 = 0, < 4*1024*1024 do
 		local byte_index: uint64 = i * 4
 
 		p[byte_index], p[byte_index + 3] = p[byte_index + 3], p[byte_index]
 		p[byte_index + 1], p[byte_index + 2] = p[byte_index + 2], p[byte_index + 1]
-
-		p2[byte_index], p2[byte_index + 3] = p2[byte_index + 3], p2[byte_index]
-		p2[byte_index + 1], p2[byte_index + 2] = p2[byte_index + 2], p2[byte_index + 1]
 	end
 
+	-- byteswap objbank
+	p = (@*[0]uint8)(&cart.objbank)
+	for i: uint64 = 0, < GPU_OBJMEM_SIZE*4 do
+		local byte_index: uint64 = i * 4
+
+		p[byte_index], p[byte_index + 3] = p[byte_index + 3], p[byte_index]
+		p[byte_index + 1], p[byte_index + 2] = p[byte_index + 2], p[byte_index + 1]
+	end
+
+	-- byteswap wavbank
 	p = (@*[0]uint8)(&cart.wavbank)
 	for i: uint64 = 0, < 7*1024*1024 do
 		local byte_index: uint64 = i * 2
@@ -1951,7 +1977,9 @@ local function saveCartInternal(vm: *e3d.EVM, filename: string): void
 
 	-- memcpy cart data to temp_cart
 	memory.copy(&vm.temp_cart.texbank, &vm.cart.texbank, 16*1024*1024)
-	memory.copy(&vm.temp_cart.objbank, &vm.cart.objbank, 16*1024*1024)
+	memory.copy(&vm.temp_cart.objbank, &vm.cart.objbank, GPU_OBJMEM_SIZE*#util.IntFloat)
+	memory.copy(&vm.temp_cart.ompbank, &vm.cart.ompbank, e3d.OMPBANK_SIZE)
+	memory.copy(&vm.temp_cart.wmpbank, &vm.cart.wmpbank, e3d.WMPBANK_SIZE)
 	memory.copy(&vm.temp_cart.wavbank, &vm.cart.wavbank, 14*1024*1024)
 	memory.copy(&vm.temp_cart.seqbank, &vm.cart.seqbank, 2*1024*1024)
 	memory.copy(&vm.temp_cart.rom, &vm.cart.rom, 16*1024*1024)
@@ -2016,12 +2044,64 @@ local function saveCartInternal(vm: *e3d.EVM, filename: string): void
 	-- write objbank[0-3].bin
 	for i = 0, < 4 do
 		local bank_filename: string = string.format("objbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.objbank[i*1024*1024])
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.objbank[i*GPU_OBJMEM_SIZE])
 		err = zip_entry_open(zip, bank_filename)
 		if err == ZIP_OK then
 			close_entry = true
 
-			err = zip_entry_write(zip, bank_ptr, 4*1024*1024)
+			err = zip_entry_write(zip, bank_ptr, GPU_OBJMEM_SIZE * #util.IntFloat)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
+	end
+
+	-- write ompbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("ompbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.ompbank[i*e3d.OBJMAP_SIZE])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, e3d.OBJMAP_SIZE)
+			if err == ZIP_OK then
+				zip_entry_close(zip)
+				close_entry = false
+			else
+				vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			end
+		else
+			vm.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			vm.io_result = false
+			return
+		end
+
+		coroutine.yield()
+	end
+
+	-- write wmpbank[0-1].bin
+	for i = 0, < 2 do
+		local bank_filename: string = string.format("wmpbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.temp_cart.wmpbank[i*e3d.WAVMAP_SIZE])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+
+			err = zip_entry_write(zip, bank_ptr, e3d.WAVMAP_SIZE)
 			if err == ZIP_OK then
 				zip_entry_close(zip)
 				close_entry = false
@@ -2192,7 +2272,7 @@ local function loadCartInternal(vm: *e3d.EVM, filename: string): void
 	-- read objbank[0-3].bin
 	for i = 0, < 4 do
 		local bank_filename: string = string.format("objbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.objbank[i*1024*1024])
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.objbank[i*GPU_OBJMEM_SIZE])
 		err = zip_entry_open(zip, bank_filename)
 		if err == ZIP_OK then
 			close_entry = true
@@ -2202,8 +2282,8 @@ local function loadCartInternal(vm: *e3d.EVM, filename: string): void
 				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
 				vm.io_result = false
 				return
-			elseif size > 4*1024*1024 then
-				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 4 MiB limit exceeded\n", bank_filename, filename)
+			elseif size > GPU_OBJMEM_SIZE * #util.IntFloat then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 3 MiB + 384 KiB limit exceeded\n", bank_filename, filename)
 				vm.io_result = false
 				return
 			else
@@ -2214,7 +2294,69 @@ local function loadCartInternal(vm: *e3d.EVM, filename: string): void
 			end
 		else
 			-- clear bank
-			memory.set(bank_ptr, 0, 4*1024*1024)
+			memory.set(bank_ptr, 0, GPU_OBJMEM_SIZE * #util.IntFloat)
+		end
+
+		coroutine.yield()
+	end
+
+	-- read ompbank[0-3].bin
+	for i = 0, < 4 do
+		local bank_filename: string = string.format("ompbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.ompbank[i*e3d.OBJMAP_SIZE])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > e3d.OBJMAP_SIZE then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 3 KiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, e3d.OBJMAP_SIZE)
+		end
+
+		coroutine.yield()
+	end
+
+	-- read wmpbank[0-1].bin
+	for i = 0, < 2 do
+		local bank_filename: string = string.format("wmpbank%d.bin", i)
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&vm.cart.wmpbank[i*e3d.WAVMAP_SIZE])
+		err = zip_entry_open(zip, bank_filename)
+		if err == ZIP_OK then
+			close_entry = true
+			size = zip_entry_size(zip)
+
+			if size < 0 then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				vm.io_result = false
+				return
+			elseif size > e3d.WAVMAP_SIZE then
+				vm.error = string.format("ERROR: failed to load `%s` from cart `%s`. 2 KiB limit exceeded\n", bank_filename, filename)
+				vm.io_result = false
+				return
+			else
+				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+				
+				zip_entry_close(zip)
+				close_entry = false
+			end
+		else
+			-- clear bank
+			memory.set(bank_ptr, 0, e3d.WAVMAP_SIZE)
 		end
 
 		coroutine.yield()
@@ -2388,8 +2530,8 @@ function e3d.newVM(): *e3d.EVM
 	vm:registerBuiltins()
 	vm:registerAPI()
 	
-	vm.gpu:init(&vm.sysmem, &vm.cart.texbank, &vm.cart.objbank)
-	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank)
+	vm.gpu:init(&vm.sysmem, &vm.cart.texbank, &vm.cart.objbank, &vm.cart.ompbank)
+	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank, &vm.cart.wmpbank)
 
 	vm.io_state = e3d.IOState.IDLE
 

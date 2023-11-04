@@ -2312,12 +2312,11 @@ end
 
 local function apiDrawModel(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void drawModel(int start, int n);
+	-- void drawModel(int id);
 
-	local start: uint32 = vm:getArgU(0)
-	local n: uint32 = vm:getArgU(1)
+	local id: uint32 = vm:getArgU(0)
 
-	vm.gpu:drawModel(GPU_TRIANGLES, start, n)
+	vm.gpu:drawModel(id)
 
 	return true
 end
@@ -2330,7 +2329,7 @@ local function apiDrawModelEx(vm: *e3d.EVM): boolean
 	local start: uint32 = vm:getArgU(1)
 	local n: uint32 = vm:getArgU(2)
 
-	vm.gpu:drawModel(mode, start, n)
+	vm.gpu:drawModelEx(mode, start, n)
 
 	return true
 end
@@ -2665,23 +2664,22 @@ local function apiPlayPattern(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiPlaySample(vm: *e3d.EVM): boolean
+local function apiPlayWav(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void playSample(int track, int start, int end, int volume);
+	-- void playWav(int track, int id);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
-	local start: uint8 = vm:getArgU(1)
-	local send: uint8 = vm:getArgU(2)
-	local volume: uint8 = (@uint8)(vm:getArgU(3))
+	local id: uint8 = (@uint8)(vm:getArgU(1))
+	local volume: uint8 = (@uint8)(vm:getArgU(2))
 
-	vm.soundchip:playSample(track, start, send, BK_C_4, volume)
+	vm.soundchip:playWav(track, id, volume)
 
 	return true
 end
 
-local function apiPlaySampleEx(vm: *e3d.EVM): boolean
+local function apiPlayWavEx(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void playSampleEx(int track, int start, int end, int note, int volume, int flags);
+	-- void playWavEx(int track, int start, int end, int note, int volume, int flags);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local start: uint8 = vm:getArgU(1)
@@ -2690,7 +2688,7 @@ local function apiPlaySampleEx(vm: *e3d.EVM): boolean
 	local volume: uint8 = (@uint8)(vm:getArgU(4))
 	local flags: uint8 = (@uint8)(vm:getArgU(5))
 
-	vm.soundchip:playSample(track, start, send, note, volume, flags)
+	vm.soundchip:playWavEx(track, start, send, note, volume, flags)
 
 	return true
 end
@@ -4477,7 +4475,6 @@ function e3d.EVM:registerAPI(): void
 			name="drawModel",
 			type_info={e3d.EVMType.VOID},
 			argdata={
-				{e3d.EVMType.INT},
 				{e3d.EVMType.INT}
 			},
 			func=apiDrawModel
@@ -4517,16 +4514,17 @@ function e3d.EVM:registerAPI(): void
 			func=apiPlayPattern
 		},
 		{
-			name="playWave",
+			name="playWav",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{e3d.EVMType.INT},
+				{e3d.EVMType.INT},
 				{e3d.EVMType.INT}
 			},
-			func=apiPlayWave
+			func=apiPlayWav
 		},
 		{
-			name="playWaveEx",
+			name="playWavEx",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{e3d.EVMType.INT},
@@ -4535,7 +4533,7 @@ function e3d.EVM:registerAPI(): void
 				{e3d.EVMType.INT},
 				{e3d.EVMType.INT}
 			},
-			func=apiPlayWaveEx
+			func=apiPlayWavEx
 		},
 		{
 			name="pauseTracks",
