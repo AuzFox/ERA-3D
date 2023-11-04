@@ -1,6 +1,6 @@
 return {
     add_path = {
-        'lib',
+        'src/third_party',
         'src'
     }
 }

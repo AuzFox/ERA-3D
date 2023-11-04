@@ -25,31 +25,35 @@ global e3d = @record{}
 	note: 1 vm word = 4 bytes
 
 	SYSTEM MEMORY:
-		HEAP                (8MiB         ) 0x00000000 - 0x007FFFFF (general purpose RAM)
-		TEXMEM              (4MiB         ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
-		OBJMEM              (3MiB + 384KiB) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		AOBMEM              (8KiB         ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
-		SYSMEM              (632KiB       ) 0x00F62000 - 0x00FFFFFF (system state registers)
-			audio state     (1B           )                         (1 byte (track playing flags))
-			track state     (72B          )                         (8 * 9 bytes (bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
-		WAVMEM              (7MiB         ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
-		SEQMEM              (256KiB       ) 0x01700000 - 0x0173FFFF (audio sequencer data)
-			song data       (2KiB         )                         (256 * 8 bytes)
-			pattern data    (80KiB        )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
-			instrument data (2KiB + 768B  )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
-			groove data     (256B         )                         (16 * 16 bytes)
-			unused          (???KiB + ???B)                         (unused)
-		GLOBALS             (256KiB       ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
-		LOCALS              (256KiB       ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
-		ARGS                (256KiB       ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
+		HEAP                (8MiB          ) 0x00000000 - 0x007FFFFF (general purpose RAM)
+		TEXMEM              (4MiB          ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
+		OBJMEM              (3MiB + 384KiB ) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		AOBMEM              (8KiB          ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
+		SYSMEM              (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
+			audio state     (1B            )                         (1 byte (track playing flags))
+			track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
+			objmem map      (3KiB          )                         (OBJMEM map (256 entries; 3 words each (type, start, n)))
+			wavmem map      (2KiB          )                         (WAVMEM map (256 entries; 2 words each (start, end)))
+		WAVMEM              (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
+		SEQMEM              (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
+			song data       (2KiB          )                         (256 * 8 bytes)
+			pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
+			instrument data (2KiB + 768B   )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
+			groove data     (256B          )                         (16 * 16 bytes)
+			unused          (???KiB + ???B )                         (unused)
+		GLOBALS             (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
+		LOCALS              (256KiB        ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
+		ARGS                (256KiB        ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
 	CART ROM:
-		TEXBANK[0-3]        (16MiB        ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
-		OBJBANK[0-3]        (16MiB        ) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		WAVBANK[0-1]        (14MiB        ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
-		SEQBANK[0-7]        (2MiB         ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
-		ROM                 (16MiB        ) 0x04800000 - 0x057FFFFF (string data + user ROM)
+		TEXBANK[0-3]        (16MiB         ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
+		OBJBANK[0-3]        (13MiB + 512KiB) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		OMPBANK[0-3]        (1MiB + 256KiB ) 
+		WMPBANK[0-1]        (1MiB + 256KiB ) 
+		WAVBANK[0-1]        (14MiB         ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
+		SEQBANK[0-7]        (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
+		ROM                 (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
 	MEMORY CARD:
-		MEMCARD             (256KiB       ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
+		MEMCARD             (256KiB        ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
 ]]
 
 global e3d.VER_MAJOR <comptime> = 0
@@ -64,7 +68,9 @@ global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.TEXBANK_SIZE        <comptime> = (4*1024*1024)  --  16MiB
-global e3d.OBJBANK_SIZE        <comptime> = ((16*1024*1024)///4) --  16MiB
+global e3d.OBJBANK_SIZE        <comptime> = (((13*1024*1024)+(512*1024))///4) -- 13MiB + 512 KiB
+global e3d.OMPBANK_SIZE        <comptime> = ((13*1024*1024)+(512*1024)) -- 1MiB + 256 KiB
+global e3d.WMPBANK_SIZE        <comptime> = ((13*1024*1024)+(512*1024)) -- 1MiB + 256 KiB
 global e3d.WAVBANK_SIZE        <comptime> = ((14*1024*1024)///2) --  14MiB
 global e3d.SEQBANK_SIZE        <comptime> = (2*1024*1024)  --  2MiB
 global e3d.ROM_SIZE            <comptime> = (16*1024*1024) --  16MiB
@@ -90,7 +96,9 @@ local mem_regions = {
 
 	-- cart data
 	{name='TEXBANK', size=16 * 1024 * 1024},
-	{name='OBJBANK', size=16 * 1024 * 1024},
+	{name='OBJBANK', size=(13 * 1024 * 1024) + (512 * 1024)},
+	{name='OMPBANK', size=(1 * 1024 * 1024) + (256 * 1024)},
+	{name='WMPBANK', size=(1 * 1024 * 1024) + (256 * 1024)},
 	{name='WAVBANK', size=14 * 1024 * 1024},
 	{name='SEQBANK', size= 2 * 1024 * 1024},
 	{name='ROM',     size=16 * 1024 * 1024},
@@ -438,6 +446,8 @@ e3d.Identifier = @record {
 global e3d.Cart = @record {
 	texbank: [e3d.TEXBANK_SIZE]rl.color,
 	objbank: [e3d.OBJBANK_SIZE]util.IntFloat,
+	ompbank: [e3d.OMPBANK_SIZE]uint8,
+	wmpbank: [e3d.WMPBANK_SIZE]uint8,
 	wavbank: [e3d.WAVBANK_SIZE]BKFrame,
 	seqbank: [e3d.SEQBANK_SIZE]uint8,
 	rom: [e3d.ROM_SIZE]uint8,
@@ -468,6 +478,8 @@ e3d.EVM = @record {
 	hook_addresses: [3]uint16,
 	hook_flags: [3]boolean,
 	current_hook: uinteger,
+	objmap_ptr: *[0]uint8,
+	wavmap_ptr: *[0]uint8,
 	
 	-- compiler vars
 	src: [e3d.SRC_SIZE]uint8,

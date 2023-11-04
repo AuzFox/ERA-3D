@@ -3,13 +3,17 @@ require("statemachine")
 -- TODO: add basic ui to load source code files
 -- NOTE: consider using a gap buffer to implement editor
 
-global function stateCodeInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateCodeInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateCodeUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.CODE
+global function stateCodeEnter(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateCodeDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.CODE
+global function stateCodeExit(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateCodeUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateCodeDraw(sm: *StateMachine, vm: *e3d.EVM): void
 end

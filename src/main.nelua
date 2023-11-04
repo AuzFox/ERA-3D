@@ -22,36 +22,50 @@ local function init(): void
 	sm.states = {
 		{
 			stateBootInit,
+			stateBootEnter,
+			stateBootExit,
 			stateBootUpdate,
 			stateBootDraw
 		},
 		{
 			stateMainInit,
+			stateMainEnter,
+			stateMainExit,
 			stateMainUpdate,
 			stateMainDraw
 		},
 		{
 			stateCodeInit,
+			stateCodeEnter,
+			stateCodeExit,
 			stateCodeUpdate,
 			stateCodeDraw
 		},
 		{
 			stateTextureInit,
+			stateTextureEnter,
+			stateTextureExit,
 			stateTextureUpdate,
 			stateTextureDraw
 		},
 		{
 			stateModelInit,
+			stateModelEnter,
+			stateModelExit,
 			stateModelUpdate,
 			stateModelDraw
 		},
 		{
 			stateTrackerInit,
+			stateTrackerEnter,
+			stateTrackerExit,
 			stateTrackerUpdate,
 			stateTrackerDraw
 		},
 		{
 			stateRunInit,
+			stateRunEnter,
+			stateRunExit,
 			stateRunUpdate,
 			stateRunDraw
 		}
@@ -64,7 +78,7 @@ local function run(): void
 	while not rl.windowShouldClose() do
 		switch vm.io_state do
 			case e3d.IOState.IDLE then
-				sm:updateState(vm)
+				sm:updateState()
 		
 				vm.soundchip:updateAudio()
 
@@ -74,7 +88,7 @@ local function run(): void
 				end
 
 				rl.beginTextureMode(vm.gpu.gfx_rendertex)
-					sm:drawState(vm)
+					sm:drawState()
 					vm.gpu:resetMatrixStack()
 				rl.endTextureMode()
 
@@ -84,7 +98,7 @@ local function run(): void
 					rl.drawFPS(0, 0)
 				rl.endDrawing()
 
-				sm:setQueuedState()
+				sm:update()
 			case e3d.IOState.LOADING, e3d.IOState.SAVING then
 				vm:updateIOState()
 

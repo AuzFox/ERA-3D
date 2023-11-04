@@ -472,10 +472,6 @@ function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 	local fx: float32 = (@float32)($x)
 	local fy: float32 = (@float32)(y)
 
-	if fx <= -6.0 or y <= -9.0 or color.a == 0 then
-		return
-	end
-
 	if c < ' '_u8 then
 		c = '?'_u8
 	elseif c == ' '_u8 then
@@ -483,17 +479,21 @@ function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 		return
 	elseif c == '\t'_u8 then
 		$x = $x + 12 -- tabs = 2 spaces
+	else
+		$x = $x + 6
+	end
+
+	if fx <= -6.0 or y <= -9.0 or color.a == 0 then
+		return
 	end
 
 	local srcx: float32 = (@float32)((c %%% 32) * 6)
 	local srcy: float32 = (@float32)((c /// 32) * 9)
 
-	local src_rect: rl.rectangle = { srcx, srcy, 6.0, 9.0 };
-	local dest_rect: rl.rectangle = { fx, fy, 6.0, 9.0 };
+	local src_rect: rl.rectangle = {srcx, srcy, 6.0, 9.0}
+	local dest_rect: rl.rectangle = {fx, fy, 6.0, 9.0}
 
 	rl.drawTexturePro(self.gfx_font_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, color)
-
-	$x = $x + 6
 end
 
 -- print2D function for host program, doesn't do formatting
@@ -741,8 +741,8 @@ function GPU:loadTexBank(bank: uint8): void
 end
 
 function GPU:loadObjBank(bank: uint8): void
-	local src: *[0]util.IntFloat = &self.objbank_ptr[(1024*1024)*bank]
-	memory.copy(&self.objmem, src, GPU_OBJMEM_SIZE)
+	local src: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE * #util.IntFloat) * bank]
+	memory.copy(&self.objmem, src, GPU_OBJMEM_SIZE * #util.IntFloat)
 	self.update_tex = true
 end
 
@@ -772,7 +772,7 @@ function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32
 	end
 
 	local vertex_count: uint32
-	local bank_ptr: *[0]util.IntFloat = &self.objbank_ptr[(1024*1024)*bank_index]
+	local bank_ptr: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE * #util.IntFloat) * bank_index]
 
 	for i = 0, < model.meshCount do
 		local mesh: rl.mesh = (@*[0]rl.mesh)(model.meshes)[i]

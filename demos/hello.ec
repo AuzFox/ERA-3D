@@ -85,7 +85,7 @@ void draw() {
 
         // begin constructing our mesh
         //
-        // the argument to beginMesh determines the type of primitives we are constructing.
+        // the argument we give to beginMesh() determines the type of primitives we are constructing.
         // here, we are specifying that we want to construct triangles
         //
         // all possible primitive types are:
@@ -102,17 +102,27 @@ void draw() {
             // vertices contain the following data:
             //   vertex color   : a tint color applied to the vertex
             //   vertex UV      : 2D coordinates for the part of the texture to sample from
-            //   vertex normal  : a 3D vector that is for lighting
+            //   vertex normal  : a 3D vector pointing away from the surface of the mesh. used for lighting
             //   vertex position: 3D coordinates for the vertex
             //
             // for this demo, we will ignore everything except for the colors and positions
             
-            // establish a vertex color of red for the next vertex
+            // establish a vertex color of red for any following vertices.
+            // if we don't set a new color, every vertex we submit will use the previously set color.
+            // this also applies to UVs and normals, but not positions!
             meshColor(RED);
 
-
+            // define where in 3D space the vertex is.
+            // the coordinates we provide will be transformed using the current matrix,
+            // meaning the rotation we specified earlier will be applied to the vertices of the mesh.
+            // 
+            // IMPORTANT NOTE:
+            // meshVertex() finalizes the vertex and submits it to the mesh.
+            // set all other attributes (color, UV, normal) before calling meshVertex()
             meshVertex((vec3){0.0, 1.0, 0.0});
 
+            // repeat the previous two function calls to finish the triangle,
+            // supplying different colors and coordinates
             meshColor(GREEN);
             meshVertex((vec3){-1.0, -1.0, 0.0});
 
@@ -130,12 +140,22 @@ void draw() {
 
     // render some text in the center of the screen
     // 
-    // the screen is 320x240 pixels
-    //
-    // each character is 6x9 pixels
+    // the screen is 480x360 pixels.
+    // each character in the default font is 6 pixels wide and 9 pixels tall
+    // 
+    // strings are a built-in data type that contain two fields:
+    //   int length: the length of the string in bytes
+    //   void* data: a pointer to the location in memory where the string data is stored.
+    //               string literal data is stored in ROM and cannot be modified.
+    //               (it can be copied to RAM though)
     string text = "HELLO ERA-3D!";
 
-    int x = (SCREEN_WIDTH / 2) - ((text.length * CHAR_WIDTH) / 2); // x screen position
-    int y = (SCREEN_HEIGHT / 2) - (CHAR_HEIGHT / 2);               // y screen position
+    // calculate centered screen x position
+    int x = (SCREEN_WIDTH / 2) - ((text.length * CHAR_WIDTH) / 2);
+    
+    // calculate centered screen y position
+    int y = (SCREEN_HEIGHT / 2) - (CHAR_HEIGHT / 2);
+
+    // draw the text
     print2D(x, y, WHITE, text);
 }

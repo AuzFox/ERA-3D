@@ -117,6 +117,27 @@ function e3d.EVM:getArgStr(i: uint16): e3d.EVMString
 	return s
 end
 
+function e3d.EVM:getArgMat(i: uint16): rl.matrix
+	return {
+		self.args[self.ap + i].f,
+		self.args[self.ap + i + 1].f,
+		self.args[self.ap + i + 2].f,
+		self.args[self.ap + i + 3].f,
+		self.args[self.ap + i + 4].f,
+		self.args[self.ap + i + 5].f,
+		self.args[self.ap + i + 6].f,
+		self.args[self.ap + i + 7].f,
+		self.args[self.ap + i + 8].f,
+		self.args[self.ap + i + 9].f,
+		self.args[self.ap + i + 10].f,
+		self.args[self.ap + i + 11].f,
+		self.args[self.ap + i + 12].f,
+		self.args[self.ap + i + 13].f,
+		self.args[self.ap + i + 14].f,
+		self.args[self.ap + i + 15].f
+	}
+end
+
 function e3d.EVM:setArg(i: uint16, val: util.IntFloat): void
 	self.args[self.ap + i] = val
 end
@@ -186,6 +207,26 @@ function e3d.EVM:pushStr(val: e3d.EVMString): void
 	self.opstack[self.osp    ] = {u=val.len}
 	self.opstack[self.osp + 1] = {u=val.data}
 	self.osp = self.osp + 2
+end
+
+function e3d.EVM:pushMat(val: rl.matrix): void
+	self.opstack[self.osp    ].f = val.m0
+	self.opstack[self.osp + 1].f = val.m4
+	self.opstack[self.osp + 2].f = val.m8
+	self.opstack[self.osp + 3].f = val.m12
+	self.opstack[self.osp + 4].f = val.m1
+	self.opstack[self.osp + 5].f = val.m5
+	self.opstack[self.osp + 6].f = val.m9
+	self.opstack[self.osp + 7].f = val.m13
+	self.opstack[self.osp + 8].f = val.m2
+	self.opstack[self.osp + 9].f = val.m6
+	self.opstack[self.osp + 10].f = val.m10
+	self.opstack[self.osp + 11].f = val.m14
+	self.opstack[self.osp + 12].f = val.m3
+	self.opstack[self.osp + 13].f = val.m7
+	self.opstack[self.osp + 14].f = val.m11
+	self.opstack[self.osp + 15].f = val.m15
+	self.osp = self.osp + 16
 end
 
 function e3d.EVM:pop(): util.IntFloat

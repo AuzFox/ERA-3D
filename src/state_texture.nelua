@@ -2,13 +2,17 @@ require("statemachine")
 
 -- TODO: add basic ui to load texture files
 
-global function stateTextureInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateTextureInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateTextureUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.TEXTURE
+global function stateTextureEnter(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateTextureDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.TEXTURE
+global function stateTextureExit(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateTextureUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateTextureDraw(sm: *StateMachine, vm: *e3d.EVM): void
 end

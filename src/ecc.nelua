@@ -3877,6 +3877,20 @@ local function program(vm: *e3d.EVM): void
 	end
 
 	vm:popScope()
+
+	-- check if at least one hook function was declared
+	local declared: boolean
+	for i = 0, < e3d.Hook.COUNT do
+		if vm.hook_flags[i] then
+			declared = true
+			break
+		end
+	end
+
+	if not declared then
+		vm.error = string.format("COMPILE ERROR: no hook functions defined\n")
+		vm.compile_err = true
+	end
 end
 
 function e3d.EVM:compile(): boolean

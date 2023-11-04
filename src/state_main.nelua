@@ -1,15 +1,24 @@
 require("arg")
 require("statemachine")
 
-global function stateMainInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateMainInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateMainEnter(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateMainExit(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateMainUpdate(sm: *StateMachine, vm: *e3d.EVM): void
     local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
 
     if rl.isKeyPressed(rl.keyboardKey.B) then
-        print("-- BYTECODE --")
-        vm:dumpBytecode()
+        if vm.bytecode_len > 0 then
+            vm:dumpBytecode()
+        else
+            print("ERROR: no bytecode to dump")
+        end
     elseif rl.isKeyPressed(rl.keyboardKey.R) and is_ctrl_down then
         if vm:compile() then
             vm:resetVM(true)
@@ -41,7 +50,7 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
         io.printf('SEQBANK: 0x%08X - 0x%08X\n', e3d.SEQBANK_START_ADDR, e3d.SEQBANK_MAX_ADDR)
         io.printf('ROM:     0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
         io.printf('MEMCARD: 0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
-    elseif rl.isKeyPressed(rl.keyboardKey.S) then
+    elseif rl.isKeyPressed(rl.keyboardKey.S) and is_ctrl_down then
         vm:saveCart(arg[2],
             function(vm: *e3d.EVM, success: boolean): void
                 if success then
@@ -51,14 +60,8 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
                 end
             end
         )
-    elseif rl.isKeyPressed(rl.keyboardKey.L) then
+    elseif rl.isKeyPressed(rl.keyboardKey.O) then
         if is_ctrl_down then
-            if vm:loadData(arg[3], arg[4]) then
-                print("load OK!")
-            else
-                io.printf(vm.error)
-            end
-        else
             vm:loadCart(arg[1],
                 function(vm: *e3d.EVM, success: boolean): void
                     if success then
@@ -68,13 +71,17 @@ global function stateMainUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): 
                     end
                 end
             )
+        else
+            if vm:loadData(arg[3], arg[4]) then
+                print("load OK!")
+            else
+                io.printf(vm.error)
+            end
         end
     end
-
-    return StateID.MAIN
 end
 
-global function stateMainDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateMainDraw(sm: *StateMachine, vm: *e3d.EVM): void
     vm.gpu:clear(GPU_BLACK)
     
     vm.gpu:camera2D(0)
@@ -83,9 +90,7 @@ global function stateMainDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): in
     vm.gpu:print2D(6, 30, GPU_WHITE, "PRESS [B] TO DUMP BYTECODE")
     vm.gpu:print2D(6, 40, GPU_WHITE, "PRESS [M] TO SWITCH TO TRACKER")
     vm.gpu:print2D(6, 50, GPU_WHITE, "PRESS [P] TO PRINT MEMORY MAP")
-    vm.gpu:print2D(6, 60, GPU_WHITE, "PRESS [S] TO SAVE CART")
-    vm.gpu:print2D(6, 70, GPU_WHITE, "PRESS [L] TO LOAD CART")
-    vm.gpu:print2D(6, 80, GPU_WHITE, "PRESS [CTRL+L] TO LOAD ASSETS")
-
-    return StateID.MAIN
+    vm.gpu:print2D(6, 60, GPU_WHITE, "PRESS [CTRL+S] TO SAVE CART")
+    vm.gpu:print2D(6, 70, GPU_WHITE, "PRESS [CTRL+O] TO LOAD CART")
+    vm.gpu:print2D(6, 80, GPU_WHITE, "PRESS [O] TO LOAD ASSETS")
 end

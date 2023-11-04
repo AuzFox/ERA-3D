@@ -96,7 +96,7 @@ local hex_keys: [HEX_KEYS_COUNT]cint = {
 
 local data: TrackerData
 
-local function drawLevels(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+local function drawLevels(sm: *StateMachine, vm: *e3d.EVM): void
     local l: BKFrame = 0
     local r: BKFrame = 0
 
@@ -112,8 +112,9 @@ local function drawLevels(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
     --print("left", l, "right", r)
 end
 
-local function drawSong(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:print2D(18, 9, GPU_WHITE, "SEQBANK 0")
+local function drawSong(sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:print2D(18, 9, GPU_WHITE, "SEQBANK")
+    vm.gpu:printHexNibble2D(66, 9, GPU_WHITE, vm.soundchip.current_seqbank - SoundchipBank.SEQBANK0)
 
     local start_row: int32 = util.midI(0, data.song_y - 3, 248)
 
@@ -153,7 +154,7 @@ local function getNoteText(note: uint8): string
     end
 end
 
-local function drawPatterns(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+local function drawPatterns(sm: *StateMachine, vm: *e3d.EVM): void
     local start_track: int32 = util.midI(0, data.track - 1, 4)
     local start_pattern_y: int32 = 108
 
@@ -294,7 +295,7 @@ local function doHexInput(vm: *e3d.EVM, byte_ptr: *[0]uint8, nibble_index: uinte
     return pressed
 end
 
-global function stateTrackerInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateTrackerInit(sm: *StateMachine, vm: *e3d.EVM): void
     data.clipboard_len = 0
     data.clipboard_type = 0
     data.selection_start = 0
@@ -311,9 +312,28 @@ global function stateTrackerInit(this: *State, sm: *StateMachine, vm: *e3d.EVM):
     data.prev_instrument = 0
 end
 
-global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateTrackerEnter(sm: *StateMachine, vm: *e3d.EVM): void
+	vm.soundchip:setBankPointers(
+        SoundchipBank.WAVBANK0,
+        SoundchipBank.SEQBANK0
+    )
+end
+
+global function stateTrackerExit(sm: *StateMachine, vm: *e3d.EVM): void
+    vm.soundchip:setBankPointers(
+        SoundchipBank.SYSTEM,
+        SoundchipBank.SYSTEM
+    )
+end
+
+global function stateTrackerUpdate(sm: *StateMachine, vm: *e3d.EVM): void
     local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
     local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
+
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        sm:back()
+        return
+    end
 
     if rl.isKeyPressed(rl.keyboardKey.SPACE) then
         if vm.soundchip.audio_state.playing_flags ~= 0 then
@@ -321,14 +341,14 @@ global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM
         else
             vm.soundchip:playSongRow(data.song_y)
         end
-        return StateID.TRACKER
+        return
     end
 
     if vm.soundchip.audio_state.playing_flags ~= 0 then
         local ts: *TrackState = vm.soundchip:getTrackState(data.track)
         data.song_y = ts.song_pos
         data.pattern_y = ts.pattern_pos
-        return StateID.TRACKER
+        return
     end
     
     if rl.isKeyPressed(rl.keyboardKey.MINUS) then
@@ -338,10 +358,10 @@ global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM
     elseif is_ctrl_down then
         if data.current_editor == Editor.SONG and rl.isKeyPressed(rl.keyboardKey.DOWN) then
             data.current_editor = Editor.PATTERN
-            return StateID.TRACKER
+            return
         elseif data.current_editor == Editor.PATTERN and rl.isKeyPressed(rl.keyboardKey.UP) then
             data.current_editor = Editor.SONG
-            return StateID.TRACKER
+            return
         end
     end
 
@@ -473,11 +493,9 @@ global function stateTrackerUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM
                 end
             end
     end
-    
-    return StateID.TRACKER
 end
 
-global function stateTrackerDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
+global function stateTrackerDraw(sm: *StateMachine, vm: *e3d.EVM): void
     vm.gpu:clear(GPU_BLACK)
     
     --[[
@@ -508,9 +526,7 @@ global function stateTrackerDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM):
 
     vm.gpu:camera2D(0)
 
-    --drawLevels(this, sm, vm)
-    drawSong(this, sm, vm)
-    drawPatterns(this, sm, vm)
-
-    return StateID.TRACKER
+    --drawLevels(sm, vm)
+    drawSong(sm, vm)
+    drawPatterns(sm, vm)
 end

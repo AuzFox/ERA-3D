@@ -14,68 +14,67 @@ global StateID = @enum {
 global State <forwarddecl> = @record {}
 global StateMachine <forwarddecl> = @record {}
 
-global StateInitFunction: type = @function(*State, *StateMachine, *e3d.EVM): void
-global StateFunction: type = @function(*State, *StateMachine, *e3d.EVM): integer
+global StateFunction: type = @function(*StateMachine, *e3d.EVM): void
 
 State = @record {
-    init: StateInitFunction,
+    init: StateFunction,
+    enter: StateFunction,
+    exit: StateFunction,
     update: StateFunction,
-    draw: StateFunction,
-    metadata: pointer -- generic metadata pointer
+    draw: StateFunction
 }
 
 StateMachine = @record {
     states: [StateID.COUNT]State,
-    state_id: integer,
     state_ptr: *State,
+    vm_ptr: *e3d.EVM,
+    state_id: integer,
     queued_state: integer,
     prev_state: integer
 }
 
-function StateMachine:initState(vm: *e3d.EVM): void
-    self.state_ptr.init(self.state_ptr, self, vm)
+function StateMachine:initState(): void
+    self.state_ptr.init(self, self.vm_ptr)
 end
 
-function StateMachine:updateState(vm: *e3d.EVM): void
-    local new_state: integer = self.state_ptr.update(self.state_ptr, self, vm)
-    if new_state ~= self.state_id then
-        if self.state_id ~= StateID.RUN then
-            self.prev_state = self.state_id
-        end
-        
-        self.state_id = new_state
-        self.state_ptr = &self.states[self.state_id]
-    end
+function StateMachine:updateState(): void
+    self.state_ptr.update(self, self.vm_ptr)
 end
 
-function StateMachine:drawState(vm: *e3d.EVM): void
-    local new_state: integer = self.state_ptr.draw(self.state_ptr, self, vm)
-    if new_state ~= self.state_id then
-        if self.state_id ~= StateID.RUN then
-            self.prev_state = self.state_id
-        end
-        
-        self.state_id = new_state
-        self.state_ptr = &self.states[self.state_id]
-    end
+function StateMachine:drawState(): void
+    self.state_ptr.draw(self, self.vm_ptr)
+end
+
+function StateMachine:back(): void
+    self.queued_state = self.prev_state
 end
 
 function StateMachine:init(vm: *e3d.EVM): void
+    self.vm_ptr = vm
+
     for i = 0, < StateID.COUNT do
         local st: *State = &self.states[i]
-        st.init(st, self, vm)
+        st.init(self, vm)
     end
     
     self.state_id = StateID.MAIN -- start with main state
     self.state_ptr = &self.states[self.state_id]
     self.queued_state = -1
     self.prev_state = self.state_id
+
+    self.state_ptr.enter(self, vm)
 end
 
-function StateMachine:setQueuedState(): void
+function StateMachine:update(): void
     if self.queued_state ~= -1 then
+        self.state_ptr.exit(self, self.vm_ptr)
+        
+        self.prev_state = self.state_id
         self.state_id = self.queued_state
         self.state_ptr = &self.states[self.state_id]
+
+        self.state_ptr.enter(self, self.vm_ptr)
+        
         self.queued_state = -1
     end
 end

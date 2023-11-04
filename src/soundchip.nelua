@@ -1,5 +1,5 @@
-require("blipkit")
-require("raylib")
+require("third_party/blipkit")
+require("third_party/raylib")
 
 -- TODO: implement playback from SEQBANK
 
@@ -15,6 +15,20 @@ global SoundchipBank = @enum {
 	SEQBANK5,
 	SEQBANK6,
 	SEQBANK7
+}
+
+-- playflags byte:
+-- M L 0 0 0 0 PM
+-- M = mute
+-- L = loop
+-- PM = playmode (2 bits)
+global PlayFlags = @enum {
+	PLAY_SONG = 0,
+	PLAY_PATTERN,
+	PLAY_SAMPLE,
+	PLAY_MASK = 0b00000011,
+	MUTE      = 0b10000000,
+	LOOP      = 0b01000000
 }
 
 global SOUNDCHIP_TRACK_COUNT <comptime> = 8
@@ -60,6 +74,7 @@ global TrackContext = @record {
 
 -- track state object, stored in sysmem
 global TrackState = @record {
+	playflags: uint8,
 	bpm: uint8,
 	volume: uint8,
 	pan: uint8,
@@ -167,17 +182,25 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 	
 	-- is track playing?
 	if (sc.audio_state.playing_flags & (0x80 >> track_index)) ~= 0 then
-		-- get track state pointer from seqmem
 		local state: *TrackState = sc:getTrackState(track_index)
+
+		if (state.playflags & PlayFlags.MUTE) ~= 0 then
+			BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, 0)
+		end
 
 		if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
 			sc:stopTrack(track_index)
 			return 0
 		end
+
+		local playmode: uint8 = state.playflags & PlayFlags.PLAY_MASK
+
+		if playmode >= PlayFlags.PLAY_SAMPLE then
+			return 0
+		end
 		
 		state.pattern_pos = math.min(63, state.pattern_pos)
 
-		-- get pattern row pointer
 		local pattern_row: *[0]uint8 = sc:getPatternRow(state.pattern_id, state.pattern_pos)
 
 		local note: uint8 = pattern_row[0]
@@ -213,12 +236,24 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 		if state.pattern_pos > 63 then
 			state.pattern_pos = 0
 
+			if playmode == PlayFlags.PLAY_PATTERN then
+				if (state.playflags & PlayFlags.LOOP) == 0 then
+					sc:stopTrack(track_index)
+				end
+				return 0	
+			end
+
 			state.song_pos = state.song_pos + 1
 
 			state.pattern_id = sc.song_data[(@uint8)(state.song_pos * 8 + track_index)]
 			if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
-				sc:stopTrack(track_index)
-				return 0
+				if (state.playflags & PlayFlags.LOOP) ~= 0 then
+					-- TODO: search upward for first empty song row for track,
+					--       play from the song row after that
+					sc:stopTrack(track_index)
+				else
+					sc:stopTrack(track_index)
+				end
 			end
 		end
 	else
@@ -236,27 +271,59 @@ function SoundChip:stopAllTracks(): void
 	self:stopPreviewNote()
 end
 
-function SoundChip:playPattern(track: uint8, pattern: uint8): void
-	if pattern == SOUNDCHIP_EMPTY_VALUE then
+function SoundChip:playTrack(track: uint8, song_row: uint8): void
+	local state: *TrackState = self:getTrackState(track)
+	local pattern_id: uint8 = self.song_data[((@uinteger)(song_row) * 8) + track]
+
+	if pattern_id == SOUNDCHIP_EMPTY_VALUE then
 		self:stopTrack(track)
 	else
 		self.audio_state.playing_flags = self.audio_state.playing_flags | (0x80 >> track)
-		local state: *TrackState = self:getTrackState(track)
-		state.pattern_id = pattern
+		state.playflags = PlayFlags.PLAY_SONG
+		state.song_pos = song_row
+		state.pattern_id = pattern_id
 		state.pattern_pos = 0
 	end
 end
 
 function SoundChip:playSongRow(song_row: uint8): void
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
-		local state: *TrackState = self:getTrackState(i)
-		local pattern_id: uint8 = self.song_data[((@uinteger)(song_row) * 8) + i]
-
-		state.song_pos = song_row
-		state.pattern_id = pattern_id
-		state.pattern_pos = 0
-		self:playPattern(i, pattern_id)
+		self:playTrack(i, song_row)
 	end
+end
+
+function SoundChip:playPattern(track: uint8, pattern: uint8): void
+	if pattern == SOUNDCHIP_EMPTY_VALUE then
+		self:stopTrack(track)
+	else
+		self.audio_state.playing_flags = self.audio_state.playing_flags | (0x80 >> track)
+		local state: *TrackState = self:getTrackState(track)
+
+		state.playflags = PlayFlags.PLAY_PATTERN
+		state.pattern_id = pattern
+		state.pattern_pos = 0
+	end
+end
+
+function SoundChip:playSampleEx(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8, flags: uint8): void
+	local tc: *TrackContext = &self.track_contexts[track]
+	local state: *TrackState = self:getTrackState(track)
+
+	
+end
+
+function SoundChip:playSample(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8): void
+	self:playSampleEx(track, start, send, note, volume, 0)
+end
+
+function SoundChip:muteTrack(track: uint8): void
+	local state: *TrackState = self:getTrackState(track)
+	state.playflags = state.playflags | PlayFlags.MUTE
+end
+
+function SoundChip:unmuteTrack(track: uint8): void
+	local state: *TrackState = self:getTrackState(track)
+	state.playflags = state.playflags & ~PlayFlags.MUTE
 end
 
 function SoundChip:updateAudio(): void
@@ -282,10 +349,10 @@ local function setBKDataPointer(data: *BKData, frame_data: pointer, data_size: B
 	if num_bits <= 8 then
 		packet_size = (num_bits * num_channels)
 	else
-		packet_size = (num_bits + 3) /// 4 * 4 * num_channels;
+		packet_size = (num_bits + 3) /// 4 * 4 * num_channels
 	end
 
-	num_frames = data_size_bits /// packet_size * num_channels;
+	num_frames = data_size_bits /// packet_size * num_channels
 
 	data.frames = (@*BKFrame)(frame_data)
 	data.numFrames = num_frames /// num_channels
@@ -293,8 +360,12 @@ local function setBKDataPointer(data: *BKData, frame_data: pointer, data_size: B
 	data.numBits = num_bits
 end
 
-function SoundChip:updateBankPointers(): void
+function SoundChip:setBankPointers(wavbank_index: uint8, seqbank_index: uint8): void
 	local wp: pointer
+
+	self.current_wavbank = wavbank_index
+	self.current_seqbank = seqbank_index
+
 	if self.current_wavbank == SoundchipBank.SYSTEM then
 		wp = &self.wavmem
 	else
@@ -370,6 +441,7 @@ function SoundChip:resetSoundchip(): void
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
 		local state: *TrackState = self:getTrackState(i)
+		state.playflags = 0
 		state.bpm = 154
 		state.volume = 127
 		state.pan = 0
@@ -407,9 +479,11 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	else
 		self.bk_data_flags = self.bk_data_flags | BK_BIG_ENDIAN
 	end
-	self.current_wavbank = SoundchipBank.WAVBANK0
-	self.current_seqbank = SoundchipBank.WAVBANK1
-	self:updateBankPointers()
+
+	self:setBankPointers(
+		SoundchipBank.SYSTEM,
+		SoundchipBank.SYSTEM
+	)
 	self.audio_state = (@*AudioState)(&self.sysmem_ptr[0])
 	self.track_state = (@*[0]uint8)(&self.sysmem_ptr[1])
 

@@ -2,13 +2,17 @@ require("statemachine")
 
 -- TODO: add basic ui to load model files
 
-global function stateModelInit(this: *State, sm: *StateMachine, vm: *e3d.EVM): void
+global function stateModelInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateModelUpdate(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.MODEL
+global function stateModelEnter(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
-global function stateModelDraw(this: *State, sm: *StateMachine, vm: *e3d.EVM): integer
-    return StateID.MODEL
+global function stateModelExit(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateModelUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+end
+
+global function stateModelDraw(sm: *StateMachine, vm: *e3d.EVM): void
 end
