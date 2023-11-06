@@ -313,7 +313,7 @@ global function stateTrackerInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateTrackerEnter(sm: *StateMachine, vm: *e3d.EVM): void
-	vm.soundchip:setBankPointers(
+    vm.soundchip:setBankPointers(
         SoundchipBank.WAVBANK0,
         SoundchipBank.SEQBANK0
     )

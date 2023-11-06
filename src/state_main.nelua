@@ -46,6 +46,8 @@ global function stateMainUpdate(sm: *StateMachine, vm: *e3d.EVM): void
         io.printf('ARGS:    0x%08X - 0x%08X\n', e3d.ARGS_START_ADDR, e3d.ARGS_MAX_ADDR)
         io.printf('TEXBANK: 0x%08X - 0x%08X\n', e3d.TEXBANK_START_ADDR, e3d.TEXBANK_MAX_ADDR)
         io.printf('OBJBANK: 0x%08X - 0x%08X\n', e3d.OBJBANK_START_ADDR, e3d.OBJBANK_MAX_ADDR)
+        io.printf('OMPBANK: 0x%08X - 0x%08X\n', e3d.OMPBANK_START_ADDR, e3d.OMPBANK_MAX_ADDR)
+        io.printf('WMPBANK: 0x%08X - 0x%08X\n', e3d.WMPBANK_START_ADDR, e3d.WMPBANK_MAX_ADDR)
         io.printf('WAVBANK: 0x%08X - 0x%08X\n', e3d.WAVBANK_START_ADDR, e3d.WAVBANK_MAX_ADDR)
         io.printf('SEQBANK: 0x%08X - 0x%08X\n', e3d.SEQBANK_START_ADDR, e3d.SEQBANK_MAX_ADDR)
         io.printf('ROM:     0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)

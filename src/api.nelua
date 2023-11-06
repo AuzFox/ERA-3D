@@ -2310,26 +2310,31 @@ local function apiSprite2DEx(vm: *e3d.EVM): boolean
 	return true
 end
 
-local function apiDrawModel(vm: *e3d.EVM): boolean
+local function apiDrawObj(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void drawModel(int id);
+	-- void drawObj(int id);
 
 	local id: uint32 = vm:getArgU(0)
 
-	vm.gpu:drawModel(id)
+	if id > 511 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid OBJMAP entry `%d`\n", id)
+		return false
+	end
+
+	vm.gpu:drawObj(id)
 
 	return true
 end
 
-local function apiDrawModelEx(vm: *e3d.EVM): boolean
+local function apiDrawObjEx(vm: *e3d.EVM): boolean
 	-- signature:
-	-- void drawModelEx(int mode, int start, int n);
+	-- void drawObjEx(int mode, int start, int n);
 
 	local mode: uint32 = vm:getArgU(0)
 	local start: uint32 = vm:getArgU(1)
 	local n: uint32 = vm:getArgU(2)
 
-	vm.gpu:drawModelEx(mode, start, n)
+	vm.gpu:drawObjEx(mode, start, n)
 
 	return true
 end
@@ -2669,8 +2674,13 @@ local function apiPlayWav(vm: *e3d.EVM): boolean
 	-- void playWav(int track, int id);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
-	local id: uint8 = (@uint8)(vm:getArgU(1))
+	local id: uint32 = vm:getArgU(1)
 	local volume: uint8 = (@uint8)(vm:getArgU(2))
+
+	if id > 511 then
+		vm.error = string.format("RUNTIME ERROR: attempt to load invalid WAVMAP entry `%d`", id)
+		return false
+	end
 
 	vm.soundchip:playWav(track, id, volume)
 
@@ -4472,22 +4482,22 @@ function e3d.EVM:registerAPI(): void
 			func=apiSprite2DEx
 		},
 		{
-			name="drawModel",
+			name="drawObj",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{e3d.EVMType.INT}
 			},
-			func=apiDrawModel
+			func=apiDrawObj
 		},
 		{
-			name="drawModelEx",
+			name="drawObjEx",
 			type_info={e3d.EVMType.VOID},
 			argdata={
 				{e3d.EVMType.INT},
 				{e3d.EVMType.INT},
 				{e3d.EVMType.INT}
 			},
-			func=apiDrawModelEx
+			func=apiDrawObjEx
 		},
 		{
 			name="playSong",

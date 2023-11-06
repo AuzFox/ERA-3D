@@ -107,7 +107,7 @@ void draw() {
     setLightingMode(true);
     pushMatrix();
         //texture(0, 64, 64, 64);
-        drawModelEx(1, 0, 94);
+        drawObjEx(1, 0, 94);
     popMatrix();
 
     pushMatrix();

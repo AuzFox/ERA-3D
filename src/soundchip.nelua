@@ -1,5 +1,5 @@
-require("third_party/blipkit")
-require("third_party/raylib")
+require("blipkit")
+require("raylib")
 
 -- TODO: implement playback from SEQBANK
 
@@ -53,9 +53,12 @@ global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
 global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
 global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
-global SOUNDCHIP_WAVMEM_SIZE <comptime> = ((7*1024*1024)///2) -- 7 MiB of 16 bit audio samples
-global SOUNDCHIP_SEQMEM_SIZE <comptime> = 256*1024 -- 256 KiB
-global SOUNDCHIP_AOBMEM_SIZE <comptime> = SOUNDCHIP_FRAMES_PER_UPDATE*2 -- 8 KiB
+global SOUNDCHIP_WAVMEM_SIZE <comptime> = ((7 * 1024 * 1024) /// 2) -- 7 MiB of 16 bit audio samples
+global SOUNDCHIP_SEQMEM_SIZE <comptime> = 256 * 1024 -- 256 KiB
+global SOUNDCHIP_AOBMEM_SIZE <comptime> = SOUNDCHIP_FRAMES_PER_UPDATE * 2 -- 8 KiB
+
+global SOUNDCHIP_WMPBANK_SIZE <comptime> = ((13 * 1024 * 1024) + (512 * 1024)) -- 1MiB + 256 KiB
+global SOUNDCHIP_WAVMAP_SIZE <comptime> = (512 * 8) -- 4KiB
 
 global SoundChip <forwarddecl> = @record {}
 
@@ -309,15 +312,50 @@ end
 function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8, flags: uint8): void
 	local tc: *TrackContext = &self.track_contexts[track]
 	local state: *TrackState = self:getTrackState(track)
-
 	
+	local range: [2]BKInt = {start, send}
+	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
+	BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & 0b10000000 ~= 0) and BK_REPEAT or BK_NO_REPEAT)
+	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, 0, 0, BK_MAX_VOLUME, 4)
+		
+	BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4)
+	if volume ~= SOUNDCHIP_EMPTY_VALUE then
+		local percentage: float32 = (@float32)(volume) / 254.0
+		local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+		BKSetAttr(&tc.bk_track, BK_VOLUME, value)-- note volume
+	end
+
+	if note ~= SOUNDCHIP_EMPTY_VALUE then
+		local bknote: BKInt
+		if note == SOUNDCHIP_NOTE_MUTE then
+			bknote = BK_NOTE_MUTE
+		elseif note == SOUNDCHIP_NOTE_RELEASE then
+			bknote = BK_NOTE_RELEASE
+		else
+			bknote = (@BKInt)(note) * BK_FINT20_UNIT
+		end
+		
+		BKSetAttr(&tc.bk_track, BK_NOTE, bknote)
+	else
+		self:stopTrack(track)
+		return
+	end
+
+	self.audio_state.playing_flags = self.audio_state.playing_flags | (0x80 >> track)
+	state.playflags = PlayFlags.PLAY_SAMPLE
 end
 
-function SoundChip:playWav(track: uint8, id: uint8, volume: uint8): void
-	-- get entry from wavmap
-	-- ...
+function SoundChip:playWav(track: uint8, id: uint32, volume: uint8): void
+	-- get wavmap entry pointer
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[(84 + (512 * 12)) + (id * 12)])
 
-	--self:playSampleEx(track, start, send, BK_C_4, volume, 0)
+	-- get start
+	local start: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
+
+	-- get send
+	local send: uint32 = ((@uint32)(entry_ptr[4]) << 24) | ((@uint32)(entry_ptr[5]) << 16) | ((@uint32)(entry_ptr[6]) << 8) | (@uint32)(entry_ptr[7])
+
+	self:playWavEx(track, start, send, BK_C_4, volume, 0)
 end
 
 function SoundChip:muteTrack(track: uint8): void
@@ -371,7 +409,7 @@ function SoundChip:setBankPointers(wavbank_index: uint8, seqbank_index: uint8): 
 	self.current_seqbank = seqbank_index
 
 	if self.current_wavbank == SoundchipBank.SYSTEM then
-		wp = &self.wavmem
+		wp = &self.wavmem[0]
 	else
 		local index: uinteger = self.current_wavbank - SoundchipBank.WAVBANK0
 		wp = &self.wavbank_ptr[(7*1024*1024) * index]
@@ -396,10 +434,14 @@ function SoundChip:setBankPointers(wavbank_index: uint8, seqbank_index: uint8): 
 end
 
 function SoundChip:loadWavBank(bank: uint8): void
+	-- load wavbank
 	local src: *[0]BKFrame = &self.wavbank_ptr[SOUNDCHIP_WAVMEM_SIZE * bank]
 	memory.copy(&self.wavmem, src, SOUNDCHIP_WAVMEM_SIZE * 2)
 
 	-- load wmpbank
+	local wavmap_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[(84 + (512 * 12))])
+	local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.wmpbank_ptr[(SOUNDCHIP_WAVMAP_SIZE * bank)])
+	memory.copy(wavmap_ptr, bank_ptr, SOUNDCHIP_WAVMAP_SIZE)
 end
 
 function SoundChip:loadSeqBank(bank: uint8): void
@@ -416,7 +458,7 @@ function SoundChip:loadAudioSample(filename: string, bank_index: uint32, start_i
 
 	start_index = start_index * 2
 
-	print(wave.channels, wave.sampleSize, wave.sampleRate, wave.frameCount)
+	--print(wave.channels, wave.sampleSize, wave.sampleRate, wave.frameCount)
 
 	local frames: *[0]BKFrame = (@*[0]BKFrame)(wave.data)
 	local frame_count: uint32
@@ -494,9 +536,9 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	self.audio_state = (@*AudioState)(&self.sysmem_ptr[0])
 	self.track_state = (@*[0]uint8)(&self.sysmem_ptr[1])
 
-	--local success: boolean
-	--local i0_start: uint32 = 0
-	--local i0_count: uint32 = 0
+	local success: boolean
+	local i0_start: uint32 = 0
+	local i0_count: uint32 = 0
 	--local i1_start: uint32 = 0
 	--local i1_count: uint32 = 0
 	--local i2_start: uint32 = 0
@@ -511,6 +553,7 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	--success, i2_count = self:loadAudioSample("test_data/recog.wav", 0, i2_start)
 	--i3_start = i2_start + i2_count
 	--success, i3_count = self:loadAudioSample("test_data/pluck.wav", 0, i3_start)
+	success, i0_count = self:loadAudioSample("test_data/175_thebasix.wav", 0, 0)
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -575,22 +618,22 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	-- reset instruments
 	-- ...
 
-	--local instr0: *[0]uint8 = self:getInstrument(0)
+	local instr0: *[0]uint8 = self:getInstrument(0)
 	--local instr1: *[0]uint8 = self:getInstrument(1)
 	--local instr2: *[0]uint8 = self:getInstrument(2)
 	--local instr3: *[0]uint8 = self:getInstrument(3)
 
-	--instr0[0] = 0
-	--instr0[1] = (i0_start >> 16) & 0xFF
-	--instr0[2] = (i0_start >> 8) & 0xFF
-	--instr0[3] = (i0_start) & 0xFF
-	--instr0[4] = ((i0_start + i0_count) >> 16) & 0xFF
-	--instr0[5] = ((i0_start + i0_count) >> 8) & 0xFF
-	--instr0[6] = ((i0_start + i0_count)) & 0xFF
-	--instr0[7] = 0
-	--instr0[8] = 0
-	--instr0[9] = 255
-	--instr0[10] = 4
+	instr0[0] = 0
+	instr0[1] = (i0_start >> 16) & 0xFF
+	instr0[2] = (i0_start >> 8) & 0xFF
+	instr0[3] = (i0_start) & 0xFF
+	instr0[4] = ((i0_start + i0_count) >> 16) & 0xFF
+	instr0[5] = ((i0_start + i0_count) >> 8) & 0xFF
+	instr0[6] = ((i0_start + i0_count)) & 0xFF
+	instr0[7] = 0
+	instr0[8] = 0
+	instr0[9] = 255
+	instr0[10] = 4
 
 	--instr1[0] = 0
 	--instr1[1] = (i1_start >> 16) & 0xFF

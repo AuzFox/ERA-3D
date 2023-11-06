@@ -32,8 +32,9 @@ global e3d = @record{}
 		SYSMEM              (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
 			audio state     (1B            )                         (1 byte (track playing flags))
 			track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
-			objmem map      (3KiB          )                         (OBJMEM map (256 entries; 3 words each (type, start, n)))
-			wavmem map      (2KiB          )                         (WAVMEM map (256 entries; 2 words each (start, end)))
+			padding         (3B            )                         (unused)
+			objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
+			wavmem map      (4KiB          )                         (WAVMEM map (512 entries; 2 words each (start, end)))
 		WAVMEM              (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
 		SEQMEM              (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
 			song data       (2KiB          )                         (256 * 8 bytes)
@@ -46,9 +47,9 @@ global e3d = @record{}
 		ARGS                (256KiB        ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
 	CART ROM:
 		TEXBANK[0-3]        (16MiB         ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
-		OBJBANK[0-3]        (13MiB + 512KiB) 0x02800000 - 0x037FFFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		OMPBANK[0-3]        (1MiB + 256KiB ) 
-		WMPBANK[0-1]        (1MiB + 256KiB ) 
+		OBJBANK[0-3]        (13MiB + 512KiB) 0x02800000 - 0x0357FFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		OMPBANK[0-3]        (1MiB + 256KiB ) 0x03580000 - 0x036BFFFF (4x maps for OBJBANK[0-3])
+		WMPBANK[0-1]        (1MiB + 256KiB ) 0x036C0000 - 0x037FFFFF (2x maps for WAVBANK[0-1])
 		WAVBANK[0-1]        (14MiB         ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
 		SEQBANK[0-7]        (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
 		ROM                 (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
@@ -61,21 +62,17 @@ global e3d.VER_MINOR <comptime> = 0
 global e3d.VER_PATCH <comptime> = 0
 
 -- memory size and address constants
-global e3d.SRC_SIZE            <comptime> = 1024*1024
-global e3d.HEAP_SIZE           <comptime> = (1024*1024*8) -- 8MiB
-global e3d.SYSMEM_SIZE         <comptime> = (632*1024) -- 632KiB
+global e3d.SRC_SIZE            <comptime> = 1024 * 1024
+global e3d.HEAP_SIZE           <comptime> = (1024 * 1024 * 8) -- 8MiB
+global e3d.SYSMEM_SIZE         <comptime> = (632 * 1024) -- 632KiB
 global e3d.GLOBALS_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.LOCALS_SIZE         <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.ARGS_SIZE           <comptime> = 65536 -- 256KiB (65536 words)
-global e3d.TEXBANK_SIZE        <comptime> = (4*1024*1024) -- 16MiB
-global e3d.OBJBANK_SIZE        <comptime> = (((13*1024*1024)+(512*1024))///4) -- 13MiB + 512 KiB
-global e3d.OMPBANK_SIZE        <comptime> = ((13*1024*1024)+(512*1024)) -- 1MiB + 256 KiB
-global e3d.WMPBANK_SIZE        <comptime> = ((13*1024*1024)+(512*1024)) -- 1MiB + 256 KiB
-global e3d.WAVBANK_SIZE        <comptime> = ((14*1024*1024)///2) -- 14MiB
-global e3d.OBJMAP_SIZE         <comptime> = (3*1024) -- 3KiB
-global e3d.WAVMAP_SIZE         <comptime> = (2*1024) -- 2KiB
-global e3d.SEQBANK_SIZE        <comptime> = (2*1024*1024) -- 2MiB
-global e3d.ROM_SIZE            <comptime> = (16*1024*1024) -- 16MiB
+global e3d.TEXBANK_SIZE        <comptime> = (4 * 1024 * 1024) -- 16MiB
+global e3d.OBJBANK_SIZE        <comptime> = (((13 * 1024 * 1024) + (512 * 1024)) ///4 ) -- 13MiB + 512 KiB
+global e3d.WAVBANK_SIZE        <comptime> = ((14 * 1024 * 1024) /// 2) -- 14MiB
+global e3d.SEQBANK_SIZE        <comptime> = (2 * 1024 * 1024) -- 2MiB
+global e3d.ROM_SIZE            <comptime> = (16 * 1024 * 1024) -- 16MiB
 global e3d.OPSTACK_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.BYTECODE_SIZE       <comptime> = 65536 -- 64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE      <comptime> = 256
@@ -448,8 +445,8 @@ e3d.Identifier = @record {
 global e3d.Cart = @record {
 	texbank: [e3d.TEXBANK_SIZE]rl.color,
 	objbank: [e3d.OBJBANK_SIZE]util.IntFloat,
-	ompbank: [e3d.OMPBANK_SIZE]uint8,
-	wmpbank: [e3d.WMPBANK_SIZE]uint8,
+	ompbank: [GPU_OMPBANK_SIZE]uint8,
+	wmpbank: [SOUNDCHIP_WMPBANK_SIZE]uint8,
 	wavbank: [e3d.WAVBANK_SIZE]BKFrame,
 	seqbank: [e3d.SEQBANK_SIZE]uint8,
 	rom: [e3d.ROM_SIZE]uint8,

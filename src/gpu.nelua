@@ -34,6 +34,9 @@ global GPU_TEXMEM_HEIGHT <comptime> = 1024
 global GPU_TEXMEM_SIZE <comptime> = (GPU_TEXMEM_WIDTH * GPU_TEXMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
 global GPU_OBJMEM_SIZE <comptime> = (32768 * 3 * 9) -- 32768 triangles, 9 IntFloats per vertex
 
+global GPU_OMPBANK_SIZE <comptime> = ((13 * 1024 * 1024) + (512 * 1024)) -- 1MiB + 256 KiB
+global GPU_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
+
 global GPU_LIGHTS_COUNT <comptime> = 8
 local lightAttribute = @enum {
 	ENABLED = 0,
@@ -622,7 +625,7 @@ function GPU:uploadOBJMEMVertex(index: uint32): void
 	self:vertex({self.objmem[word_index].f, self.objmem[word_index + 1].f, self.objmem[word_index + 2].f})
 end
 
-function GPU:drawModelEx(mode: uint32, start: uint32, n: uint32): void
+function GPU:drawObjEx(mode: uint32, start: uint32, n: uint32): void
 	if n == 0 then
 		return
 	end
@@ -655,11 +658,20 @@ function GPU:drawModelEx(mode: uint32, start: uint32, n: uint32): void
 	self:endMesh()
 end
 
-function GPU:drawModel(id: uint8): void
-	-- get data from objmap
-	-- ...
+function GPU:drawObj(id: uint32): void
+	-- get objmap entry pointer
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[84 + (id * 12)])
 
-	--self:drawModelEx(mode, start, n)
+	-- get mode
+	local mode: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
+
+	-- get start
+	local start: uint32 = ((@uint32)(entry_ptr[4]) << 24) | ((@uint32)(entry_ptr[5]) << 16) | ((@uint32)(entry_ptr[6]) << 8) | (@uint32)(entry_ptr[7])
+
+	-- get n
+	local n: uint32 = ((@uint32)(entry_ptr[8]) << 24) | ((@uint32)(entry_ptr[9]) << 16) | ((@uint32)(entry_ptr[10]) << 8) | (@uint32)(entry_ptr[11])
+
+	self:drawObjEx(mode, start, n)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
@@ -749,10 +761,15 @@ function GPU:loadTexBank(bank: uint8): void
 end
 
 function GPU:loadObjBank(bank: uint8): void
+	-- load objbank
 	local src: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE) * bank]
 	memory.copy(&self.objmem, src, GPU_OBJMEM_SIZE * #util.IntFloat)
 
 	-- load ompbank
+	local objmap_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[84])
+	local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.ompbank_ptr[(GPU_OBJMAP_SIZE * bank)])
+	memory.copy(objmap_ptr, bank_ptr, GPU_OBJMAP_SIZE)
+
 	self.update_tex = true
 end
 
@@ -1002,6 +1019,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
+	--[[
 	if rl.isWindowReady() then
 		-- kinda gross "hack" to check if we need the HighDPI flag
 		local dpi_scale: rl.vector2 = rl.getWindowScaleDPI()
@@ -1012,6 +1030,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 			rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 		end
 	end
+	]]
 
 	rl.setTargetFPS(30)
 	rl.setExitKey(rl.keyboardKey.NULL)
@@ -1056,6 +1075,8 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	end
 
 	self:resetGPU()
+
+	self:loadModel("test_data/viewcube.obj", 0, 0)
 end
 
 function GPU:cleanup(): void
