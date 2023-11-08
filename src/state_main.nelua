@@ -53,29 +53,21 @@ global function stateMainUpdate(sm: *StateMachine, vm: *e3d.EVM): void
         io.printf('ROM:     0x%08X - 0x%08X\n', e3d.ROM_START_ADDR, e3d.ROM_MAX_ADDR)
         io.printf('MEMCARD: 0x%08X - 0x%08X\n', e3d.MEMCARD_START_ADDR, e3d.MEMCARD_MAX_ADDR)
     elseif rl.isKeyPressed(rl.keyboardKey.S) and is_ctrl_down then
-        vm:saveCart(arg[2],
-            function(vm: *e3d.EVM, success: boolean): void
-                if success then
-                    print("save OK!")
-                else
-                    io.printf(vm.error)
-                end
-            end
-        )
+        if vm:saveCart(arg[2]) then
+            print("cart saved!")
+        else
+            io.printf(vm.error)
+        end
     elseif rl.isKeyPressed(rl.keyboardKey.O) then
         if is_ctrl_down then
-            vm:loadCart(arg[1],
-                function(vm: *e3d.EVM, success: boolean): void
-                    if success then
-                        print("load OK!")
-                    else
-                        io.printf(vm.error)
-                    end
-                end
-            )
+            if vm:loadCart(arg[1]) then
+                print("cart loaded!")
+            else
+                io.printf(vm.error)
+            end
         else
             if vm:loadData(arg[3], arg[4]) then
-                print("load OK!")
+                print("data loaded!")
             else
                 io.printf(vm.error)
             end

@@ -40,7 +40,7 @@ global e3d = @record{}
 			song data       (2KiB          )                         (256 * 8 bytes)
 			pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
 			instrument data (2KiB + 768B   )                         (256 * 11 bytes (flags, sample start (24bit), sample end(24bit), attack, decay, sustain, release))
-			groove data     (256B          )                         (16 * 16 bytes)
+			groove data     (1KiB          )                         (16 * 64 bytes)
 			unused          (???KiB + ???B )                         (unused)
 		GLOBALS             (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
 		LOCALS              (256KiB        ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
@@ -359,12 +359,6 @@ global e3d.Hook = @enum {
 	COUNT
 }
 
-global e3d.IOState = @enum {
-	IDLE = 0,
-	SAVING,
-	LOADING
-}
-
 -------------------------
 --                     --
 --        TYPES        --
@@ -452,8 +446,6 @@ global e3d.Cart = @record {
 	rom: [e3d.ROM_SIZE]uint8,
 }
 
-global e3d.IOCallback: type = @function(*e3d.EVM, boolean): void
-
 e3d.EVM = @record {
 	-- vm vars
 	heap: [e3d.HEAP_SIZE]uint8,
@@ -524,11 +516,7 @@ e3d.EVM = @record {
 	soundchip: SoundChip,
 	gpu: GPU,
 	error: string,
-	init_time: float64,
-	io_callback: e3d.IOCallback,
-	io_co: coroutine,
-	io_state: uint8,
-	io_result: boolean
+	init_time: float64
 }
 
 global e3d.btnmap: [e3d.ControllerButtons.COUNT * e3d.INPUT_PLAYERS_COUNT]cint

@@ -1,6 +1,8 @@
 GENERAL:
 - cleanup+refactor nasty code (looking at you, operatorTypeCheck())
 - implement safeguards on everything
+- refactor memory address+constants (no more magic numbers, better constants for size)
+- code structure refactor
 
 COMPILER:
 - improve end-of-function return generation (return zero value if no explicit return is used)
@@ -14,15 +16,28 @@ COMPILER:
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
 VM:
+- complete audio system
+  - implement groove
+  - implement command fx
+- implement missing api functions
+  - audio bpm+pan+volume getters and setters
+  - math functions
+  - matrix functions
+  - collision functions
+- complete collision system
 - complete wrapi() and wrapf() negative ranges
 - implement debug opcodes
 - implement memory allocator and api for vm heap
 - implement memory card system and api
-- implement cartridge data loading api
+- implement cartridge data loading/saving api
 - implement triangle rendering limit
 - implement cycle limit (how to deal with incomplete calls?)
 
 HOST:
+- implement asset importing
+- implement config file
+- implement carts directory
+- implement window resizing
 - implement debugger
 - implement boot animation
 - implement ui (terminal?, editors?. etc.)

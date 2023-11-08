@@ -47,7 +47,7 @@ global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * SOUNDCHIP_PATTERN_ROW_SIZE
 global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
 global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 11
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
-global SOUNDCHIP_GROOVE_SIZE <comptime> = 16
+global SOUNDCHIP_GROOVE_SIZE <comptime> = 64
 global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
 
 global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
@@ -609,14 +609,23 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 
 	self:resetSoundchip()
 
-	-- reset song
-	memory.set(self.song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
+	-- reset seqbanks
+	for i = SoundchipBank.SEQBANK0, <= SoundchipBank.SEQBANK7 do
+		local index: uint64 = i - SoundchipBank.SEQBANK0
+		index = index * SOUNDCHIP_SEQMEM_SIZE
+		local song_data: *[0]uint8 = (@*[0]uint8)(&self.seqbank_ptr[index])
+		local pattern_data: *[0]uint8 = (@*[0]uint8)(&self.seqbank_ptr[index + SOUNDCHIP_PATTERN_DATA_START])
+		local groove_data: *[0]uint8 = (@*[0]uint8)(&self.seqbank_ptr[index + SOUNDCHIP_GROOVE_DATA_START])
 
-    -- reset patterns, each pattern row set to all EMPTY
-    memory.set(self.pattern_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
+		-- reset song
+		memory.set(song_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_SONG_SIZE)
 
-	-- reset instruments
-	-- ...
+		-- reset patterns, each pattern row set to all EMPTY
+		memory.set(pattern_data, SOUNDCHIP_EMPTY_VALUE, SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
+
+		-- reset grooves
+		memory.set(groove_data, 6, SOUNDCHIP_GROOVE_COUNT * SOUNDCHIP_GROOVE_SIZE)
+	end
 
 	local instr0: *[0]uint8 = self:getInstrument(0)
 	--local instr1: *[0]uint8 = self:getInstrument(1)

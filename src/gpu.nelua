@@ -1076,7 +1076,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 
 	self:resetGPU()
 
-	self:loadModel("test_data/viewcube.obj", 0, 0)
+	--self:loadModel("test_data/viewcube.obj", 0, 0)
 end
 
 function GPU:cleanup(): void
