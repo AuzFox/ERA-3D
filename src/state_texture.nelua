@@ -6,13 +6,23 @@ global function stateTextureInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateTextureEnter(sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:setRenderTexture(RenderTexture.TEXTURE)
 end
 
 global function stateTextureExit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateTextureUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+    local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
+
+    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+        sm.queued_state = StateID.MAIN -- switch to main state next frame
+    end
 end
 
 global function stateTextureDraw(sm: *StateMachine, vm: *e3d.EVM): void
+    rl.clearBackground({0, 0, 0, 0})
+    vm.gpu:camera2D(-1)
+
+    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((31 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 4, GPU_GREEN, "// TEXTURE EDITOR STUFF HERE...")
 end

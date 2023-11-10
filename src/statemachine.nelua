@@ -1,5 +1,7 @@
 require("e3d")
 
+require("rayeasings")
+
 global StateID = @enum {
     BOOT = 0,
     MAIN,
@@ -30,7 +32,14 @@ StateMachine = @record {
     vm_ptr: *e3d.EVM,
     state_id: integer,
     queued_state: integer,
-    prev_state: integer
+    prev_state: integer,
+
+    -- 3D menu swapping animation
+    playing_animation: boolean,
+    facing_angle: float32,
+    target_angle: float32,
+    anim_time: float32,
+    beginning_angle: float32
 }
 
 function StateMachine:initState(): void
@@ -63,6 +72,22 @@ function StateMachine:init(vm: *e3d.EVM): void
     self.prev_state = self.state_id
 
     self.state_ptr.enter(self, vm)
+
+    self.playing_animation = false
+    self.facing_angle = 0.0
+	self.target_angle = 0.0
+	self.anim_time = 0.0
+	self.beginning_angle = 0.0
+end
+
+function StateMachine:updateAnimation(): void
+    if math.abs(self.target_angle - self.facing_angle) > 0.1 then
+        self.anim_time = self.anim_time + rl.getFrameTime()
+        self.facing_angle = rle.quadOut(self.anim_time, self.beginning_angle, self.target_angle - self.beginning_angle, 0.50)
+    else
+        self.facing_angle = self.target_angle
+        self.playing_animation = false
+    end
 end
 
 function StateMachine:update(): void
@@ -76,5 +101,23 @@ function StateMachine:update(): void
         self.state_ptr.enter(self, self.vm_ptr)
         
         self.queued_state = -1
+        
+        switch self.state_id do
+            case StateID.MAIN then
+                self.playing_animation = true
+                self.anim_time = 0.0
+                self.beginning_angle = self.facing_angle
+                self.target_angle = 0.0
+            case StateID.TRACKER then
+                self.playing_animation = true
+                self.anim_time = 0.0
+                self.beginning_angle = self.facing_angle
+                self.target_angle = 90.0
+            case StateID.TEXTURE then
+                self.playing_animation = true
+                self.anim_time = 0.0
+                self.beginning_angle = self.facing_angle
+                self.target_angle = -90.0
+        end
     end
 end

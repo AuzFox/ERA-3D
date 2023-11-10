@@ -47,7 +47,7 @@ void init() {
 	setFogMode(0);      // 1 = enable, 0 = disable
 	setFogStart(2.0);   // 0.0 to 1000.0
 	setFogEnd(2.5);     // 0.0 to 1000.0
-	setFogColor(ALPHA); // RGBA32, can be transparent!
+	setFogColor(BLACK); // RGBA32, can be transparent!
 }
 
 void update(float delta_time) {

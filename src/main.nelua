@@ -8,16 +8,48 @@ require("state_texture")
 require("state_model")
 require("state_tracker")
 require("state_run")
+require("input")
 
-global vm: *e3d.EVM
-global sm: StateMachine
+local MAX_PARTICLES <comptime> = 32
 
-local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
-local dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
+local TriParticle = @record {
+	position: rl.vector3,
+	rotation: rl.vector3,
+	rotation_factor: rl.vector3,
+	age: float32,
+	age_factor: float32
+}
+
+local vm: *e3d.EVM
+local sm: StateMachine
+local particles: [MAX_PARTICLES]TriParticle
+
+local function randomizeParticle(p: *TriParticle): void
+	p.position = {
+		-- min + math.random() * (max - min)
+		-1.5 + math.random() * (1.5 - -1.5),
+		-1.5,
+		-2.5 + math.random() * (-1.0 - -2.5)
+	}
+	p.rotation = {
+		-- min + math.random() * (max - min)
+		0.0 + math.random() * (360.0 - 0.0),
+		0.0 + math.random() * (360.0 - 0.0),
+		0.0 + math.random() * (360.0 - 0.0)
+	}
+	p.rotation_factor = {
+		-- min + math.random() * (max - min)
+		0.1 + math.random() * (1.0 - 0.1),
+		0.1 + math.random() * (1.0 - 0.1),
+		0.1 + math.random() * (1.0 - 0.1)
+	}
+	p.age_factor = 0.5 + math.random() * (1.0 - 0.5)
+	p.age = 0.0
+end
 
 local function init(): void
 	vm = e3d.newVM()
-	e3d.setDefaultBtnmap()
+	input.setDefaultButtonMap()
 
 	sm.states = {
 		{
@@ -71,12 +103,21 @@ local function init(): void
 		}
 	}
 
+	for i = 0, < MAX_PARTICLES do
+		local p: *TriParticle = &particles[i]
+		randomizeParticle(p)
+	end
+
 	sm:init(vm)
 end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		sm:updateState()
+		if sm.playing_animation then
+			sm:updateAnimation()
+		else
+			sm:updateState()
+		end
 
 		vm.soundchip:updateAudio()
 
@@ -85,15 +126,160 @@ local function run(): void
 			vm.gpu.update_tex = false
 		end
 
-		rl.beginTextureMode(vm.gpu.gfx_rendertex)
+		-- draw to state render texture
+		vm.gpu:beginCurrentRenderTexture()
 			sm:drawState()
-			vm.gpu:resetMatrixStack()
-		rl.endTextureMode()
+		vm.gpu:endRenderTexture()
+		
+		vm.gpu:resetMatrixStack()
 
+		-- draw to master render texture
+		vm.gpu:beginMasterRenderTexture()
+			vm.gpu:clear(GPU_BLACK)
+
+			if sm.state_id == StateID.RUN then
+				vm.gpu:camera2D(-1)
+				vm.gpu:drawCurrentRenderTexture()
+			else
+				vm.gpu:camera3D(-1)
+				
+				local aspect: float32 = (@float32)(GPU_SCREEN_W) / (@float32)(GPU_SCREEN_H)
+				local distance: float32 = 1.0
+				local frustum_height: float32 = 2.0 * distance * math.tan(math.rad(vm.gpu.system_cam.fovy * 0.5))
+				local frustum_width: float32 = frustum_height * aspect
+
+				local width: float32 = (frustum_width / 2)
+				local height: float32 = (frustum_height / 2)
+
+				-- draw triangle particles
+				rlgl.pushMatrix()
+					rlgl.disableBackfaceCulling()
+					rl.beginShaderMode(vm.gpu.gfx_shader)
+						rlgl.begin(rlgl.QUADS)
+							for i = 0, < MAX_PARTICLES do
+								local p: *TriParticle = &particles[i]
+
+								p.age = p.age + rl.getFrameTime() * p.age_factor
+								if p.age > 4.0 then
+									randomizeParticle(p)
+								else
+									p.position = p.position + (@rl.vector3){0.0, rl.getFrameTime() * p.age_factor, 0.0}
+									p.rotation = p.rotation + ((@rl.vector3){
+										90.0 * rl.getFrameTime() * p.age_factor,
+										90.0 * rl.getFrameTime() * p.age_factor,
+										90.0 * rl.getFrameTime() * p.age_factor
+									} * p.rotation_factor)
+								end
+
+								rlgl.loadIdentity()
+								rlgl.translatef(p.position.x, p.position.y, p.position.z)
+								rlgl.rotatef(p.rotation.z, 0, 0, 1)
+								rlgl.rotatef(p.rotation.y, 0, 1, 0)
+								rlgl.rotatef(p.rotation.x, 1, 0, 0)
+
+								local alpha: cuchar = 255 - (cuchar)((math.min(p.age, 1.75) / 1.75) * 255.0)
+
+								rlgl.color4ub(0xFF, 0x00, 0x00, alpha)
+								rlgl.vertex3f(0.0, 0.1, 0.0)
+								rlgl.vertex3f(0.0, 0.1, 0.0)
+
+								rlgl.color4ub(0x00, 0xFF, 0x00, alpha)
+								rlgl.vertex3f(-0.1, -0.1, 0.0)
+
+								rlgl.color4ub(0x00, 0x00, 0xFF, alpha)
+								rlgl.vertex3f(0.1, -0.1, 0.0)
+							end
+						rlgl.ending()
+					rl.endShaderMode()
+					rlgl.enableBackfaceCulling()
+				rlgl.popMatrix()
+
+				if sm.playing_animation then
+					-- draw state rendertexture quads
+					rlgl.pushMatrix()
+						rlgl.rotatef(sm.facing_angle, 0.0, 1.0, 0.0)
+						
+						-- main/run
+						vm.gpu:useRenderTexture(RenderTexture.MAIN)
+						rlgl.begin(rlgl.QUADS)
+							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
+							rlgl.texCoord2f(0.0, 1.0)
+							rlgl.vertex3f(-width, height, -distance)
+							rlgl.texCoord2f(0.0, 0.0)
+							rlgl.vertex3f(-width, -height, -distance)
+							rlgl.texCoord2f(1.0, 0.0)
+							rlgl.vertex3f(width, -height, -distance)
+							rlgl.texCoord2f(1.0, 1.0)
+							rlgl.vertex3f(width, height, -distance)
+						rlgl.ending()
+
+						-- tracker
+						vm.gpu:useRenderTexture(RenderTexture.TRACKER)
+						rlgl.begin(rlgl.QUADS)
+							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
+							rlgl.texCoord2f(0.0, 1.0)
+							rlgl.vertex3f(distance, height, -width)
+							rlgl.texCoord2f(0.0, 0.0)
+							rlgl.vertex3f(distance, -height, -width)
+							rlgl.texCoord2f(1.0, 0.0)
+							rlgl.vertex3f(distance, -height, width)
+							rlgl.texCoord2f(1.0, 1.0)
+							rlgl.vertex3f(distance, height, width)
+						rlgl.ending()
+
+						-- code
+						vm.gpu:useRenderTexture(RenderTexture.MAIN)
+						rlgl.begin(rlgl.QUADS)
+							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
+							rlgl.texCoord2f(0.0, 1.0)
+							rlgl.vertex3f(width, height, distance)
+							rlgl.texCoord2f(0.0, 0.0)
+							rlgl.vertex3f(width, -height, distance)
+							rlgl.texCoord2f(1.0, 0.0)
+							rlgl.vertex3f(-width, -height, distance)
+							rlgl.texCoord2f(1.0, 1.0)
+							rlgl.vertex3f(-width, height, distance)
+						rlgl.ending()
+
+						-- texture
+						vm.gpu:useRenderTexture(RenderTexture.TEXTURE)
+						rlgl.begin(rlgl.QUADS)
+							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
+							rlgl.texCoord2f(0.0, 1.0)
+							rlgl.vertex3f(-distance, height, width)
+							rlgl.texCoord2f(0.0, 0.0)
+							rlgl.vertex3f(-distance, -height, width)
+							rlgl.texCoord2f(1.0, 0.0)
+							rlgl.vertex3f(-distance, -height, -width)
+							rlgl.texCoord2f(1.0, 1.0)
+							rlgl.vertex3f(-distance, height, -width)
+						rlgl.ending()
+					rlgl.popMatrix()
+				end
+				
+				vm.gpu:camera2D(-1)
+
+				if not sm.playing_animation then
+					vm.gpu:drawCurrentRenderTexture()
+				end
+
+				switch sm.state_id do
+					case StateID.MAIN then
+						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "MAIN MENU")
+					case StateID.TRACKER then
+						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
+					case StateID.TEXTURE then
+						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+				end
+			end
+		vm.gpu:endRenderTexture()
+
+		vm.gpu:resetMatrixStack()
+
+		-- render master render texture to the screen
 		rl.beginDrawing()
-			rl.clearBackground(rl.BLACK)
-			rl.drawTexturePro(vm.gpu.gfx_rendertex.texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
-			rl.drawFPS(0, 0)
+			rl.clearBackground(rl.GRAY)
+			vm.gpu:drawMasterRenderTexture()
 		rl.endDrawing()
 
 		sm:update()

@@ -684,8 +684,8 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 end
 
 function SoundChip:cleanup(): void
-	rl.unloadAudioStream(self.audio_stream)
 	rl.closeAudioDevice()
+	rl.unloadAudioStream(self.audio_stream)
 
 	BKDispose(&self.bk_data)
 	

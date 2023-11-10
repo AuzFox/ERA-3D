@@ -18,8 +18,11 @@ global GPU_BLUE        <comptime> = 0x0000FFFF
 -- screen dimentions (vscreen is console's virtual resolution)
 global GPU_VSCREEN_W <comptime> = 480
 global GPU_VSCREEN_H <comptime> = 360
-global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * 2)
-global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * 2)
+global GPU_SCREEN_SCALE <comptime> = 2
+global GPU_VSCREEN_HALF_W <comptime> = (GPU_VSCREEN_W /// 2)
+global GPU_VSCREEN_HALF_H <comptime> = (GPU_VSCREEN_H /// 2)
+global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * GPU_SCREEN_SCALE)
+global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * GPU_SCREEN_SCALE)
 global GPU_CAMERAS_COUNT <comptime> = 4
 
 global GPU_LINES <comptime> = 0
@@ -38,6 +41,16 @@ global GPU_OMPBANK_SIZE <comptime> = ((13 * 1024 * 1024) + (512 * 1024)) -- 1MiB
 global GPU_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
 
 global GPU_LIGHTS_COUNT <comptime> = 8
+
+global RenderTexture = @enum {
+	MAIN = 0,
+    CODE,
+    TEXTURE,
+    MODEL,
+    TRACKER,
+	COUNT
+}
+
 local lightAttribute = @enum {
 	ENABLED = 0,
 	TYPE,
@@ -243,12 +256,16 @@ global GPU = @record {
 	texmem: [GPU_TEXMEM_SIZE]rl.color,
 	objmem: [GPU_OBJMEM_SIZE]util.IntFloat,
 	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
+	system_cam2d: rl.camera2D,
 	cameras: [GPU_CAMERAS_COUNT]rl.camera,
+	system_cam: rl.camera,
 	lights: [GPU_LIGHTS_COUNT]Light,
+	gfx_master_rendertexture: rl.renderTexture,
+	gfx_rendertextures: [RenderTexture.COUNT]rl.renderTexture,
 	gfx_texture: rl.texture,
 	gfx_shader: rl.shader,
-	gfx_rendertex: rl.renderTexture,
 	gfx_font_texture: rl.texture,
+	gfx_rendertexture_index: uinteger,
 	texbank_ptr: *[0]rl.color,
 	objbank_ptr: *[0]util.IntFloat,
 	ompbank_ptr: *[0]uint8,
@@ -303,6 +320,9 @@ global GPU = @record {
 	viewport_h: cint
 }
 
+local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
+local master_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
+local sub_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), (@float32)(GPU_VSCREEN_H)}
 local light_attrib_locs: [GPU_LIGHTS_COUNT][lightAttribute.COUNT]cint
 
 function GPU:clear(col: uint32): void
@@ -322,8 +342,14 @@ function GPU:clear(col: uint32): void
 	end
 end
 
-function GPU:camera2D(id: uinteger): void
-	local cam: rl.camera2D = self.cameras2D[id]
+function GPU:camera2D(id: integer): void
+	local cam: rl.camera2D
+
+	if id >= 0 then
+		cam = self.cameras2D[id]
+	else
+		cam = self.system_cam2d
+	end
 
 	rlgl.disableDepthTest()
 	
@@ -341,8 +367,14 @@ function GPU:camera2D(id: uinteger): void
 	self.matrix_mode = rlgl.MODELVIEW
 end
 
-function GPU:camera3D(id: uinteger): void
-	local cam: rl.camera = self.cameras[id]
+function GPU:camera3D(id: integer): void
+	local cam: rl.camera
+	
+	if id >= 0 then
+		cam = self.cameras[id]
+	else
+		cam = self.system_cam
+	end
 
 	-- copy Raylib's BeginMode3D(),
 	-- but we don't need to push a new projection matrix
@@ -916,6 +948,34 @@ function GPU:resetMatrixStack(): void
 	end
 end
 
+function GPU:beginCurrentRenderTexture(): void
+	rl.beginTextureMode(self.gfx_rendertextures[self.gfx_rendertexture_index])
+end
+
+function GPU:beginMasterRenderTexture(): void
+	rl.beginTextureMode(self.gfx_master_rendertexture)
+end
+
+function GPU:endRenderTexture(): void
+	rl.endTextureMode()
+end
+
+function GPU:drawCurrentRenderTexture(): void
+	rl.drawTexturePro(self.gfx_rendertextures[self.gfx_rendertexture_index].texture, src_rect, sub_dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+end
+
+function GPU:drawMasterRenderTexture(): void
+	rl.drawTexturePro(self.gfx_master_rendertexture.texture, src_rect, master_dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+end
+
+function GPU:useRenderTexture(index: uinteger): void
+	rlgl.setTexture(self.gfx_rendertextures[index].texture.id)
+end
+
+function GPU:setRenderTexture(index: uinteger): void
+	self.gfx_rendertexture_index = index
+end
+
 function GPU:enableRenderState(): void
 	switch self.cull_mode do
 		case 0 then
@@ -1016,7 +1076,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.ompbank_ptr = ompbank_ptr
 
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
-	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 	--[[
@@ -1035,7 +1095,12 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	rl.setTargetFPS(30)
 	rl.setExitKey(rl.keyboardKey.NULL)
 
-	self.gfx_rendertex = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+	self.gfx_master_rendertexture = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+
+	self.gfx_rendertexture_index = RenderTexture.MAIN
+	for i = 0, < RenderTexture.COUNT do
+		self.gfx_rendertextures[i] = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+	end
 
 	local img: rl.image = rl.genImageColor(GPU_TEXMEM_WIDTH, GPU_TEXMEM_HEIGHT, {0,0,0,0})
 	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
@@ -1074,6 +1139,21 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 		light_attrib_locs[i][lightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
 	end
 
+	self.system_cam2d = {
+		offset={0.0,0.0},
+		target={0.0,0.0},
+		rotation=0.0,
+		zoom=1.0
+	}
+
+	self.system_cam = {
+		position={0,0,0},
+		target={0,0,-1},
+		up={0,1,0},
+		fovy=45,
+		projection=rl.cameraProjection.PERSPECTIVE
+	}
+
 	self:resetGPU()
 
 	--self:loadModel("test_data/viewcube.obj", 0, 0)
@@ -1083,7 +1163,12 @@ function GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
 	rl.unloadTexture(self.gfx_font_texture)
 	rl.unloadTexture(self.gfx_texture)
-	rl.unloadRenderTexture(self.gfx_rendertex)
+
+	for i = 0, < RenderTexture.COUNT do
+		rl.unloadRenderTexture(self.gfx_rendertextures[i])
+	end
+
+	rl.unloadRenderTexture(self.gfx_master_rendertexture)
 
 	rl.closeWindow()
 end

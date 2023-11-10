@@ -313,6 +313,7 @@ global function stateTrackerInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateTrackerEnter(sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:setRenderTexture(RenderTexture.TRACKER)
     vm.soundchip:setBankPointers(
         SoundchipBank.WAVBANK0,
         SoundchipBank.SEQBANK0
@@ -330,8 +331,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *e3d.EVM): void
     local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
     local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
 
-    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
-        sm:back()
+    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.LEFT) then
+        sm.queued_state = StateID.MAIN
         return
     end
 
@@ -496,35 +497,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateTrackerDraw(sm: *StateMachine, vm: *e3d.EVM): void
-    vm.gpu:clear(GPU_BLACK)
-    
-    --[[
-    vm.gpu:camera3D(0)
-
-    rlgl.pushMatrix()
-        rlgl.loadIdentity()
-        rlgl.rotatef(rl.getTime() * 45.0, 0, 1, 0)
-
-        vm.gpu:beginMesh(GPU_LINES)
-            vm.gpu:vertColor(GPU_RED)
-            vm.gpu:vertex({0.0, 0.5, 0.0})
-            vm.gpu:vertColor(GPU_GREEN)
-            vm.gpu:vertex({-0.5, -0.5, 0.0})
-
-            vm.gpu:vertColor(GPU_GREEN)
-            vm.gpu:vertex({-0.5, -0.5, 0.0})
-            vm.gpu:vertColor(GPU_BLUE)
-            vm.gpu:vertex({0.5, -0.5, 0.0})
-
-            vm.gpu:vertColor(GPU_BLUE)
-            vm.gpu:vertex({0.5, -0.5, 0.0})
-            vm.gpu:vertColor(GPU_RED)
-            vm.gpu:vertex({0.0, 0.5, 0.0})
-        vm.gpu:endMesh()
-    rlgl.popMatrix()
-    ]]
-
-    vm.gpu:camera2D(0)
+    rl.clearBackground({0, 0, 0, 0})
+    vm.gpu:camera2D(-1)
 
     --drawLevels(sm, vm)
     drawSong(sm, vm)

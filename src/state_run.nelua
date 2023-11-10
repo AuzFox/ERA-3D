@@ -6,6 +6,7 @@ global function stateRunInit(sm: *StateMachine, vm: *e3d.EVM): void
 end
 
 global function stateRunEnter(sm: *StateMachine, vm: *e3d.EVM): void
+    vm.gpu:setRenderTexture(RenderTexture.MAIN)
     run_cart = true
 end
 

@@ -77,7 +77,6 @@ global e3d.OPSTACK_SIZE        <comptime> = 65536 -- 256KiB (65536 words)
 global e3d.BYTECODE_SIZE       <comptime> = 65536 -- 64KiB (65536 bytes)
 global e3d.CALLSTACK_SIZE      <comptime> = 256
 global e3d.API_FUNCS_SIZE      <comptime> = 65536
-global e3d.INPUT_PLAYERS_COUNT <comptime> = 4
 
 ##[[
 local mem_regions = {
@@ -120,25 +119,6 @@ local mem_regions = {
 
 global e3d.RAM_MAX_ADDR <comptime> = #[mem_region_offset - 1]#
 global e3d.NULL <comptime> = 0xFFFFFFFF
-
--- emulate a PS1-like controller
-global e3d.ControllerButtons = @enum {
-	UP = 0,
-	DOWN,
-	LEFT,
-	RIGHT,
-	TRIANGLE,
-	CROSS,
-	SQUARE,
-	CIRCLE,
-	L1,
-	L2,
-	R1,
-	R2,
-	SELECT,
-	START,
-	COUNT -- not an actual button; used to count the number of buttons
-}
 
 -- tokens used by the compiler (ecc.nelua)
 global e3d.Token = @enum {
@@ -518,36 +498,3 @@ e3d.EVM = @record {
 	error: string,
 	init_time: float64
 }
-
-global e3d.btnmap: [e3d.ControllerButtons.COUNT * e3d.INPUT_PLAYERS_COUNT]cint
-
----------------------------------------
---                                   --
---        NAMESPACE FUNCTIONS        --
---                                   --
----------------------------------------
-
-function e3d.setDefaultBtnmap(): void
-	e3d.btnmap[e3d.ControllerButtons.UP]       = rl.keyboardKey.UP
-	e3d.btnmap[e3d.ControllerButtons.DOWN]     = rl.keyboardKey.DOWN
-	e3d.btnmap[e3d.ControllerButtons.LEFT]     = rl.keyboardKey.LEFT
-	e3d.btnmap[e3d.ControllerButtons.RIGHT]    = rl.keyboardKey.RIGHT
-	e3d.btnmap[e3d.ControllerButtons.TRIANGLE] = rl.keyboardKey.W
-	e3d.btnmap[e3d.ControllerButtons.CROSS]    = rl.keyboardKey.S
-	e3d.btnmap[e3d.ControllerButtons.SQUARE]   = rl.keyboardKey.A
-	e3d.btnmap[e3d.ControllerButtons.CIRCLE]   = rl.keyboardKey.D
-	e3d.btnmap[e3d.ControllerButtons.L1]       = rl.keyboardKey.Q
-	e3d.btnmap[e3d.ControllerButtons.L2]       = rl.keyboardKey.ONE
-	e3d.btnmap[e3d.ControllerButtons.R1]       = rl.keyboardKey.E
-	e3d.btnmap[e3d.ControllerButtons.R2]       = rl.keyboardKey.THREE
-	e3d.btnmap[e3d.ControllerButtons.SELECT]   = rl.keyboardKey.RIGHT_SHIFT
-	e3d.btnmap[e3d.ControllerButtons.START]    = rl.keyboardKey.ENTER
-end
-
-function e3d.getBtnKeycode(btn: integer): cint
-	return e3d.btnmap[btn]
-end
-
-function e3d.setBtnKeycode(btn: integer, keycode: cint): void
-	e3d.btnmap[btn] = keycode
-end

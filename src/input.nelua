@@ -1,0 +1,51 @@
+require("raylib")
+
+global input = @record {}
+
+global input.PLAYER_COUNT <comptime> = 4
+
+-- emulate a PS1-like controller
+global input.Button = @enum {
+	UP = 0,
+	DOWN,
+	LEFT,
+	RIGHT,
+	TRIANGLE,
+	CROSS,
+	SQUARE,
+	CIRCLE,
+	L1,
+	L2,
+	R1,
+	R2,
+	SELECT,
+	START,
+	COUNT -- not an actual button; used to count the number of buttons
+}
+
+global input.button_map: [input.Button.COUNT * input.PLAYER_COUNT]cint
+
+function input.setDefaultButtonMap(): void
+	input.button_map[input.Button.UP]       = rl.keyboardKey.UP
+	input.button_map[input.Button.DOWN]     = rl.keyboardKey.DOWN
+	input.button_map[input.Button.LEFT]     = rl.keyboardKey.LEFT
+	input.button_map[input.Button.RIGHT]    = rl.keyboardKey.RIGHT
+	input.button_map[input.Button.TRIANGLE] = rl.keyboardKey.W
+	input.button_map[input.Button.CROSS]    = rl.keyboardKey.S
+	input.button_map[input.Button.SQUARE]   = rl.keyboardKey.A
+	input.button_map[input.Button.CIRCLE]   = rl.keyboardKey.D
+	input.button_map[input.Button.L1]       = rl.keyboardKey.Q
+	input.button_map[input.Button.L2]       = rl.keyboardKey.ONE
+	input.button_map[input.Button.R1]       = rl.keyboardKey.E
+	input.button_map[input.Button.R2]       = rl.keyboardKey.THREE
+	input.button_map[input.Button.SELECT]   = rl.keyboardKey.RIGHT_SHIFT
+	input.button_map[input.Button.START]    = rl.keyboardKey.ENTER
+end
+
+function input.getButtonKeycode(btn: integer): cint
+	return input.button_map[btn]
+end
+
+function input.setButtonKeycode(btn: integer, keycode: cint): void
+	input.button_map[btn] = keycode
+end

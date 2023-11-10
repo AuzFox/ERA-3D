@@ -1,4 +1,5 @@
 require("e3d")
+require("input")
 
 function e3d.EVM:getArgI(i: uint16): int32 <forwarddecl> end
 function e3d.EVM:getArgU(i: uint16): uint32 <forwarddecl> end
@@ -533,10 +534,10 @@ local function apiPressed(vm: *e3d.EVM): boolean
 	local p: uint32 = vm:getArgU(0)
 	local b: uint32 = vm:getArgU(1)
 
-	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
-	b = (p * e3d.ControllerButtons.COUNT) + b
+	p = math.clamp(p, 0, input.PLAYER_COUNT - 1)
+	b = (p * input.Button.COUNT) + b
 
-	local code: cint = e3d.btnmap[b]
+	local code: cint = input.button_map[b]
 
 	if code == 0 then
 		vm:pushU(0)
@@ -554,10 +555,10 @@ local function apiReleased(vm: *e3d.EVM): boolean
 	local p: uint32 = vm:getArgU(0)
 	local b: uint32 = vm:getArgU(1)
 
-	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
-	b = (p * e3d.ControllerButtons.COUNT) + b
+	p = math.clamp(p, 0, input.PLAYER_COUNT - 1)
+	b = (p * input.Button.COUNT) + b
 
-	local code: cint = e3d.btnmap[b]
+	local code: cint = input.button_map[b]
 
 	if code == 0 then
 		vm:pushU(0)
@@ -575,10 +576,10 @@ local function apiHeld(vm: *e3d.EVM): boolean
 	local p: uint32 = vm:getArgU(0)
 	local b: uint32 = vm:getArgU(1)
 
-	p = math.clamp(p, 0, e3d.INPUT_PLAYERS_COUNT - 1)
-	b = (p * e3d.ControllerButtons.COUNT) + b
+	p = math.clamp(p, 0, input.PLAYER_COUNT - 1)
+	b = (p * input.Button.COUNT) + b
 
-	local code: cint = e3d.btnmap[b]
+	local code: cint = input.button_map[b]
 
 	if code == 0 then
 		vm:pushU(0)
