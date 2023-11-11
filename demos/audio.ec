@@ -1,7 +1,9 @@
 void init() {
     int* wavmap = (int*)(0x00F63854);
     wavmap[0] = 0;
-    wavmap[1] = 2048;
+    wavmap[1] = 60480;
+    wavmap[2] = 0;
+    wavmap[3] = 0;
 }
 
 void update(float delta_time) {

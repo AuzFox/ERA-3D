@@ -1,67 +1,11 @@
 require("string")
 
-require("raylib")
-require("rlgl")
+require("definitions")
 
 local GL_DEPTH_BUFFER_BIT <comptime> = 0x00000100
 local function glClear(mask: cint): void <cimport> end
 
-global GPU_ALPHA_BLACK <comptime> = 0x00000000
-global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
-global GPU_BLACK       <comptime> = 0x000000FF
-global GPU_GRAY        <comptime> = 0x808080FF
-global GPU_WHITE       <comptime> = 0xFFFFFFFF
-global GPU_RED         <comptime> = 0xFF0000FF
-global GPU_GREEN       <comptime> = 0x00FF00FF
-global GPU_BLUE        <comptime> = 0x0000FFFF
-
--- screen dimentions (vscreen is console's virtual resolution)
-global GPU_VSCREEN_W <comptime> = 480
-global GPU_VSCREEN_H <comptime> = 360
-global GPU_SCREEN_SCALE <comptime> = 2
-global GPU_VSCREEN_HALF_W <comptime> = (GPU_VSCREEN_W /// 2)
-global GPU_VSCREEN_HALF_H <comptime> = (GPU_VSCREEN_H /// 2)
-global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * GPU_SCREEN_SCALE)
-global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * GPU_SCREEN_SCALE)
-global GPU_CAMERAS_COUNT <comptime> = 4
-
-global GPU_LINES <comptime> = 0
-global GPU_TRIANGLES <comptime> = 1
-global GPU_QUADS <comptime> = 2
-
-global GPU_PROJECTION <comptime> = 0
-global GPU_MODELVIEW <comptime> = 1
-
-global GPU_TEXMEM_WIDTH <comptime> = 1024
-global GPU_TEXMEM_HEIGHT <comptime> = 1024
-global GPU_TEXMEM_SIZE <comptime> = (GPU_TEXMEM_WIDTH * GPU_TEXMEM_HEIGHT) -- 4MiB (1024*1024 pixels (32BPP))
-global GPU_OBJMEM_SIZE <comptime> = (32768 * 3 * 9) -- 32768 triangles, 9 IntFloats per vertex
-
-global GPU_OMPBANK_SIZE <comptime> = ((13 * 1024 * 1024) + (512 * 1024)) -- 1MiB + 256 KiB
-global GPU_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
-
-global GPU_LIGHTS_COUNT <comptime> = 8
-
-global RenderTexture = @enum {
-	MAIN = 0,
-    CODE,
-    TEXTURE,
-    MODEL,
-    TRACKER,
-	COUNT
-}
-
-local lightAttribute = @enum {
-	ENABLED = 0,
-	TYPE,
-	RADIUS,
-	POSITION,
-	DIRECTION,
-	COLOR,
-	COUNT -- not an actual attribute, used to count the number of attributes
-}
-
-global GPU_VERT_SRC <const> = [[
+local GPU_VERT_SRC <const> = [[
 #version 330
 
 // Input vertex attributes
@@ -165,7 +109,7 @@ void main()
 }
 ]]
 
-global GPU_FRAG_SRC <const> = [[
+local GPU_FRAG_SRC <const> = [[
 #version 330
 
 // built-in values:
@@ -242,88 +186,10 @@ void main()
 }
 ]]
 
-global Light = @record {
-	enabled: cint,
-	light_type: cint,
-	radius: float32,
-	position: rl.vector3,
-	direction: rl.vector3,
-	color: rl.vector3
-}
-
--- holds graphics information for the vm
-global GPU = @record {
-	texmem: [GPU_TEXMEM_SIZE]rl.color,
-	objmem: [GPU_OBJMEM_SIZE]util.IntFloat,
-	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
-	system_cam2d: rl.camera2D,
-	cameras: [GPU_CAMERAS_COUNT]rl.camera,
-	system_cam: rl.camera,
-	lights: [GPU_LIGHTS_COUNT]Light,
-	gfx_master_rendertexture: rl.renderTexture,
-	gfx_rendertextures: [RenderTexture.COUNT]rl.renderTexture,
-	gfx_texture: rl.texture,
-	gfx_shader: rl.shader,
-	gfx_font_texture: rl.texture,
-	gfx_rendertexture_index: uinteger,
-	texbank_ptr: *[0]rl.color,
-	objbank_ptr: *[0]util.IntFloat,
-	ompbank_ptr: *[0]uint8,
-	sysmem_ptr: *[0]uint8,
-	
-	-- shader uniform locations
-	mat_model_loc: cint,
-	mat_normal_loc: cint,
-	tex_mode_loc: cint,
-	tex_x_loc: cint,
-	tex_y_loc: cint,
-	tex_w_loc: cint,
-	tex_h_loc: cint,
-	fog_mode_loc: cint,
-	fog_start_loc: cint,
-	fog_end_loc: cint,
-	fog_color_loc: cint,
-	lighting_mode_loc: cint,
-	ambient_factor_loc: cint,
-	ambient_color_loc: cint,
-
-	update_tex: boolean, -- set when TEXMEM is updated. when set, TEXMEM is uploaded to the real GPU
-
-	-- "triangle mode" data
-	--
-	-- RLGL currently doesn't allow primitives created using RL_TRIANGLES to use UV coordinates for textures.
-	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
-	triangle_mode: boolean,
-	triangle_vert_index: integer,
-
-	proj_matrix_count: uinteger, -- used to track matrix stack
-	view_matrix_count: uinteger, -- used to track matrix stack
-	matrix_mode: uinteger,
-	
-	-- graphics state
-	cull_mode: uinteger,
-	wire_mode: boolean,
-	tex_mode: cint,
-	tex_x: cint,
-	tex_y: cint,
-	tex_w: cint,
-	tex_h: cint,
-	fog_mode: cint,
-	fog_start: float32,
-	fog_end: float32,
-	fog_color: rl.vector4,
-	lighting_mode: cint,
-	ambient_factor: float32,
-	ambient_color: rl.vector3,
-	blend_mode: cint,
-	viewport_w: cint,
-	viewport_h: cint
-}
-
 local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
 local master_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
 local sub_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), (@float32)(GPU_VSCREEN_H)}
-local light_attrib_locs: [GPU_LIGHTS_COUNT][lightAttribute.COUNT]cint
+local light_attrib_locs: [GPU_LIGHTS_COUNT][LightAttribute.COUNT]cint
 
 function GPU:clear(col: uint32): void
 	local alpha: cuchar = (@cuchar)(col & 0xFF)
@@ -754,27 +620,27 @@ end
 
 function GPU:setLightEnabled(id: uint32, enabled: uint32): void
 	self.lights[id].enabled = (enabled ~= 0) and 1 or 0
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.ENABLED], &self.lights[id].enabled, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.ENABLED], &self.lights[id].enabled, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
 function GPU:setLightType(id: uint32, light_type: uint32): void
 	self.lights[id].light_type = (@cint)(light_type)
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.TYPE], &self.lights[id].light_type, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.TYPE], &self.lights[id].light_type, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
 function GPU:setLightRadius(id: uint32, radius: float32): void
 	self.lights[id].radius = radius
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.RADIUS], &self.lights[id].radius, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.RADIUS], &self.lights[id].radius, rl.shaderUniformDataType.UNIFORM_FLOAT)
 end
 
 function GPU:setLightPosition(id: uint32, pos: rl.vector3): void
 	self.lights[id].position = pos
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.POSITION], &self.lights[id].position, rl.shaderUniformDataType.UNIFORM_VEC3)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.POSITION], &self.lights[id].position, rl.shaderUniformDataType.UNIFORM_VEC3)
 end
 
 function GPU:setLightDirection(id: uint32, dir: rl.vector3): void
 	self.lights[id].direction = dir
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.DIRECTION], &self.lights[id].direction, rl.shaderUniformDataType.UNIFORM_VEC3)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.DIRECTION], &self.lights[id].direction, rl.shaderUniformDataType.UNIFORM_VEC3)
 end
 
 function GPU:setLightColor(id: uint32, col: uint32): void
@@ -783,24 +649,24 @@ function GPU:setLightColor(id: uint32, col: uint32): void
 		(@float32)((col >> 16) & 0xFF) / 255.0,
 		(@float32)((col >> 8) & 0xFF) / 255.0
 	}
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][lightAttribute.COLOR], &self.lights[id].color, rl.shaderUniformDataType.UNIFORM_VEC3)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.COLOR], &self.lights[id].color, rl.shaderUniformDataType.UNIFORM_VEC3)
 end
 
 function GPU:loadTexBank(bank: uint8): void
-	local src: *[0]rl.color = &self.texbank_ptr[GPU_TEXMEM_SIZE*bank]
-	memory.copy(&self.texmem, src, GPU_TEXMEM_SIZE*#rl.color)
+	local src: *[0]rl.color = &self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank]
+	memory.copy(&self.texmem, src, MEMORY_TEXMEM_SIZE_BYTES)
 	self.update_tex = true
 end
 
 function GPU:loadObjBank(bank: uint8): void
 	-- load objbank
-	local src: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE) * bank]
-	memory.copy(&self.objmem, src, GPU_OBJMEM_SIZE * #util.IntFloat)
+	local src: *[0]IntFloat = &self.objbank_ptr[(MEMORY_OBJMEM_SIZE_ELEMENTS) * bank]
+	memory.copy(&self.objmem, src, MEMORY_OBJMEM_SIZE_BYTES)
 
 	-- load ompbank
 	local objmap_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[84])
-	local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.ompbank_ptr[(GPU_OBJMAP_SIZE * bank)])
-	memory.copy(objmap_ptr, bank_ptr, GPU_OBJMAP_SIZE)
+	local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.ompbank_ptr[(MEMORY_OBJMAP_SIZE * bank)])
+	memory.copy(objmap_ptr, bank_ptr, MEMORY_OBJMAP_SIZE)
 
 	self.update_tex = true
 end
@@ -815,7 +681,7 @@ function GPU:loadTexturesheet(filename: string, bank_index: integer): boolean
 	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
 		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
 	end
-	memory.copy(&self.texbank_ptr[GPU_TEXMEM_SIZE * bank_index], img.data, GPU_TEXMEM_SIZE * #rl.color)
+	memory.copy(&self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank_index], img.data, MEMORY_TEXMEM_SIZE_BYTES)
 	
 	rl.unloadImage(img)
 
@@ -831,7 +697,7 @@ function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32
 	end
 
 	local vertex_count: uint32
-	local bank_ptr: *[0]util.IntFloat = &self.objbank_ptr[(GPU_OBJMEM_SIZE) * bank_index]
+	local bank_ptr: *[0]IntFloat = &self.objbank_ptr[MEMORY_OBJMEM_SIZE_ELEMENTS * bank_index]
 
 	for i = 0, < model.meshCount do
 		local mesh: rl.mesh = (@*[0]rl.mesh)(model.meshes)[i]
@@ -1069,14 +935,14 @@ function GPU:resetGPU(): void
 	self.view_matrix_count = 0
 end
 
-function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr: *[0]util.IntFloat, ompbank_ptr: *[0]uint8): void
+function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr: *[0]IntFloat, ompbank_ptr: *[0]uint8): void
 	self.sysmem_ptr = sysmem_ptr
 	self.texbank_ptr = texbank_ptr
 	self.objbank_ptr = objbank_ptr
 	self.ompbank_ptr = ompbank_ptr
 
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
-	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 	--[[
@@ -1131,12 +997,12 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 
 	-- get light attribute locs
 	for i = 0, < GPU_LIGHTS_COUNT do
-		light_attrib_locs[i][lightAttribute.ENABLED]   = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].enabled", i))
-		light_attrib_locs[i][lightAttribute.TYPE]      = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].type", i))
-		light_attrib_locs[i][lightAttribute.RADIUS]    = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].radius", i))
-		light_attrib_locs[i][lightAttribute.POSITION]  = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].position", i))
-		light_attrib_locs[i][lightAttribute.DIRECTION] = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].direction", i))
-		light_attrib_locs[i][lightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
+		light_attrib_locs[i][LightAttribute.ENABLED]   = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].enabled", i))
+		light_attrib_locs[i][LightAttribute.TYPE]      = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].type", i))
+		light_attrib_locs[i][LightAttribute.RADIUS]    = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].radius", i))
+		light_attrib_locs[i][LightAttribute.POSITION]  = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].position", i))
+		light_attrib_locs[i][LightAttribute.DIRECTION] = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].direction", i))
+		light_attrib_locs[i][LightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
 	end
 
 	self.system_cam2d = {

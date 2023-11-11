@@ -1,0 +1,776 @@
+require("sequence")
+require("hashmap")
+require("stringbuilder")
+
+require("blipkit")
+require("raylib")
+require("rlgl")
+
+-- --------------------------------
+-- CONSTANTS
+-- --------------------------------
+
+-- ERA-3D version info
+global ERA_VER_MAJOR <comptime> = 0
+global ERA_VER_MINOR <comptime> = 0
+global ERA_VER_PATCH <comptime> = 0
+
+-- EVM internal memory constants
+global EVM_SRC_SIZE       <comptime> = 1024 * 1024
+global EVM_OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
+global EVM_BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
+global EVM_CALLSTACK_SIZE <comptime> = 256
+global EVM_API_FUNCS_SIZE <comptime> = 65536
+
+--[[ VM logical memory map
+	note: 1 vm word = 4 bytes
+
+	SYSTEM MEMORY:
+		HEAP                (8MiB          ) 0x00000000 - 0x007FFFFF (general purpose RAM)
+		TEXMEM              (4MiB          ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
+		OBJMEM              (3MiB + 384KiB ) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		AOBMEM              (8KiB          ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
+		SYSMEM              (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
+			audio state     (1B            )                         (1 byte (track playing flags))
+			track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
+			padding         (3B            )                         (unused)
+			objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
+			wavmem map      (8KiB          )                         (WAVMEM map (512 entries; 4 words each (sample start, sample end, sustain start, sustain end)))
+		WAVMEM              (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
+		SEQMEM              (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
+			song data       (2KiB          )                         (256 * 8 bytes)
+			pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
+			instrument data (4KiB + 256B   )                         (256 * 17 bytes (flags, sample start (24bit), sample end(24bit), sustain start (24bit), sustain end(24bit), attack, decay, sustain, release))
+			groove data     (1KiB          )                         (16 * 64 bytes)
+			unused          (???KiB + ???B )                         (unused)
+		GLOBALS             (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
+		LOCALS              (256KiB        ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
+		ARGS                (256KiB        ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
+	CART ROM:
+		TEXBANK[0-3]        (16MiB         ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
+		OBJBANK[0-3]        (13MiB + 512KiB) 0x02800000 - 0x0357FFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+		OMPBANK[0-3]        (1MiB + 256KiB ) 0x03580000 - 0x036BFFFF (4x maps for OBJBANK[0-3])
+		WMPBANK[0-1]        (1MiB + 256KiB ) 0x036C0000 - 0x037FFFFF (2x maps for WAVBANK[0-1])
+		WAVBANK[0-1]        (14MiB         ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
+		SEQBANK[0-7]        (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
+		ROM                 (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
+	MEMORY CARD:
+		MEMCARD             (256KiB        ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
+]]
+
+-- memory size and address constants
+##[[
+local KiB = 1024
+local MiB = (1024 * 1024)
+local mem_regions = {
+	-- system memory
+	{name='HEAP',    size=8*MiB,             element_size=1},
+	{name='TEXMEM',  size=4*MiB,             element_size=4},
+	{name='OBJMEM',  size=(3*MiB + 384*KiB), element_size=4},
+	{name='AOBMEM',  size=8*KiB,             element_size=2},
+	{name='SYSMEM',  size=632*KiB,           element_size=1},
+	{name='WAVMEM',  size=7*MiB,             element_size=2},
+	{name='SEQMEM',  size=256*KiB,           element_size=1},
+	{name='GLOBALS', size=256*KiB,           element_size=4},
+	{name='LOCALS',  size=256*KiB,           element_size=4},
+	{name='ARGS',    size=256*KiB,           element_size=4},
+
+	-- cart data
+	{name='TEXBANK', size=16*MiB,             element_size=4},
+	{name='OBJBANK', size=(13*MiB + 512*KiB), element_size=4},
+	{name='OMPBANK', size=(1*MiB + 256*KiB),  element_size=1},
+	{name='WMPBANK', size=(1*MiB + 256*KiB),  element_size=1},
+	{name='WAVBANK', size=14*MiB,             element_size=2},
+	{name='SEQBANK', size= 2*MiB,             element_size=1},
+	{name='ROM',     size=16*MiB,             element_size=1},
+
+	-- memory card
+	{name='MEMCARD', size=256*KiB, element_size=1}
+}
+]]
+
+## local mem_region_offset = 0
+## for _ , region in ipairs(mem_regions) do
+	global #|"MEMORY_"..region.name..'_START_ADDR'|# <comptime> = #[mem_region_offset]#
+    global #|"MEMORY_"..region.name..'_SIZE_BYTES'|# <comptime> = #[region.size]#
+    global #|"MEMORY_"..region.name..'_SIZE_ELEMENTS'|# <comptime> = #[region.size // region.element_size]#
+
+	## mem_region_offset = mem_region_offset + region.size
+	
+	global #|"MEMORY_"..region.name..'_MAX_ADDR'|# <comptime> = #[mem_region_offset - 1]#
+## end
+
+global MEMORY_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
+global MEMORY_WAVMAP_SIZE <comptime> = (512 * 16) -- 8KiB
+global MEMORY_MAX_ADDR <comptime> = #[mem_region_offset - 1]#
+global MEMORY_NULL <comptime> = 0xFFFFFFFF
+
+global GPU_ALPHA_BLACK <comptime> = 0x00000000
+global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
+global GPU_BLACK       <comptime> = 0x000000FF
+global GPU_GRAY        <comptime> = 0x808080FF
+global GPU_WHITE       <comptime> = 0xFFFFFFFF
+global GPU_RED         <comptime> = 0xFF0000FF
+global GPU_GREEN       <comptime> = 0x00FF00FF
+global GPU_BLUE        <comptime> = 0x0000FFFF
+
+-- screen dimentions (vscreen is console's virtual resolution)
+global GPU_VSCREEN_W <comptime> = 480
+global GPU_VSCREEN_H <comptime> = 360
+global GPU_SCREEN_SCALE <comptime> = 2
+global GPU_VSCREEN_HALF_W <comptime> = (GPU_VSCREEN_W /// 2)
+global GPU_VSCREEN_HALF_H <comptime> = (GPU_VSCREEN_H /// 2)
+global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * GPU_SCREEN_SCALE)
+global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * GPU_SCREEN_SCALE)
+
+global GPU_LINES <comptime> = 0
+global GPU_TRIANGLES <comptime> = 1
+global GPU_QUADS <comptime> = 2
+global GPU_PROJECTION <comptime> = 0
+global GPU_MODELVIEW <comptime> = 1
+
+global GPU_TEXMEM_WIDTH <comptime> = 1024
+global GPU_TEXMEM_HEIGHT <comptime> = 1024
+
+global GPU_LIGHTS_COUNT <comptime> = 8
+global GPU_CAMERAS_COUNT <comptime> = 4
+
+global SOUNDCHIP_TRACK_COUNT <comptime> = 8
+global SOUNDCHIP_SAMPLE_RATE <comptime> = 22050 -- 22050hz sample rate
+global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 2048
+global SOUNDCHIP_EMPTY_VALUE <comptime> = 0xFF
+global SOUNDCHIP_NOTE_MUTE <comptime> = 0xFE
+global SOUNDCHIP_NOTE_RELEASE <comptime> = 0xFD
+global SOUNDCHIP_MIN_OCTAVE <comptime> = 0
+global SOUNDCHIP_MAX_OCTAVE <comptime> = 7
+global SOUNDCHIP_OCTAVE_SIZE <comptime> = 12
+
+global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
+global SOUNDCHIP_PATTERN_ROW_SIZE <comptime> = 5
+global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * SOUNDCHIP_PATTERN_ROW_SIZE
+global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
+global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 17
+global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
+global SOUNDCHIP_GROOVE_SIZE <comptime> = 64
+global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
+
+global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
+global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
+global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
+
+-- --------------------------------
+-- ENUMS
+-- --------------------------------
+
+-- tokens used by the compiler
+global Token = @enum {
+	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
+	FLOAT_LITERAL,
+	STRING_LITERAL,
+	VOID,
+	INT,
+	FLOAT,
+	VEC2,
+	VEC3,
+	STRUCT_ID, -- struct type id
+	STRING,
+	STRUCT,
+	FUNCTION,
+	ENUM,
+	ID,
+	ELSE,
+	IF,
+	RETURN,
+	BREAK,
+	CONTINUE,
+	SIZEOF,
+	FOR,
+	WHILE,
+	VARARGS,
+	LNOT,
+	NOT,
+	ASSIGN,
+	COND,
+	LOR,
+	LAND,
+	OR,
+	XOR,
+	AND,
+	EQ,
+	NE,
+	LT,
+	GT,
+	LE,
+	GE,
+	LSHIFT,
+	RSHIFT,
+	ARSHIFT,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	MOD,
+	ARROW,
+	DOT,
+	BRAK
+}
+
+-- opcodes used by the vm and emitted by the compiler
+global Opcode = @enum {
+	GET_G = 0,
+	GET_GX,
+	SET_G,
+	SET_GX,
+	NEW_L,
+	DEL_L,
+	GET_L,
+	GET_LX,
+	SET_L,
+	SET_LX,
+	GET_A,
+	GET_AX,
+	SET_A,
+	SET_AX,
+	GET_M,
+	GET_MX,
+	SET_M,
+	SET_MX,
+	GET_S,
+	SET_S,
+	ADDROF_G,
+	ADDROF_L,
+	ADDROF_A,
+	PUSH_ZERO,
+	PUSH_ZEROF,
+	PUSH_ONE,
+	PUSH_ONEF,
+	PUSH_CHAR,
+	PUSH_INT,
+	PUSH_FLOAT,
+	PUSH_VEC2_ZERO,
+	PUSH_VEC3_ZERO,
+	PUSH_STRING,
+	DISCARD,
+	NOT,
+	OR,
+	XOR,
+	AND,
+	LSHIFT,
+	RSHIFT,
+	ARSHIFT,
+	NEG,
+	NEGF,
+	NEGV,
+	ADD,
+	ADDF,
+	ADDV,
+	ADDP,
+	SUB,
+	SUBF,
+	SUBV,
+	SUBP,
+	MUL,
+	MULF,
+	MULV,
+	DIV,
+	DIVU,
+	DIVF,
+	DIVV,
+	MOD,
+	MODU,
+	MODF,
+	LNOT,
+	LNOTP,
+	EQ,
+	EQF,
+	EQV,
+	EQS,
+	NE,
+	NEF,
+	NEV,
+	NES,
+	LTI,
+	LTU,
+	LTF,
+	LTV,
+	GTI,
+	GTU,
+	GTF,
+	GTV,
+	LEI,
+	LEU,
+	LEF,
+	LEV,
+	GEI,
+	GEU,
+	GEF,
+	GEV,
+	JUMP,
+	JUMP_Z,
+	JUMP_ZD,
+	JUMP_NZD,
+	JUMP_NULL,
+	JUMP_NULLD,
+	JUMP_NNULLD,
+	CALL,
+	CALL_PTR,
+	RETURN,
+	VARGP,
+	FTOI,
+	ITOF,
+	ITOB, -- int to bool, used by || and && operators
+	PTOB, -- pointer to bool, used by || and && operators
+	API
+}
+
+global Class = @enum {
+	KEYWORD = 0,
+	API,
+	CONSTANT,
+	STRUCT,
+	FUNCTION,
+	MEMORY, -- only used when writing values into memory using pointers
+	STRING, -- only used when writing characters to a string using indexing
+	GLOBAL,
+	ARG,
+	LOCAL
+}
+
+global EVMType = @enum {
+	VOID = 0,
+	INT,
+	FLOAT,
+	VEC2,
+	VEC3,
+	STRUCT,
+	STRING,
+	FUNC_POINTER,
+	POINTER = 16 -- repeatedly added to type id value to indicate pointer levels
+}
+
+-- vm multiplication opcode has several modes for multiplying different types
+global MulVMode = @enum {
+	INT_V2 = 0,
+	INT_V3,
+	FLOAT_V2,
+	FLOAT_V3,
+	V2_INT,
+	V2_FLOAT,
+	V2_V2,
+	V3_INT,
+	V3_FLOAT,
+	V3_V3
+}
+
+-- vm division opcode has several modes for dividing different types
+global DivVMode = @enum {
+	V2_INT = 0,
+	V2_FLOAT,
+	V2_V2,
+	V3_INT,
+	V3_FLOAT,
+	V3_V3
+}
+
+-- vm script hook function ids
+global Hook = @enum {
+	INIT = 0,
+	UPDATE,
+	DRAW,
+	COUNT
+}
+
+global RenderTexture = @enum {
+	MAIN = 0,
+    CODE,
+    TEXTURE,
+    MODEL,
+    TRACKER,
+	COUNT
+}
+
+global LightAttribute = @enum {
+	ENABLED = 0,
+	TYPE,
+	RADIUS,
+	POSITION,
+	DIRECTION,
+	COLOR,
+	COUNT -- not an actual attribute, used to count the number of attributes
+}
+
+global SoundchipBank = @enum {
+	SYSTEM = 0,
+	WAVBANK0 = 1,
+	WAVBANK1,
+	SEQBANK0 = 1,
+	SEQBANK1,
+	SEQBANK2,
+	SEQBANK3,
+	SEQBANK4,
+	SEQBANK5,
+	SEQBANK6,
+	SEQBANK7
+}
+
+-- instrument flags byte:
+-- L R 0 0 0 0 0 M
+-- L = loop (only used when R flag is 0)
+-- R = use sustain range (L flag is ignored)
+-- M = use sample start value as wavmap index
+global InstrumentFlag = @enum {
+	LOOP              = 0b10000000,
+	USE_SUSTAIN_RANGE = 0b01000000,
+	USE_WAVMAP        = 0b00000001
+}
+
+-- playflags byte:
+-- M L 0 0 0 0 PM
+-- M = mute
+-- L = loop
+-- PM = playmode (2 bits)
+global PlayFlag = @enum {
+	PLAY_SONG = 0,
+	PLAY_PATTERN,
+	PLAY_SAMPLE,
+	PLAY_MASK = 0b00000011,
+	MUTE      = 0b10000000,
+	LOOP      = 0b01000000
+}
+
+global StateID = @enum {
+    BOOT = 0,
+    MAIN,
+    CODE,
+    TEXTURE,
+    MODEL,
+    TRACKER,
+    RUN,
+    COUNT
+}
+
+-- --------------------------------
+-- RECORDS
+-- --------------------------------
+
+global EVM <forwarddecl> = @record {}
+
+global Identifier <forwarddecl> = @record {}
+
+global APIFunction: type = @function(vm: *EVM): boolean
+
+-- union used to store values of different types
+global IntFloat = @union {
+	i: int32,
+	u: uint32,
+	f: float32
+}
+
+-- record used to represet an ERA-C string struct
+global EVMString = @record {
+    len: uint32, -- string length
+    data: uint32 -- string data virtual address
+}
+
+-- record used to represet an ERA-C colaabb struct
+global ColAABB = @record {
+    type: uint32,
+    position: rl.vector3,
+    width: float32,
+    height: float32,
+    depth: float32
+}
+
+-- record that tracks data used by the vm when calling functions
+global CallFrame = @record {
+    pc: uinteger,
+    lbp: uinteger,
+    argc: uint16,
+    vargc: uint16, -- remaining vararg word count for function
+    vargp: uint16, -- vararg pointer
+    vargf: boolean, -- vararg flag, true if the function for this frame is a varargs function
+}
+
+-- ERA-C struct metadata record used in the compiler
+global Struct = @record {
+    is_complete: boolean,
+    size: uinteger,
+    name: string,
+    member_map: hashmap(string, uinteger),
+    members: sequence(*Identifier)
+}
+
+global TypeInfo = @record {
+    type_id: uinteger,
+    structref: *Struct -- only used when base_type is EVMType.STRUCT
+}
+
+global LoopInfo = @record {
+    loop_start: uinteger,
+    loop_step: uinteger,
+    loop_end: uinteger,
+    break_count: uinteger,
+    step_count: uinteger,
+    del_l_count: uinteger,
+    has_step: boolean
+}
+
+Identifier = @record {
+    name: string,
+    token: uinteger,
+    class: uinteger,
+    index: uinteger,
+    varargs_index: uinteger, -- only used for varargs functions
+    type_info: TypeInfo,
+    is_array: boolean,
+    is_varargs: boolean, -- only used for functions
+    const_val: uint32, -- only used for constants
+    const_valf: float32, -- only used for constants
+    func: APIFunction, -- only used when registering api functions
+    argdata: sequence(TypeInfo) -- only used to track function arguments
+}
+
+global Cart = @record {
+    texbank: [MEMORY_TEXBANK_SIZE_ELEMENTS]rl.color,
+    objbank: [MEMORY_OBJBANK_SIZE_ELEMENTS]IntFloat,
+    ompbank: [MEMORY_OMPBANK_SIZE_ELEMENTS]uint8,
+    wmpbank: [MEMORY_WMPBANK_SIZE_ELEMENTS]uint8,
+    wavbank: [MEMORY_WAVBANK_SIZE_ELEMENTS]BKFrame,
+    seqbank: [MEMORY_SEQBANK_SIZE_ELEMENTS]uint8,
+    rom: [MEMORY_ROM_SIZE_ELEMENTS]uint8,
+}
+
+global Light = @record {
+	enabled: cint,
+	light_type: cint,
+	radius: float32,
+	position: rl.vector3,
+	direction: rl.vector3,
+	color: rl.vector3
+}
+
+-- holds graphics information for the vm
+global GPU = @record {
+	texmem: [MEMORY_TEXMEM_SIZE_ELEMENTS]rl.color,
+	objmem: [MEMORY_OBJMEM_SIZE_ELEMENTS]IntFloat,
+	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
+	system_cam2d: rl.camera2D,
+	cameras: [GPU_CAMERAS_COUNT]rl.camera,
+	system_cam: rl.camera,
+	lights: [GPU_LIGHTS_COUNT]Light,
+	gfx_master_rendertexture: rl.renderTexture,
+	gfx_rendertextures: [RenderTexture.COUNT]rl.renderTexture,
+	gfx_texture: rl.texture,
+	gfx_shader: rl.shader,
+	gfx_font_texture: rl.texture,
+	gfx_rendertexture_index: uinteger,
+	texbank_ptr: *[0]rl.color,
+	objbank_ptr: *[0]IntFloat,
+	ompbank_ptr: *[0]uint8,
+	sysmem_ptr: *[0]uint8,
+	
+	-- shader uniform locations
+	mat_model_loc: cint,
+	mat_normal_loc: cint,
+	tex_mode_loc: cint,
+	tex_x_loc: cint,
+	tex_y_loc: cint,
+	tex_w_loc: cint,
+	tex_h_loc: cint,
+	fog_mode_loc: cint,
+	fog_start_loc: cint,
+	fog_end_loc: cint,
+	fog_color_loc: cint,
+	lighting_mode_loc: cint,
+	ambient_factor_loc: cint,
+	ambient_color_loc: cint,
+
+	update_tex: boolean, -- set when TEXMEM is updated. when set, TEXMEM is uploaded to the real GPU
+
+	-- "triangle mode" data
+	--
+	-- RLGL currently doesn't allow primitives created using RL_TRIANGLES to use UV coordinates for textures.
+	-- to mimic textured triangles, we use use RL_QUADS and send a copy of the first vertex as the last quad vertex
+	triangle_mode: boolean,
+	triangle_vert_index: integer,
+
+	proj_matrix_count: uinteger, -- used to track matrix stack
+	view_matrix_count: uinteger, -- used to track matrix stack
+	matrix_mode: uinteger,
+	
+	-- graphics state
+	cull_mode: uinteger,
+	wire_mode: boolean,
+	tex_mode: cint,
+	tex_x: cint,
+	tex_y: cint,
+	tex_w: cint,
+	tex_h: cint,
+	fog_mode: cint,
+	fog_start: float32,
+	fog_end: float32,
+	fog_color: rl.vector4,
+	lighting_mode: cint,
+	ambient_factor: float32,
+	ambient_color: rl.vector3,
+	blend_mode: cint,
+	viewport_w: cint,
+	viewport_h: cint
+}
+
+global SoundChip <forwarddecl> = @record {}
+
+global AudioState = @record {
+    playing_flags: uint8
+}
+
+global TrackContext = @record {
+    bk_track: BKTrack,
+    bk_clock: BKClock,
+    bk_divider: BKDivider,
+    bk_instrument: BKInstrument,
+    soundchip: *SoundChip,
+    track_index: uint8
+}
+
+-- track state object, stored in sysmem
+global TrackState = @record {
+    playflags: uint8,
+    bpm: uint8,
+    volume: uint8,
+    pan: uint8,
+    song_id: uint8,
+    song_pos: uint8,
+    pattern_id: uint8,
+    pattern_pos: uint8,
+    groove_id: uint8,
+    groove_pos: uint8
+}
+
+SoundChip = @record {
+    seqmem: [MEMORY_SEQMEM_SIZE_ELEMENTS]uint8, -- song, chain, phrase, instrument, and state data
+    wavmem: [MEMORY_WAVMEM_SIZE_ELEMENTS]BKFrame, -- sample wave data
+    aobmem: [MEMORY_AOBMEM_SIZE_ELEMENTS]BKFrame, -- working audio buffer
+    track_contexts: [SOUNDCHIP_TRACK_COUNT]TrackContext,
+    preview_bk_track: BKTrack,
+    bk_context: BKContext,
+    bk_data: BKData,
+    audio_stream: rl.audioStream,
+    current_wavbank: uint8, -- which region of memory to use for sample data
+    current_seqbank: uint8, -- which region of memory to use for sequencer data
+    bk_data_flags: BKEnum, -- flags describing sample data format
+
+    -- memory pointers
+    sysmem_ptr: *[0]uint8,
+    wmpbank_ptr: *[0]uint8,
+    wavbank_ptr: *[0]BKFrame,
+    seqbank_ptr: *[0]uint8,
+    song_data: *[0]uint8,
+    pattern_data: *[0]uint8,
+    instrument_data: *[0]uint8,
+    groove_data: *[0]uint8,
+    audio_state: *AudioState,
+    track_state: *[0]uint8
+}
+
+EVM = @record {
+    -- vm vars
+    heap: [MEMORY_HEAP_SIZE_ELEMENTS]uint8,
+    globals: [MEMORY_GLOBALS_SIZE_ELEMENTS]IntFloat,
+    locals: [MEMORY_LOCALS_SIZE_ELEMENTS]IntFloat,
+    args: [MEMORY_ARGS_SIZE_ELEMENTS]IntFloat,
+    opstack: [EVM_OPSTACK_SIZE]IntFloat,
+    bytecode: [EVM_BYTECODE_SIZE]uint8,
+    callstack: [EVM_CALLSTACK_SIZE]CallFrame,
+    api_funcs: [EVM_API_FUNCS_SIZE]APIFunction,
+    sysmem: [MEMORY_SYSMEM_SIZE_ELEMENTS]uint8,
+    cf: CallFrame,
+    rom_len: uinteger,
+    bytecode_len: uinteger,
+    globals_len: uinteger,
+    lsp: uinteger,
+    asp: uinteger,
+    ap: uinteger, -- ap for current function
+    osp: uinteger,
+    csp: uinteger,
+    hook_addresses: [3]uint16,
+    hook_flags: [3]boolean,
+    current_hook: uinteger,
+    objmap_ptr: *[0]uint8,
+    wavmap_ptr: *[0]uint8,
+    
+    -- compiler vars
+    src: [EVM_SRC_SIZE]uint8,
+    src_len: uinteger,
+    src_index: uinteger,
+    prev_src_index: uinteger,
+    token: uinteger,
+    token_val: uinteger,
+    token_valf: float32,
+    string_len: uinteger,
+    prev_token: uinteger,
+    prev_scope_size: uint16,
+    line: uinteger,
+    expr_type: TypeInfo,
+    local_index: uinteger,
+    mlcomment_level: uinteger,
+    prev_opcode: uint8,
+    has_id: boolean,
+    skip_next_id_lookup: boolean,
+    compile_err: boolean,
+    current_id: *Identifier,
+    current_id_name: string,
+    current_func_id: *Identifier,
+    struct_vec2: *Struct,
+    struct_vec3: *Struct,
+    struct_string: *Struct,
+    sb: stringbuilder,
+    keywords: hashmap(string, *Identifier),
+    constants: hashmap(string, *Identifier),
+    api_ids: hashmap(string, *Identifier),
+    builtin_struct_ids: hashmap(string, *Identifier),
+    struct_ids: hashmap(string, *Identifier),
+    sym_tables: sequence(*hashmap(string, *Identifier)),
+    scope_sizes: sequence(uinteger),
+    loop_info_stack: sequence(LoopInfo),
+    loop_break_stack: sequence(uint16),
+    loop_step_stack: sequence(uint16),
+    loop_del_l_stack: sequence(uint16),
+    
+    -- general vars
+    cart: Cart,
+    temp_cart: Cart, -- used for temp storage while saving cart data
+    soundchip: SoundChip,
+    gpu: GPU,
+    error: string,
+    init_time: float64
+}
+
+global State <forwarddecl> = @record {}
+global StateMachine <forwarddecl> = @record {}
+
+global StateFunction: type = @function(*StateMachine, *EVM): void
+
+State = @record {
+	init: StateFunction,
+	enter: StateFunction,
+	exit: StateFunction,
+	update: StateFunction,
+	draw: StateFunction
+}
+
+StateMachine = @record {
+	states: [StateID.COUNT]State,
+	state_ptr: *State,
+	vm_ptr: *EVM,
+	state_id: integer,
+	queued_state: integer,
+	prev_state: integer,
+
+	-- 3D menu swapping animation
+	playing_animation: boolean,
+	facing_angle: float32,
+	target_angle: float32,
+	anim_time: float32,
+	beginning_angle: float32
+}

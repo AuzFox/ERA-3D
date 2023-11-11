@@ -1,19 +1,14 @@
+require("definitions")
+
 global util = @record {}
 
--- union used to store values of different types
-global util.IntFloat = @union {
-	i: int32,
-	u: uint32,
-	f: float32
-}
-
-function util.getIntFloatBtye(array: *[0]util.IntFloat, segment_start: uint32, addr: uint32): uint8
+function util.getIntFloatBtye(array: *[0]IntFloat, segment_start: uint32, addr: uint32): uint8
 	return (@uint8)((array[(addr - segment_start) /// 4].u >> (8 * (3 - (addr & 0b11)))) & 0xFF)
 end
 
-function util.setIntFloatByte(array: *[0]util.IntFloat, segment_start: uint32, addr: uint32, val: uint8): void
+function util.setIntFloatByte(array: *[0]IntFloat, segment_start: uint32, addr: uint32, val: uint8): void
 	local shift: uinteger = 8 * (3 - (addr & 0b11))
-	local v: *util.IntFloat = &array[(addr - segment_start) /// 4]
+	local v: *IntFloat = &array[(addr - segment_start) /// 4]
 	v.u = (v.u & (0xFF000000 >> shift)) | (((@uint32)(val) << 24) >> shift)
 end
 

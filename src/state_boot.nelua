@@ -2,17 +2,17 @@ require("statemachine")
 
 -- TODO: boot animation
 
-global function stateBootInit(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateBootInit(sm: *StateMachine, vm: *EVM): void
 end
 
-global function stateBootEnter(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateBootEnter(sm: *StateMachine, vm: *EVM): void
 end
 
-global function stateBootExit(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateBootExit(sm: *StateMachine, vm: *EVM): void
 end
 
-global function stateBootUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateBootUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
-global function stateBootDraw(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateBootDraw(sm: *StateMachine, vm: *EVM): void
 end

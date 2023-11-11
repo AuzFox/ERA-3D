@@ -1,38 +1,52 @@
 require("statemachine")
 
+local current_wavbank: uint8
+local current_seqbank: uint8
 local run_cart: boolean
 
-global function stateRunInit(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunInit(sm: *StateMachine, vm: *EVM): void
 end
 
-global function stateRunEnter(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
     vm.gpu:setRenderTexture(RenderTexture.MAIN)
+
+    current_wavbank = vm.soundchip.current_wavbank
+    current_seqbank = vm.soundchip.current_seqbank
+    vm.soundchip:setBankPointers(
+        SoundchipBank.SYSTEM,
+        SoundchipBank.SYSTEM
+    )
+    
     run_cart = true
 end
 
-global function stateRunExit(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunExit(sm: *StateMachine, vm: *EVM): void
+    vm.soundchip:setBankPointers(
+        current_wavbank,
+        current_seqbank
+    )
 end
 
-global function stateRunUpdate(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
         run_cart = false
         sm:back()
     end
     
-    if not vm:callHook(e3d.Hook.UPDATE) then
+    if not vm:callHook(Hook.UPDATE) then
         run_cart = false
         sm:back()
     end
 end
 
-global function stateRunDraw(sm: *StateMachine, vm: *e3d.EVM): void
+global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
     if not run_cart then
         return
     end
 
     vm.gpu:camera3D(0) -- configure default camera
     vm.gpu:enableRenderState()
-    if not vm:callHook(e3d.Hook.DRAW) then
+    if not vm:callHook(Hook.DRAW) then
         io.printf(vm.error)
         sm:back()
     end

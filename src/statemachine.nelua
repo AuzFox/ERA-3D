@@ -1,46 +1,6 @@
-require("e3d")
-
 require("rayeasings")
 
-global StateID = @enum {
-    BOOT = 0,
-    MAIN,
-    CODE,
-    TEXTURE,
-    MODEL,
-    TRACKER,
-    RUN,
-    COUNT
-}
-
-global State <forwarddecl> = @record {}
-global StateMachine <forwarddecl> = @record {}
-
-global StateFunction: type = @function(*StateMachine, *e3d.EVM): void
-
-State = @record {
-    init: StateFunction,
-    enter: StateFunction,
-    exit: StateFunction,
-    update: StateFunction,
-    draw: StateFunction
-}
-
-StateMachine = @record {
-    states: [StateID.COUNT]State,
-    state_ptr: *State,
-    vm_ptr: *e3d.EVM,
-    state_id: integer,
-    queued_state: integer,
-    prev_state: integer,
-
-    -- 3D menu swapping animation
-    playing_animation: boolean,
-    facing_angle: float32,
-    target_angle: float32,
-    anim_time: float32,
-    beginning_angle: float32
-}
+require("definitions")
 
 function StateMachine:initState(): void
     self.state_ptr.init(self, self.vm_ptr)
@@ -58,7 +18,7 @@ function StateMachine:back(): void
     self.queued_state = self.prev_state
 end
 
-function StateMachine:init(vm: *e3d.EVM): void
+function StateMachine:init(vm: *EVM): void
     self.vm_ptr = vm
 
     for i = 0, < StateID.COUNT do

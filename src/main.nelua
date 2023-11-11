@@ -1,6 +1,7 @@
-require("arg")
-require("ecc")
+require("definitions")
+require("compiler")
 require("evm")
+require("statemachine")
 require("state_boot")
 require("state_main")
 require("state_code")
@@ -20,7 +21,7 @@ local TriParticle = @record {
 	age_factor: float32
 }
 
-local vm: *e3d.EVM
+local vm: *EVM
 local sm: StateMachine
 local particles: [MAX_PARTICLES]TriParticle
 
@@ -48,7 +49,7 @@ local function randomizeParticle(p: *TriParticle): void
 end
 
 local function init(): void
-	vm = e3d.newVM()
+	vm = newVM()
 	input.setDefaultButtonMap()
 
 	sm.states = {
