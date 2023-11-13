@@ -672,6 +672,7 @@ SoundChip = @record {
     aobmem: [MEMORY_AOBMEM_SIZE_ELEMENTS]BKFrame, -- working audio buffer
     track_contexts: [SOUNDCHIP_TRACK_COUNT]TrackContext,
     preview_bk_track: BKTrack,
+    preview_bk_instrument: BKInstrument,
     bk_context: BKContext,
     bk_data: BKData,
     audio_stream: rl.audioStream,

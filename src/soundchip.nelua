@@ -43,34 +43,65 @@ function SoundChip:setInstrument(track: uint8, instrument: uint8): void
 	local sustain: uint8 = idata[15]
 	local release: uint8 = idata[16]
 
-	local tc: *TrackContext = &self.track_contexts[track]
+	local bk_track_ptr: *BKTrack
+	local bk_instr_ptr: *BKInstrument
+
+	if track == SOUNDCHIP_EMPTY_VALUE then
+		bk_track_ptr = &self.preview_bk_track
+		bk_instr_ptr = &self.preview_bk_instrument
+	else
+		local tc: *TrackContext = &self.track_contexts[track]
+		bk_track_ptr = &tc.bk_track
+		bk_instr_ptr = &tc.bk_instrument
+	end
 	
 	if flags & InstrumentFlag.MANUAL == 0 then
 		sample_start, sample_end, sustain_start, sustain_end = self:getWavMapEntryValues(sample_start)
 	end
 	
 	local range: [2]BKInt = {sample_start, sample_end}
-	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
+	BKSetPtr(bk_track_ptr, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 
 	switch flags & InstrumentFlag.LOOP_MASK do
 		case InstrumentFlag.LOOP_OFF then
-			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
+			BKSetAttr(bk_track_ptr, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
 		case InstrumentFlag.LOOP_FORWARD then
-			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_REPEAT)
+			BKSetAttr(bk_track_ptr, BK_SAMPLE_REPEAT, BK_REPEAT)
 		case InstrumentFlag.LOOP_PINGPONG then
-			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_PALINDROME)
+			BKSetAttr(bk_track_ptr, BK_SAMPLE_REPEAT, BK_PALINDROME)
 		case InstrumentFlag.LOOP_RANGE then
 			range[0] = sustain_start
 			range[1] = sustain_end
-			BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
+			BKSetPtr(bk_track_ptr, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
 	end
 
 	local percentage: float32 = (@float32)(sustain) / 255.0
 	local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
-	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, attack, decay, value, release)
+	BKInstrumentSetEnvelopeADSR(bk_instr_ptr, attack, decay, value, release)
 end
 
-function SoundChip:playPreviewNote(note: uint8): void
+function SoundChip:stopPreviewNote(note: uint8): void
+	BKSetAttr(&self.preview_bk_track, BK_NOTE, BK_NOTE_MUTE)
+end
+
+function SoundChip:playPreviewNote(note: uint8, volume: uint8, instrument: uint8): void
+	if instrument ~= SOUNDCHIP_EMPTY_VALUE then
+		BKSetAttr(&self.preview_bk_track, BK_NOTE, BK_NOTE_MUTE)
+		self:setInstrument(SOUNDCHIP_EMPTY_VALUE, instrument)
+	else
+		self:stopPreviewNote()
+		return
+	end
+
+	if volume ~= SOUNDCHIP_EMPTY_VALUE then
+		local percentage: float32 = (@float32)(volume) / 254.0
+		local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+		BKSetAttr(&self.preview_bk_track, BK_VOLUME, value) -- note volume
+	else
+		self:stopPreviewNote()
+		return
+	end
+
 	if note ~= SOUNDCHIP_EMPTY_VALUE then
 		local bknote: BKInt
 		if note == SOUNDCHIP_NOTE_MUTE then
@@ -82,11 +113,10 @@ function SoundChip:playPreviewNote(note: uint8): void
 		end
 
 		BKSetAttr(&self.preview_bk_track, BK_NOTE, bknote)
+	else
+		self:stopPreviewNote()
+		return
 	end
-end
-
-function SoundChip:stopPreviewNote(note: uint8): void
-	BKSetAttr(&self.preview_bk_track, BK_NOTE, BK_NOTE_MUTE)
 end
 
 function SoundChip:stopTrack(track: uint8): void
@@ -516,9 +546,15 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	end
 
 	BKTrackInit(&self.preview_bk_track, BK_SQUARE)
-	BKSetAttr(&self.preview_bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 8) -- mix volume
+	BKSetAttr(&self.preview_bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME // 4) -- mix volume
 	BKSetAttr(&self.preview_bk_track, BK_VOLUME, BK_MAX_VOLUME /// 4) -- note volume
 	BKTrackAttach(&self.preview_bk_track, &self.bk_context)
+
+	BKSetPtr(&self.preview_bk_track, BK_SAMPLE, &self.bk_data, 0)
+
+	BKInstrumentInit(&self.preview_bk_instrument)
+	BKInstrumentSetEnvelopeADSR(&self.preview_bk_instrument, 0, 3, BK_MAX_VOLUME, 3)
+	BKSetPtr(&self.preview_bk_track, BK_INSTRUMENT, &self.preview_bk_instrument, 0)
 
 	self:resetSoundchip()
 
@@ -587,11 +623,13 @@ function SoundChip:cleanup(): void
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
 		
+		BKDispose(&tc.bk_instrument)
 		BKDispose(&tc.bk_track)
 		BKDispose(&tc.bk_divider)
 		BKDispose(&tc.bk_clock)
 	end
 	
+	BKDispose(&self.preview_bk_instrument)
 	BKDispose(&self.preview_bk_track)
 	BKDispose(&self.bk_context)
 end

@@ -410,7 +410,7 @@ local function doNoteInput(vm: *EVM): boolean
                     row[0] = note
                     row[1] = data.prev_volume
                     row[2] = data.prev_instrument
-                    vm.soundchip:playPreviewNote(note)
+                    vm.soundchip:playPreviewNote(note, data.prev_volume, data.prev_instrument)
                     return true
                 end
             elseif rl.isKeyReleased(piano_keys[i]) then
