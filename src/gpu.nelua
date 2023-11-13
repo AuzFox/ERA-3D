@@ -376,6 +376,7 @@ function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 
 	if c < ' '_u8 then
 		c = '?'_u8
+		$x = $x + 6
 	elseif c == ' '_u8 then
 		$x = $x + 6
 		return

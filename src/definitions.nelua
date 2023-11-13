@@ -40,7 +40,7 @@ global EVM_API_FUNCS_SIZE <comptime> = 65536
 		SEQMEM              (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
 			song data       (2KiB          )                         (256 * 8 bytes)
 			pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
-			instrument data (4KiB + 256B   )                         (256 * 17 bytes (flags, sample start (24bit), sample end(24bit), sustain start (24bit), sustain end(24bit), attack, decay, sustain, release))
+			instrument data (6KiB + 256B   )                         (256 * 25 bytes (flags, sample start (24bit), sample end(24bit), sustain start (24bit), sustain end(24bit), attack, decay, sustain, release, name))
 			groove data     (1KiB          )                         (16 * 64 bytes)
 			unused          (???KiB + ???B )                         (unused)
 		GLOBALS             (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
@@ -108,11 +108,28 @@ global MEMORY_NULL <comptime> = 0xFFFFFFFF
 global GPU_ALPHA_BLACK <comptime> = 0x00000000
 global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
 global GPU_BLACK       <comptime> = 0x000000FF
+global GPU_LGRAY       <comptime> = 0xC3C3C3FF
 global GPU_GRAY        <comptime> = 0x808080FF
+global GPU_DGRAY       <comptime> = 0x484848FF
 global GPU_WHITE       <comptime> = 0xFFFFFFFF
-global GPU_RED         <comptime> = 0xFF0000FF
-global GPU_GREEN       <comptime> = 0x00FF00FF
-global GPU_BLUE        <comptime> = 0x0000FFFF
+global GPU_RED         <comptime> = 0xFF6868FF
+global GPU_ORANGE      <comptime> = 0xFFB762FF
+global GPU_YELLOW      <comptime> = 0xFBFF70FF
+global GPU_GREEN       <comptime> = 0x8FFF78FF
+global GPU_LBLUE       <comptime> = 0x59F0FFFF
+global GPU_BLUE        <comptime> = 0x5E9BFFFF
+global GPU_PURPULE     <comptime> = 0x826DFFFF
+global GPU_PINK        <comptime> = 0xFF7EFFFF
+global GPU_PALETTE: []uint32 = {
+	GPU_RED,
+	GPU_ORANGE,
+	GPU_YELLOW,
+	GPU_GREEN,
+	GPU_LBLUE,
+	GPU_BLUE,
+	GPU_PURPULE,
+	GPU_PINK
+}
 
 -- screen dimentions (vscreen is console's virtual resolution)
 global GPU_VSCREEN_W <comptime> = 480
@@ -149,7 +166,7 @@ global SOUNDCHIP_SONG_SIZE <comptime> = 256 * 8
 global SOUNDCHIP_PATTERN_ROW_SIZE <comptime> = 5
 global SOUNDCHIP_PATTERN_SIZE <comptime> = 64 * SOUNDCHIP_PATTERN_ROW_SIZE
 global SOUNDCHIP_PATTERN_COUNT <comptime> = 256
-global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 17
+global SOUNDCHIP_INSTRUMENT_SIZE <comptime> = 25
 global SOUNDCHIP_INSTRUMENT_COUNT <comptime> = 256
 global SOUNDCHIP_GROOVE_SIZE <comptime> = 64
 global SOUNDCHIP_GROOVE_COUNT <comptime> = 16
@@ -414,21 +431,23 @@ global SoundchipBank = @enum {
 }
 
 -- instrument flags byte:
--- L R 0 0 0 0 0 M
--- L = loop (only used when R flag is 0)
--- R = use sustain range (L flag is ignored)
--- M = use sample start value as wavmap index
+-- W 0 0 0 0 0 LM
+-- W = use sample start value as wavmap index
+-- LM = loop mode (2 bits)
 global InstrumentFlag = @enum {
-	LOOP              = 0b10000000,
-	USE_SUSTAIN_RANGE = 0b01000000,
-	USE_WAVMAP        = 0b00000001
+	LOOP_OFF = 0,
+	LOOP_FORWARD,
+	LOOP_PINGPONG,
+	LOOP_RANGE,
+	LOOP_MASK = 0b00000011,
+	MANUAL    = 0b10000000
 }
 
 -- playflags byte:
 -- M L 0 0 0 0 PM
 -- M = mute
 -- L = loop
--- PM = playmode (2 bits)
+-- PM = play mode (2 bits)
 global PlayFlag = @enum {
 	PLAY_SONG = 0,
 	PLAY_PATTERN,

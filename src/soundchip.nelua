@@ -2,8 +2,6 @@ require("blipkit")
 
 require("definitions")
 
--- TODO: implement playback from SEQBANK
-
 function SoundChip:getTrackState(id: uinteger): *TrackState
     return (@*TrackState)(&self.track_state[id * #TrackState])
 end
@@ -47,22 +45,25 @@ function SoundChip:setInstrument(track: uint8, instrument: uint8): void
 
 	local tc: *TrackContext = &self.track_contexts[track]
 	
-	if flags & InstrumentFlag.USE_WAVMAP ~= 0 then
+	if flags & InstrumentFlag.MANUAL == 0 then
 		sample_start, sample_end, sustain_start, sustain_end = self:getWavMapEntryValues(sample_start)
 	end
 	
 	local range: [2]BKInt = {sample_start, sample_end}
 	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 
-	if flags & InstrumentFlag.USE_SUSTAIN_RANGE ~= 0 then
-		range[0] = sustain_start
-		range[1] = sustain_end
-		print("sustain range", sustain_start, sustain_end)
-		BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
-	else
-		BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & InstrumentFlag.LOOP ~= 0) and BK_REPEAT or BK_NO_REPEAT)
+	switch flags & InstrumentFlag.LOOP_MASK do
+		case InstrumentFlag.LOOP_OFF then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
+		case InstrumentFlag.LOOP_FORWARD then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_REPEAT)
+		case InstrumentFlag.LOOP_PINGPONG then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_PALINDROME)
+		case InstrumentFlag.LOOP_RANGE then
+			range[0] = sustain_start
+			range[1] = sustain_end
+			BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
 	end
-	
 
 	local percentage: float32 = (@float32)(sustain) / 255.0
 	local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
@@ -230,7 +231,21 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 	
 	local range: [2]BKInt = {start, send}
 	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
-	BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, (flags & InstrumentFlag.LOOP ~= 0) and BK_REPEAT or BK_NO_REPEAT)
+
+	switch flags & InstrumentFlag.LOOP_MASK do
+		case InstrumentFlag.LOOP_OFF then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
+		case InstrumentFlag.LOOP_FORWARD then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_REPEAT)
+		case InstrumentFlag.LOOP_PINGPONG then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_PALINDROME)
+		case InstrumentFlag.LOOP_RANGE then
+			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
+			--range[0] = sustain_start
+			--range[1] = sustain_end
+			--BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
+	end
+	
 	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, 0, 0, BK_MAX_VOLUME, 4)
 		
 	BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4)
@@ -452,7 +467,6 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	local i0_start: uint32 = 0
 	local i0_count: uint32 = 0
 	success, i0_count = self:loadAudioSample("test_data/Control Amen.wav", 0, i0_start)
-	print(success, i0_count)
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -529,7 +543,7 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	local instr0: *[0]uint8 = self:getInstrument(0)
 
 	-- flags
-	instr0[0] = InstrumentFlag.USE_SUSTAIN_RANGE
+	instr0[0] = InstrumentFlag.LOOP_RANGE | InstrumentFlag.MANUAL
 	-- sample start
 	instr0[1] = (i0_start >> 16) & 0xFF
 	instr0[2] = (i0_start >> 8) & 0xFF
@@ -543,14 +557,23 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	instr0[8] = ((i0_start + (i0_count /// 2)) >> 8) & 0xFF
 	instr0[9] = ((i0_start + (i0_count /// 2))) & 0xFF
 	-- sustain end
-	instr0[10] = ((i0_start + (i0_count /// 4)) >> 16) & 0xFF
-	instr0[11] = ((i0_start + (i0_count /// 4)) >> 8) & 0xFF
-	instr0[12] = ((i0_start + (i0_count /// 4))) & 0xFF
+	instr0[10] = ((i0_start + (i0_count /// 2) + (i0_count /// 4)) >> 16) & 0xFF
+	instr0[11] = ((i0_start + (i0_count /// 2) + (i0_count /// 4)) >> 8) & 0xFF
+	instr0[12] = ((i0_start + (i0_count /// 2) + (i0_count /// 4))) & 0xFF
 	-- adsr
 	instr0[13] = 12
 	instr0[14] = 0
 	instr0[15] = 255
 	instr0[16] = 4
+	-- name
+	instr0[17] = 'B'_u8
+	instr0[18] = 'R'_u8
+	instr0[19] = 'K'_u8
+	instr0[20] = '('_u8
+	instr0[21] = '1'_u8
+	instr0[22] = '7'_u8
+	instr0[23] = '5'_u8
+	instr0[24] = ')'_u8
 
 	rl.playAudioStream(self.audio_stream)
 end
