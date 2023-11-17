@@ -1,5 +1,3 @@
-require("arg")
-
 require("statemachine")
 
 global function stateMainInit(sm: *StateMachine, vm: *EVM): void
@@ -33,17 +31,17 @@ global function stateMainUpdate(sm: *StateMachine, vm: *EVM): void
                 io.printf(vm.error)
             end
         elseif rl.isKeyPressed(rl.keyboardKey.S) then
-            if vm:saveCart(arg[2]) then
-                print("cart saved!")
+            if core.current_cart_path == "" then
+                sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
+                sm.queued_dialog = DialogID.SAVE_CART
             else
-                io.printf(vm.error)
+                if not vm:saveCart(core.current_cart_path) then
+                    io.printf(vm.error)
+                end
             end
         elseif rl.isKeyPressed(rl.keyboardKey.O) then
-            if vm:loadCart(arg[1]) then
-                print("cart loaded!")
-            else
-                io.printf(vm.error)
-            end
+            sm:resetFileBrowser(core.carts_directory, FileBrowserMode.LOAD)
+            sm.queued_dialog = DialogID.LOAD_CART
         end
     else
         if rl.isKeyPressed(rl.keyboardKey.P) then
@@ -65,12 +63,6 @@ global function stateMainUpdate(sm: *StateMachine, vm: *EVM): void
             io.printf('SEQBANK: 0x%08X - 0x%08X\n', MEMORY_SEQBANK_START_ADDR, MEMORY_SEQBANK_MAX_ADDR)
             io.printf('ROM:     0x%08X - 0x%08X\n', MEMORY_ROM_START_ADDR, MEMORY_ROM_MAX_ADDR)
             io.printf('MEMCARD: 0x%08X - 0x%08X\n', MEMORY_MEMCARD_START_ADDR, MEMORY_MEMCARD_MAX_ADDR)
-        elseif rl.isKeyPressed(rl.keyboardKey.O) then
-            if vm:loadData(arg[3], arg[4]) then
-                print("data loaded!")
-            else
-                io.printf(vm.error)
-            end
         elseif rl.isKeyPressed(rl.keyboardKey.B) then
             if vm.bytecode_len > 0 then
                 vm:dumpBytecode()
@@ -90,4 +82,7 @@ global function stateMainDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 18, GPU_GRAY, "[CTRL+R]         : RUN CART")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 27, GPU_GRAY, "[CTRL+O]         : OPEN CART")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 36, GPU_GRAY, "[CTRL+S]         : SAVE CART")
+end
+
+global function stateMainCleanup(sm: *StateMachine, vm: *EVM): void
 end

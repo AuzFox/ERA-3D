@@ -353,10 +353,10 @@ global rl.vrStereoConfig: type <cimport'VrStereoConfig', cinclude'<raylib.h>',no
     scaleIn: [2]float32
 }
 
-global rl.filePathList = @record{
+global rl.filePathList: type <cimport'FilePathList', cinclude'<raylib.h>',nodecl> = @record{
     capacity: cuint,
     count: cuint,
-    paths: cchar
+    paths: *[0]cstring
 }
 
 ------------------------------------------------------------------------------------

@@ -2397,6 +2397,7 @@ function EVM:loadCart(filename: string): boolean
 	return true
 end
 
+--[[
 function EVM:loadData(src_file: string, tex_file: string): boolean
 	local sfs, err, errcode = filestream.open(src_file)
 	if not sfs:isopen() then
@@ -2418,6 +2419,7 @@ function EVM:loadData(src_file: string, tex_file: string): boolean
 
 	return true
 end
+]]
 
 function EVM:__gc(): void
 	self.soundchip:cleanup()

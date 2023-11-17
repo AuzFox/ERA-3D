@@ -3,6 +3,7 @@ require("raylib")
 global input = @record {}
 
 global input.PLAYER_COUNT <comptime> = 4
+global input.HEX_KEYS_COUNT <comptime> = 16
 
 -- emulate a PS1-like controller
 global input.Button = @enum {
@@ -21,6 +22,25 @@ global input.Button = @enum {
 	SELECT,
 	START,
 	COUNT -- not an actual button; used to count the number of buttons
+}
+
+global input.hex_keys: [input.HEX_KEYS_COUNT]cint = {
+    rl.keyboardKey.ZERO,
+    rl.keyboardKey.ONE,
+    rl.keyboardKey.TWO,
+    rl.keyboardKey.THREE,
+    rl.keyboardKey.FOUR,
+    rl.keyboardKey.FIVE,
+    rl.keyboardKey.SIX,
+    rl.keyboardKey.SEVEN,
+    rl.keyboardKey.EIGHT,
+    rl.keyboardKey.NINE,
+    rl.keyboardKey.A,
+    rl.keyboardKey.B,
+    rl.keyboardKey.C,
+    rl.keyboardKey.D,
+    rl.keyboardKey.E,
+    rl.keyboardKey.F
 }
 
 global input.button_map: [input.Button.COUNT * input.PLAYER_COUNT]cint
@@ -48,4 +68,44 @@ end
 
 function input.setButtonKeycode(btn: integer, keycode: cint): void
 	input.button_map[btn] = keycode
+end
+
+function input.hexEdit(byte_ptr: *[0]uint8, out_byte: *uint8, nibble_index: uinteger, handle_empty: boolean): boolean
+    local pressed: boolean = false
+    local nibble: uint8
+
+    if handle_empty and rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
+        byte_ptr[0] = SOUNDCHIP_EMPTY_VALUE
+        return true
+    end
+
+    for i: uint8 = 0, < input.HEX_KEYS_COUNT do
+        if rl.isKeyPressed(input.hex_keys[i]) then
+            pressed = true
+            nibble = i
+			break
+        end
+    end
+
+    if pressed then
+        local byte_val: uint8 = byte_ptr[0]
+
+        if handle_empty and byte_val == SOUNDCHIP_EMPTY_VALUE then
+            byte_val = 0
+        end
+
+        if nibble_index == 0 then
+            byte_val = (byte_val & 0x0F) | (nibble << 4)
+        else
+            byte_val = (byte_val & 0xF0) | nibble
+        end
+
+		if out_byte ~= nilptr then
+        	$out_byte = byte_val
+		end
+
+        byte_ptr[0] = byte_val
+    end
+
+    return pressed
 end

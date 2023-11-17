@@ -118,7 +118,7 @@ void draw() {
     pushMatrix();
         scale((vec3){8.0, 8.0, 8.0});
         texture(0, 0, 16, 16);
-        drawModelEx(2, 0, 6);
+        drawObjEx(2, 0, 6);
     popMatrix();
     setCullMode(0);
 
@@ -131,7 +131,7 @@ void draw() {
             identity();
             translate(p);
             scale((vec3){0.5, 0.5, 0.5});
-            drawModelEx(2, 0, 6);
+            drawObjEx(2, 0, 6);
 
             p.y = -7.9;
 

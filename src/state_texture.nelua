@@ -17,6 +17,13 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
 
     if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.RIGHT) then
         sm.queued_state = StateID.MAIN -- switch to main state next frame
+        return
+    end
+
+    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
+        sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
+        sm.queued_dialog = DialogID.IMPORT_TEXTURE
+        return
     end
 end
 
@@ -25,4 +32,7 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:camera2D(-1)
 
     vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((31 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 4, GPU_GREEN, "// TEXTURE EDITOR STUFF HERE...")
+end
+
+global function stateTextureCleanup(sm: *StateMachine, vm: *EVM): void
 end

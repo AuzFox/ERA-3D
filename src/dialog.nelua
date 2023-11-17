@@ -1,0 +1,463 @@
+require("statemachine")
+
+local function fileBrowserChangeDirectory(dir: cstring, vm: *EVM): void
+    -- copy prev path into stringbuilder
+    local str: *[0]cchar = (@*[0]cchar)(dir)
+    vm.sb:clear()
+    local i: uinteger = 0
+    local c: cchar = str[i]
+    while c ~= '\0'_u8 do
+        vm.sb:writebyte(c)
+
+        i = i + 1
+        c = str[i]
+    end
+
+    -- get stringview
+    core.current_browser_path = vm.sb:view()
+
+    -- load directory file list
+    rl.unloadDirectoryFiles(core.file_paths)
+    core.file_paths = rl.loadDirectoryFiles(core.current_browser_path)
+    core.browser_index = 0
+end
+
+local function fileBrowserUpdate(sm: *StateMachine, vm: *EVM): integer
+    switch core.browser_input_mode do
+        case FileBrowserInputMode.SET_FILENAME then
+            if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+                return FileBrowserResult.CANCEL
+            elseif rl.isKeyPressed(rl.keyboardKey.ENTER) then
+                core.browser_input_mode = FileBrowserInputMode.SELECT_FILE_OR_DIR
+            elseif rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
+                if core.dialog_val0 > 0 then
+                    core.file_name[core.dialog_val0 - 1] = '\0'_u8
+                    core.dialog_val0 = core.dialog_val0 - 1
+                end
+            else
+                local c: cint = rl.getCharPressed()
+                while c ~= 0 do
+                    if core.dialog_val0 < 64 then
+                        core.file_name[core.dialog_val0] = (@uint8)(c)
+                        core.dialog_val0 = core.dialog_val0 + 1
+                        c = rl.getCharPressed()
+                    else
+                        break
+                    end
+                end
+            end
+        case FileBrowserInputMode.SELECT_FILE_OR_DIR then
+            if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+                if core.browser_mode == FileBrowserMode.LOAD then
+                    return FileBrowserResult.CANCEL
+                else
+                    core.browser_input_mode = FileBrowserInputMode.SET_FILENAME
+                end
+            elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                -- navigate back to parent directory
+                fileBrowserChangeDirectory(rl.getPrevDirectoryPath(core.current_browser_path), vm)
+            elseif rl.isKeyPressed(rl.keyboardKey.ENTER) then
+                switch core.browser_mode do
+                    case FileBrowserMode.LOAD then
+                        if core.file_paths.count ~= 0 and rl.isPathFile(core.file_paths.paths[core.browser_index]) then
+                            return FileBrowserResult.SELECTED_FILE
+                        end
+                    case FileBrowserMode.SAVE then
+                        -- select current directory
+                        return FileBrowserResult.SELECTED_DIRECTORY
+                end
+            elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                if core.file_paths.count ~= 0 then
+                    if not rl.isPathFile(core.file_paths.paths[core.browser_index]) then
+                        -- navigate into selected directory
+                        fileBrowserChangeDirectory(core.file_paths.paths[core.browser_index], vm)
+                    end
+                end
+            elseif rl.isKeyPressed(rl.keyboardKey.UP) then
+                core.browser_index = util.wrapI(core.browser_index - 1, 0, core.file_paths.count)
+            elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
+                core.browser_index = util.wrapI(core.browser_index + 1, 0, core.file_paths.count)
+            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_UP) then
+                core.browser_index = util.wrapI(core.browser_index - 34, 0, core.file_paths.count)
+            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_DOWN) then
+                core.browser_index = util.wrapI(core.browser_index + 34, 0, core.file_paths.count)
+            elseif rl.isKeyPressed(rl.keyboardKey.HOME) then
+                if rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL) then
+                    if rl.isKeyDown(rl.keyboardKey.LEFT_ALT) or rl.isKeyDown(rl.keyboardKey.RIGHT_ALT) then
+                        fileBrowserChangeDirectory(core.data_directory, vm)
+                    else
+                        fileBrowserChangeDirectory(core.user_directory, vm)
+                    end
+                else
+                    core.browser_index = 0
+                end
+            elseif rl.isKeyPressed(rl.keyboardKey.END) then
+                core.browser_index = core.file_paths.count - 1
+            end
+    end
+
+
+    return FileBrowserResult.CONTINUE
+end
+
+local function fileBrowserDraw(sm: *StateMachine, vm: *EVM): void
+    local start_y: int32
+    local max_filenames: integer
+    local border_x: int32
+    local border_y: int32
+    local border_w: int32
+    local border_h: int32
+    local name_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SET_FILENAME) and core.cursor_color or GPU_GRAY
+    local browser_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SELECT_FILE_OR_DIR) and core.cursor_color or GPU_GRAY
+
+    if core.browser_mode == FileBrowserMode.SAVE then
+        start_y = 36
+        max_filenames = 32
+
+        --vm.gpu:drawRect2D(border_x, border_y, border_w, 1, core.cursor_color)
+        --vm.gpu:drawRect2D(border_x, border_y + 1, 1, border_h, core.cursor_color)
+        --vm.gpu:drawRect2D(border_x + border_w - 1, border_y + 1, 1, border_h, core.cursor_color)
+        --vm.gpu:drawRect2D(border_x, border_y + border_h, border_w, 1, core.cursor_color)
+
+        -- name border
+        border_x = 4
+        border_y = 16
+        border_w = GPU_VSCREEN_W - 8
+        border_h = 12
+        vm.gpu:drawRect2D(border_x, border_y, border_w, 1, name_cursor_color)
+        vm.gpu:drawRect2D(border_x, border_y + 1, 1, border_h, name_cursor_color)
+        vm.gpu:drawRect2D(border_x + border_w - 1, border_y + 1, 1, border_h, name_cursor_color)
+        vm.gpu:drawRect2D(border_x, border_y + border_h, border_w, 1, name_cursor_color)
+
+        -- browser border
+        border_y = 34
+        border_h = (34 * 9) + 3
+        vm.gpu:drawRect2D(border_x, border_y, border_w, 1, browser_cursor_color)
+        vm.gpu:drawRect2D(border_x, border_y + 1, 1, border_h, browser_cursor_color)
+        vm.gpu:drawRect2D(border_x + border_w - 1, border_y + 1, 1, border_h, browser_cursor_color)
+        vm.gpu:drawRect2D(border_x, border_y + border_h, border_w, 1, browser_cursor_color)
+
+        vm.gpu:print2D(6, 18, GPU_GRAY, "NAME")
+        vm.gpu:drawRect2D(36, 18, 64 * 6, 9, GPU_DGRAY)
+        vm.gpu:drawRect2D(36 + core.dialog_val0 * 6, 18, 6, 9, name_cursor_color)
+        vm.gpu:printCString2D(36, 18, GPU_WHITE, (@cstring)(&core.file_name))
+    else
+        start_y = 18
+        max_filenames = 34
+    end
+
+    vm.gpu:print2D(6, start_y, GPU_LGRAY, core.current_browser_path)
+
+    if core.file_paths.count == 0 then
+        vm.gpu:print2D(GPU_VSCREEN_HALF_W - 54, GPU_VSCREEN_HALF_H - 4, GPU_GRAY, "DIRECTORY IS EMPTY")
+        return
+    end
+
+    local start_index: integer = math.max(0, core.browser_index - (max_filenames /// 2 - 1))
+    if core.file_paths.count <= max_filenames then
+        start_index = 0
+    else
+        start_index = math.min(start_index, core.file_paths.count - max_filenames)
+    end
+    for i = 0, < max_filenames do
+        local y: int32 = (start_y + 18) + (i * 9)
+        local index: integer = start_index + i
+        if index >= core.file_paths.count then
+            break
+        end
+
+        local path: cstring = core.file_paths.paths[index]
+
+        if index == core.browser_index then
+            vm.gpu:drawRect2D(36, y, 438, 9, browser_cursor_color)
+        end
+
+        if rl.isPathFile(path) then
+            vm.gpu:print2D(6, y, GPU_LGRAY, "FILE")
+        else
+            vm.gpu:print2D(6, y, GPU_GRAY, "DIR")
+        end
+        vm.gpu:printCString2D(36, y, GPU_WHITE, rl.getFileName(path))
+    end
+end
+
+local function sampleConfigUpdate(sm: *StateMachine, vm: *EVM): void
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        rl.unloadWave(core.sample_to_import)
+        core.has_loaded_sample = false
+
+        core.dialog_step = DialogStep.FILE_BROWSER
+    elseif rl.isKeyPressed(rl.keyboardKey.ENTER) then
+        -- load sample data
+        local sample_start: uint32 = ((@uint32)(core.byte_buffer[1]) << 16) | ((@uint32)(core.byte_buffer[2]) << 8) | (@uint32)(core.byte_buffer[3])
+        local wavmap_id: uint8 = core.byte_buffer[0]
+
+        vm.soundchip:loadSampleData(vm.soundchip.current_wavbank - SoundchipBank.WAVBANK0, sample_start)
+
+        --[[ TODO: complete this!
+        if wavmap_id ~= SOUNDCHIP_EMPTY_VALUE then
+            -- set wavmap entry data
+        end
+        ]]
+
+        rl.unloadWave(core.sample_to_import)
+	    core.has_loaded_sample = false
+        sm.queued_dialog = DialogID.NONE
+    elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
+        if core.dialog_val1 == 0 then
+            core.dialog_val0 = util.wrapI(core.dialog_val0 - 1, 0, 6)
+        else
+            core.dialog_val0 = util.wrapI(core.dialog_val0 - 1, 0, 2)
+        end
+    elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+        if core.dialog_val1 == 0 then
+            core.dialog_val0 = util.wrapI(core.dialog_val0 + 1, 0, 6)
+        else
+            core.dialog_val0 = util.wrapI(core.dialog_val0 + 1, 0, 2)
+        end
+    elseif rl.isKeyPressed(rl.keyboardKey.UP) then
+        core.dialog_val0 = 0
+        core.dialog_val1 = util.wrapI(core.dialog_val1 - 1, 0, 2)
+    elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
+        core.dialog_val0 = 0
+        core.dialog_val1 = util.wrapI(core.dialog_val1 + 1, 0, 2)
+    else
+        if core.dialog_val1 == 0 then
+            if input.hexEdit(
+                &core.byte_buffer[1 + core.dialog_val0 /// 2],
+                nilptr,
+                core.dialog_val0 & 1,
+                false
+            ) then
+                local sample_start: uint32 = ((@uint32)(core.byte_buffer[1]) << 16) | ((@uint32)(core.byte_buffer[2]) << 8) | (@uint32)(core.byte_buffer[3])
+                
+                local max_index: uint32 = MEMORY_WAVMEM_SIZE_ELEMENTS - (@uint32)(core.sample_to_import.frameCount) - 1
+                if sample_start > max_index then
+                    core.byte_buffer[1] = (@uint8)((max_index >> 16) & 0xFF)
+                    core.byte_buffer[2] = (@uint8)((max_index >> 8) & 0xFF)
+                    core.byte_buffer[3] = (@uint8)(max_index & 0xFF)
+                end
+
+                core.dialog_val0 = util.wrapI(core.dialog_val0 + 1, 0, 6)
+            end
+        else
+            if input.hexEdit(
+                &core.byte_buffer[0],
+                nilptr,
+                core.dialog_val0 & 1,
+                true
+            ) then
+                core.dialog_val0 = util.wrapI(core.dialog_val0 + 1, 0, 2)
+            end
+        end
+    end
+end
+
+local function sampleConfigDraw(sm: *StateMachine, vm: *EVM): void
+    vm.gpu:print2D(6, 18, GPU_LGRAY, "SAMPLE CONFIG")
+
+    local label_x: int32 = 6
+    local value_x: int32 = 84
+
+    switch core.dialog_val1 do
+        case 0 then -- sample start
+            vm.gpu:drawRect2D(value_x + core.dialog_val0 * 6, 45, 6, 9, core.cursor_color)
+        case 1 then -- wavmap entry id
+            vm.gpu:drawRect2D(value_x + core.dialog_val0 * 6, 54, 6, 9, core.cursor_color)
+    end
+    
+    local frame_count: uint32 = (@uint32)(core.sample_to_import.frameCount)
+    vm.gpu:print2D(label_x, 36, GPU_GRAY, "SAMPLE SIZE")
+    vm.gpu:printHexByte2D(value_x, 36, GPU_GRAY, (frame_count >> 16) & 0xFF)
+    vm.gpu:printHexByte2D(value_x + 12, 36, GPU_GRAY, (frame_count >> 8) & 0xFF)
+    vm.gpu:printHexByte2D(value_x + 24, 36, GPU_GRAY, frame_count & 0xFF)
+
+    local sample_start: uint32 = ((@uint32)(core.byte_buffer[1]) << 16) | ((@uint32)(core.byte_buffer[2]) << 8) | (@uint32)(core.byte_buffer[3])
+    local sample_end: uint32 = sample_start + frame_count
+    vm.gpu:print2D(label_x, 45, GPU_GRAY, "START/END")
+    vm.gpu:printHexByte2D(value_x, 45, GPU_WHITE, core.byte_buffer[1])
+    vm.gpu:printHexByte2D(value_x + 12, 45, GPU_WHITE, core.byte_buffer[2])
+    vm.gpu:printHexByte2D(value_x + 24, 45, GPU_WHITE, core.byte_buffer[3])
+
+    vm.gpu:printHexByte2D(value_x + 42, 45, GPU_GRAY, (sample_end >> 16) & 0xFF)
+    vm.gpu:printHexByte2D(value_x + 54, 45, GPU_GRAY, (sample_end >> 8) & 0xFF)
+    vm.gpu:printHexByte2D(value_x + 66, 45, GPU_GRAY, sample_end & 0xFF)
+
+    vm.gpu:print2D(label_x, 54, GPU_GRAY, "WAVMAP ID")
+    if core.byte_buffer[0] == SOUNDCHIP_EMPTY_VALUE then
+        vm.gpu:print2D(value_x, 54, GPU_WHITE, "..")
+    else
+        vm.gpu:printHexByte2D(value_x, 54, GPU_WHITE, core.byte_buffer[0])
+    end
+end
+
+global function dialogImportCodeUpdate(sm: *StateMachine, vm: *EVM): void
+end
+
+global function dialogImportCodeDraw(sm: *StateMachine, vm: *EVM): void
+end
+
+global function dialogImportTextureUpdate(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            switch fileBrowserUpdate(sm, vm) do
+                case FileBrowserResult.CANCEL then
+                    sm.queued_dialog = DialogID.NONE
+                case FileBrowserResult.SELECTED_FILE then
+                    core.image_to_import = rl.loadImage(core.file_paths.paths[core.browser_index])
+
+                    if not rl.isImageReady(core.image_to_import) then
+                        print("could not load image", core.file_paths.paths[core.browser_index])
+                        sm.queued_dialog = DialogID.NONE
+                        return
+                    end
+
+                    core.has_loaded_image = true
+
+                    if core.image_to_import.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
+                    	rl.imageFormat(&core.image_to_import, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
+                    end
+
+                    -- TODO: check image size
+                    --core.dialog_step = DialogStep.TEXTURE_POSITION
+
+                    vm.gpu:loadTextureData(0, 0, 0, 0, 0, 1024, 1024)
+
+                    rl.unloadImage(core.image_to_import)
+	                core.has_loaded_image = false
+                    sm.queued_dialog = DialogID.NONE
+            end
+        --case DialogStep.TEXTURE_POSITION then
+        --    texturePositionUpdate(sm, vm)
+        --case DialogStep.TEXTURE_CROP then
+        --    textureCropUpdate(sm, vm)
+    end
+end
+
+global function dialogImportTextureDraw(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            fileBrowserDraw(sm, vm)
+        -- TODO: complete this!
+        --case DialogStep.TEXTURE_POSITION then
+        --    texturePositionDraw(sm, vm)
+        --case DialogStep.TEXTURE_CROP then
+        --    textureCropDraw(sm, vm)
+    end
+end
+
+global function dialogImportModelUpdate(sm: *StateMachine, vm: *EVM): void
+end
+
+global function dialogImportModelDraw(sm: *StateMachine, vm: *EVM): void
+end
+
+global function dialogImportSampleUpdate(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            switch fileBrowserUpdate(sm, vm) do
+                case FileBrowserResult.CANCEL then
+                    sm.queued_dialog = DialogID.NONE
+                case FileBrowserResult.SELECTED_FILE then
+                    core.sample_to_import = rl.loadWave(core.file_paths.paths[core.browser_index])
+
+                    if not rl.isWaveReady(core.sample_to_import) then
+                        print("could not load sample", core.file_paths.paths[core.browser_index])
+                        sm.queued_dialog = DialogID.NONE
+                        return
+                    end
+
+                    core.has_loaded_sample = true
+
+                    if core.sample_to_import.sampleRate ~= SOUNDCHIP_SAMPLE_RATE or core.sample_to_import.sampleSize ~= 16 or core.sample_to_import.channels ~= 2 then
+                        rl.waveFormat(&core.sample_to_import, SOUNDCHIP_SAMPLE_RATE, 16, 2)
+                    end
+
+                    core.dialog_val0 = 0 -- "x" cursor position
+                    core.dialog_val1 = 0 -- "y" cursor position
+                    core.byte_buffer[0] = SOUNDCHIP_EMPTY_VALUE -- wavmap entry id
+                    core.byte_buffer[1] = 0 -- sample start index (byte 0)
+                    core.byte_buffer[2] = 0 -- sample start index (byte 1)
+                    core.byte_buffer[3] = 0 -- sample start index (byte 2)
+
+                    core.dialog_step = DialogStep.SAMPLE_CONFIG
+            end
+        case DialogStep.SAMPLE_CONFIG then
+            sampleConfigUpdate(sm, vm)
+    end
+end
+
+global function dialogImportSampleDraw(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            fileBrowserDraw(sm, vm)
+        case DialogStep.SAMPLE_CONFIG then
+            sampleConfigDraw(sm, vm)
+    end
+end
+
+global function dialogLoadCartUpdate(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            switch fileBrowserUpdate(sm, vm) do
+                case FileBrowserResult.CANCEL then
+                    sm.queued_dialog = DialogID.NONE
+                case FileBrowserResult.SELECTED_FILE then
+                    if vm:loadCart((@string)(core.file_paths.paths[core.browser_index])) then
+                        sm.queued_dialog = DialogID.NONE
+                    else
+                        io.printf(vm.error)
+                    end
+            end
+    end
+end
+
+global function dialogLoadCartDraw(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            fileBrowserDraw(sm, vm)
+    end
+end
+
+global function dialogSaveCartUpdate(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            switch fileBrowserUpdate(sm, vm) do
+                case FileBrowserResult.CANCEL then
+                    sm.queued_dialog = DialogID.NONE
+                case FileBrowserResult.SELECTED_DIRECTORY then
+                    local file_name_str: string = {
+                        data=&core.file_name,
+                        size=core.dialog_val0
+                    }
+
+                    if #file_name_str > 4 then
+                        local ext: string = string.subview(file_name_str, -4)
+                        if ext ~= ".e3d" and ext ~= ".zip" then
+                            file_name_str = file_name_str .. ".e3d"
+                        end
+                    else
+                        file_name_str = file_name_str .. ".e3d"
+                    end
+
+                    ## if ccinfo.is_windows then
+                        core.current_cart_path = (@string)(core.current_browser_path) .. "\\" .. file_name_str
+                    ## elseif ccinfo.is_linux then
+                        core.current_cart_path = (@string)(core.current_browser_path) .. "/" .. file_name_str
+                    ## end
+
+                    if vm:saveCart(core.current_cart_path) then
+                        sm.queued_dialog = DialogID.NONE
+                    else
+                        io.printf(vm.error)
+                    end
+            end
+    end
+end
+
+global function dialogSaveCartDraw(sm: *StateMachine, vm: *EVM): void
+    switch core.dialog_step do
+        case DialogStep.FILE_BROWSER then
+            fileBrowserDraw(sm, vm)
+    end
+end

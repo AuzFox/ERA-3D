@@ -468,6 +468,47 @@ global StateID = @enum {
     COUNT
 }
 
+global DialogID = @enum {
+    NONE = 0,
+	IMPORT_CODE,
+	IMPORT_TEXTURE,
+	IMPORT_MODEL,
+	IMPORT_SAMPLE,
+	LOAD_CART,
+	SAVE_CART,
+    COUNT
+}
+
+global StateAnimation = @enum {
+    NONE = 0,
+	STATE_SWITCH,
+	DIALOG_OPENCLOSE
+}
+
+global DialogStep = @enum {
+    FILE_BROWSER = 0,
+	TEXTURE_POSITION,
+	TEXTURE_CROP,
+	SAMPLE_CONFIG
+}
+
+global FileBrowserMode = @enum {
+    LOAD = 0,
+	SAVE
+}
+
+global FileBrowserInputMode = @enum {
+    SET_FILENAME = 0,
+	SELECT_FILE_OR_DIR
+}
+
+global FileBrowserResult = @enum {
+    CONTINUE = 0,
+	CANCEL,
+	SELECTED_FILE,
+	SELECTED_DIRECTORY
+}
+
 -- --------------------------------
 -- RECORDS
 -- --------------------------------
@@ -776,21 +817,75 @@ State = @record {
 	enter: StateFunction,
 	exit: StateFunction,
 	update: StateFunction,
+	draw: StateFunction,
+	cleanup: StateFunction
+}
+
+global Dialog = @record {
+	update: StateFunction,
 	draw: StateFunction
 }
 
 StateMachine = @record {
 	states: [StateID.COUNT]State,
+	dialogs: [DialogID.COUNT]Dialog,
 	state_ptr: *State,
+	dialog_ptr: *Dialog,
 	vm_ptr: *EVM,
 	state_id: integer,
+	dialog_id: integer,
 	queued_state: integer,
+	queued_dialog: integer,
 	prev_state: integer,
 
-	-- 3D menu swapping animation
-	playing_animation: boolean,
-	facing_angle: float32,
-	target_angle: float32,
+	-- general animation data
+	animation_type: uint32,
 	anim_time: float32,
-	beginning_angle: float32
+	anim_beginning: float32,
+	anim_target: float32,
+	-- 3D menu swapping animation
+	facing_angle: float32,
+	-- dialog open/close animation
+	dialog_size: float32
 }
+
+-- global data record
+global CoreData = @record {
+	--gpu: GPU,
+	--soundchip: Soundchip,
+	--vm: EVM,
+	--compiler: Compiler,
+	--sm: Statemachine,
+
+	user_directory: string,
+	data_directory: string,
+	carts_directory: string,
+	current_cart_path: string,
+	current_browser_path: string,
+	file_name: [65]uint8, -- used to name a file when saving
+	byte_buffer: [8]uint8,
+	dialog_val0: int32, -- general purpose integer used by dialogs
+	dialog_val1: int32, -- general purpose integer used by dialogs
+	dialog_val2: int32, -- general purpose integer used by dialogs
+	dialog_val3: int32, -- general purpose integer used by dialogs
+	file_paths: rl.filePathList,
+	image_to_import: rl.image,
+	sample_to_import: rl.wave,
+	model_to_import: rl.model,
+	dialog_step: uinteger,
+	browser_index: integer,
+	browser_mode: integer,
+	browser_input_mode: integer, -- setting file name vs selecting dir/file
+	has_loaded_paths: boolean,
+	has_loaded_image: boolean,
+	has_loaded_sample: boolean,
+	has_loaded_model: boolean,
+
+	cursor_color: uint32
+}
+
+--function CoreData:__close(): void
+--	-- do cleanup here...
+--end
+
+global core: CoreData --<close>

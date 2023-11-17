@@ -1,3 +1,7 @@
+require("os")
+
+require("fs")
+
 require("definitions")
 require("compiler")
 require("evm")
@@ -9,6 +13,7 @@ require("state_texture")
 require("state_model")
 require("state_tracker")
 require("state_run")
+require("dialog")
 require("input")
 
 local MAX_PARTICLES <comptime> = 32
@@ -24,6 +29,33 @@ local TriParticle = @record {
 local vm: *EVM
 local sm: StateMachine
 local particles: [MAX_PARTICLES]TriParticle
+
+local function updateCursorColor(
+    frequency1: float32,
+    frequency2: float32,
+    frequency3: float32,
+    phase1: float32,
+    phase2: float32,
+    phase3: float32,
+    center: float32,
+    width: float32,
+    len: float32): void
+    -- default center = 128;
+    -- default width = 127;
+    -- default len = 50;
+
+    local i: float32 = util.wrapF(rl.getTime() * 12, 0, len)
+
+    local fred: float32 = math.sin(frequency1 * i + phase1) * width + center
+    local fgreen: float32 = math.sin(frequency2 * i + phase2) * width + center
+    local fblue: float32 = math.sin(frequency3 * i + phase3) * width + center
+
+    local red: uint32 = ((@uint32)(fred) & 0xFF)
+    local green: uint32 = ((@uint32)(fgreen) & 0xFF)
+    local blue: uint32 = ((@uint32)(fblue) & 0xFF)
+
+    core.cursor_color = (red << 24) | (green << 16) | (blue << 8) | 0xFF
+end
 
 local function randomizeParticle(p: *TriParticle): void
 	p.position = {
@@ -48,7 +80,38 @@ local function randomizeParticle(p: *TriParticle): void
 	p.age = 0.0
 end
 
+local function setupDirectories(): void
+	## if ccinfo.is_windows then
+		core.user_directory = os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH")
+		core.data_directory = core.user_directory .. "\\AppData\\Roaming\\era-3d"
+		core.carts_directory = core.data_directory .. "\\carts"
+	## elseif ccinfo.is_linux then
+		core.user_directory = os.getenv("HOME")
+		core.data_directory = core.user_directory .. "/.era-3d"
+		core.carts_directory = core.data_directory .. "/carts"
+	## end
+
+	print("user dir:", core.user_directory)
+	print("data dir:", core.data_directory)
+	print("carts dir:", core.carts_directory)
+
+	local succees: boolean
+	local errmsg: string
+	local errcode: integer
+
+	if not fs.isdir(core.data_directory) then
+		succees, errmsg, errcode = fs.mkdir(core.data_directory)
+		print("mkdir", core.data_directory, succees, errmsg, errcode)
+	end
+	if not fs.isdir(core.carts_directory) then
+		succees, errmsg, errcode = fs.mkdir(core.carts_directory)
+		print("mkdir", core.carts_directory, succees, errmsg, errcode)
+	end
+end
+
 local function init(): void
+	setupDirectories()
+
 	vm = newVM()
 	input.setDefaultButtonMap()
 
@@ -58,49 +121,87 @@ local function init(): void
 			stateBootEnter,
 			stateBootExit,
 			stateBootUpdate,
-			stateBootDraw
+			stateBootDraw,
+			stateBootCleanup
 		},
 		{
 			stateMainInit,
 			stateMainEnter,
 			stateMainExit,
 			stateMainUpdate,
-			stateMainDraw
+			stateMainDraw,
+			stateMainCleanup
 		},
 		{
 			stateCodeInit,
 			stateCodeEnter,
 			stateCodeExit,
 			stateCodeUpdate,
-			stateCodeDraw
+			stateCodeDraw,
+			stateCodeCleanup
 		},
 		{
 			stateTextureInit,
 			stateTextureEnter,
 			stateTextureExit,
 			stateTextureUpdate,
-			stateTextureDraw
+			stateTextureDraw,
+			stateTextureCleanup
 		},
 		{
 			stateModelInit,
 			stateModelEnter,
 			stateModelExit,
 			stateModelUpdate,
-			stateModelDraw
+			stateModelDraw,
+			stateModelCleanup
 		},
 		{
 			stateTrackerInit,
 			stateTrackerEnter,
 			stateTrackerExit,
 			stateTrackerUpdate,
-			stateTrackerDraw
+			stateTrackerDraw,
+			stateTrackerCleanup
 		},
 		{
 			stateRunInit,
 			stateRunEnter,
 			stateRunExit,
 			stateRunUpdate,
-			stateRunDraw
+			stateRunDraw,
+			stateRunCleanup
+		}
+	}
+
+	sm.dialogs = {
+		{
+			nilptr,
+			nilptr
+		},
+		{
+			dialogImportCodeUpdate,
+			dialogImportCodeDraw,
+		},
+		{
+			dialogImportTextureUpdate,
+			dialogImportTextureDraw,
+		},
+		{
+			dialogImportModelUpdate,
+			dialogImportModelDraw,
+		},
+		{
+			dialogImportSampleUpdate,
+			dialogImportSampleDraw,
+		},
+		{
+			dialogLoadCartUpdate,
+			dialogLoadCartDraw,
+		},
+		{
+			dialogSaveCartUpdate,
+			dialogSaveCartDraw,
 		}
 	}
 
@@ -114,8 +215,10 @@ end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		if sm.playing_animation then
+		if sm.animation_type ~= StateAnimation.NONE then
 			sm:updateAnimation()
+		elseif sm.dialog_id ~= DialogID.NONE then
+			sm:updateDialog()
 		else
 			sm:updateState()
 		end
@@ -129,7 +232,11 @@ local function run(): void
 
 		-- draw to state render texture
 		vm.gpu:beginCurrentRenderTexture()
-			sm:drawState()
+			if sm.dialog_id ~= DialogID.NONE or sm.animation_type == StateAnimation.DIALOG_OPENCLOSE then
+				sm:drawDialog()
+			else
+				sm:drawState()
+			end
 		vm.gpu:endRenderTexture()
 		
 		vm.gpu:resetMatrixStack()
@@ -142,6 +249,8 @@ local function run(): void
 				vm.gpu:camera2D(-1)
 				vm.gpu:drawCurrentRenderTexture()
 			else
+				updateCursorColor(0.3, 0.3, 0.3, 0, 2, 4, 128.0, 127.0, 64.0)
+
 				vm.gpu:camera3D(-1)
 				
 				local aspect: float32 = (@float32)(GPU_SCREEN_W) / (@float32)(GPU_SCREEN_H)
@@ -195,7 +304,7 @@ local function run(): void
 					rlgl.enableBackfaceCulling()
 				rlgl.popMatrix()
 
-				if sm.playing_animation then
+				if sm.animation_type == StateAnimation.STATE_SWITCH then
 					-- draw state rendertexture quads
 					rlgl.pushMatrix()
 						rlgl.rotatef(sm.facing_angle, 0.0, 1.0, 0.0)
@@ -256,21 +365,37 @@ local function run(): void
 							rlgl.vertex3f(-distance, height, -width)
 						rlgl.ending()
 					rlgl.popMatrix()
-				end
-				
-				vm.gpu:camera2D(-1)
 
-				if not sm.playing_animation then
+					vm.gpu:camera2D(-1)
+				else
+					vm.gpu:camera2D(-1)
 					vm.gpu:drawCurrentRenderTexture()
 				end
 
-				switch sm.state_id do
-					case StateID.MAIN then
-						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "MAIN MENU")
-					case StateID.TRACKER then
-						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
-					case StateID.TEXTURE then
-						vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+				if sm.dialog_id ~= DialogID.NONE then
+					switch sm.dialog_id do
+						case DialogID.IMPORT_CODE then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SCRIPT")
+						case DialogID.IMPORT_TEXTURE then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "IMPORT TEXTURE")
+						case DialogID.IMPORT_MODEL then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "IMPORT MODEL")
+						case DialogID.IMPORT_SAMPLE then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SAMPLE")
+						case DialogID.LOAD_CART then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "LOAD CART")
+						case DialogID.SAVE_CART then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "SAVE CART")
+					end
+				else
+					switch sm.state_id do
+						case StateID.MAIN then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "MAIN MENU")
+						case StateID.TRACKER then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
+						case StateID.TEXTURE then
+							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+					end
 				end
 			end
 		vm.gpu:endRenderTexture()
@@ -285,6 +410,8 @@ local function run(): void
 
 		sm:update()
 	end
+
+	sm:cleanup()
 end
 
 init()

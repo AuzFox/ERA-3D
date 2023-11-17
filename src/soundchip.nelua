@@ -19,6 +19,7 @@ function SoundChip:getInstrument(id: uinteger): *[0]uint8
 end
 
 function SoundChip:getWavMapEntryValues(id: uint32): (uint32, uint32, uint32, uint32)
+	-- TODO: keep pointer to current wavmap bank (system memory vs cart bank)
 	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[(84 + (MEMORY_OBJMAP_SIZE)) + (id * 16)])
 	local start: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
 	local send: uint32 = ((@uint32)(entry_ptr[4]) << 24) | ((@uint32)(entry_ptr[5]) << 16) | ((@uint32)(entry_ptr[6]) << 8) | (@uint32)(entry_ptr[7])
@@ -406,38 +407,16 @@ function SoundChip:loadSeqBank(bank: uint8): void
 	memory.copy(&self.seqmem, src, MEMORY_SEQMEM_SIZE_BYTES)
 end
 
-function SoundChip:loadAudioSample(filename: string, bank_index: uint32, start_index: uint32): (boolean, uint32)
-	local wave: rl.wave = rl.loadWave(filename)
-
-	if not rl.isWaveReady(wave) then
-		return false, 0
-	end
-
+function SoundChip:loadSampleData(bank_index: uint32, start_index: uint32): void
 	start_index = start_index * 2
 
-	--print(wave.channels, wave.sampleSize, wave.sampleRate, wave.frameCount)
+	local frames: *[0]BKFrame = (@*[0]BKFrame)(core.sample_to_import.data)
+	local frame_count: uint64 = core.sample_to_import.frameCount * 2
+	local bank_ptr: *[0]BKFrame = (@*[0]BKFrame)(&self.wavbank_ptr[MEMORY_WAVMEM_SIZE_ELEMENTS * bank_index])
 
-	local frames: *[0]BKFrame = (@*[0]BKFrame)(wave.data)
-	local frame_count: uint32
-
-	if wave.channels == 1 then
-		for i: uint64 = 0, < wave.frameCount do
-			local frame: BKFrame = frames[i]
-			self.wavbank_ptr[start_index + (i * 2)] = frame
-			self.wavbank_ptr[start_index + (i * 2) + 1] = frame
-		end
-		frame_count = wave.frameCount
-	elseif wave.channels == 2 then
-		for i: uint64 = 0, < wave.frameCount * 2 do
-			local frame: BKFrame = frames[i]
-			self.wavbank_ptr[start_index + i] = frame
-		end
-		frame_count = wave.frameCount
+	for i: uint64 = 0, < frame_count do
+		bank_ptr[start_index + i] = frames[i]
 	end
-
-	rl.unloadWave(wave)
-
-	return true, frame_count
 end
 
 function SoundChip:resetSoundchip(): void
@@ -493,10 +472,24 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	self.audio_state = (@*AudioState)(&self.sysmem_ptr[0])
 	self.track_state = (@*[0]uint8)(&self.sysmem_ptr[1])
 
+	--[[
 	local success: boolean
 	local i0_start: uint32 = 0
 	local i0_count: uint32 = 0
-	success, i0_count = self:loadAudioSample("test_data/Control Amen.wav", 0, i0_start)
+	local i1_start: uint32 = 0
+	local i1_count: uint32 = 0
+	local i2_start: uint32 = 0
+	local i2_count: uint32 = 0
+	local i3_start: uint32 = 0
+	local i3_count: uint32 = 0
+	success, i0_count = self:loadAudioSample("test_data/bd.wav", 0, i0_start)
+	i1_start = i0_start + i0_count
+	success, i1_count = self:loadAudioSample("test_data/hh.wav", 0, i1_start)
+	i2_start = i1_start + i1_count
+	success, i2_count = self:loadAudioSample("test_data/sd.wav", 0, i2_start)
+	i3_start = i2_start + i2_count
+	success, i3_count = self:loadAudioSample("test_data/oldskool.wav", 0, i3_start)
+	]]
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		local tc: *TrackContext = &self.track_contexts[i]
@@ -576,10 +569,14 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 		memory.set(groove_data, 6, SOUNDCHIP_GROOVE_COUNT * SOUNDCHIP_GROOVE_SIZE)
 	end
 
+	--[[
 	local instr0: *[0]uint8 = self:getInstrument(0)
+	local instr1: *[0]uint8 = self:getInstrument(1)
+	local instr2: *[0]uint8 = self:getInstrument(2)
+	local instr3: *[0]uint8 = self:getInstrument(3)
 
 	-- flags
-	instr0[0] = InstrumentFlag.LOOP_RANGE | InstrumentFlag.MANUAL
+	instr0[0] = InstrumentFlag.MANUAL
 	-- sample start
 	instr0[1] = (i0_start >> 16) & 0xFF
 	instr0[2] = (i0_start >> 8) & 0xFF
@@ -588,28 +585,96 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	instr0[4] = ((i0_start + i0_count) >> 16) & 0xFF
 	instr0[5] = ((i0_start + i0_count) >> 8) & 0xFF
 	instr0[6] = ((i0_start + i0_count)) & 0xFF
-	-- sustain start
-	instr0[7] = ((i0_start + (i0_count /// 2)) >> 16) & 0xFF
-	instr0[8] = ((i0_start + (i0_count /// 2)) >> 8) & 0xFF
-	instr0[9] = ((i0_start + (i0_count /// 2))) & 0xFF
-	-- sustain end
-	instr0[10] = ((i0_start + (i0_count /// 2) + (i0_count /// 4)) >> 16) & 0xFF
-	instr0[11] = ((i0_start + (i0_count /// 2) + (i0_count /// 4)) >> 8) & 0xFF
-	instr0[12] = ((i0_start + (i0_count /// 2) + (i0_count /// 4))) & 0xFF
 	-- adsr
-	instr0[13] = 12
+	instr0[13] = 0
 	instr0[14] = 0
 	instr0[15] = 255
-	instr0[16] = 4
+	instr0[16] = 0
 	-- name
-	instr0[17] = 'B'_u8
-	instr0[18] = 'R'_u8
-	instr0[19] = 'K'_u8
-	instr0[20] = '('_u8
-	instr0[21] = '1'_u8
-	instr0[22] = '7'_u8
-	instr0[23] = '5'_u8
-	instr0[24] = ')'_u8
+	instr0[17] = 'K'_u8
+	instr0[18] = 'I'_u8
+	instr0[19] = 'C'_u8
+	instr0[20] = 'K'_u8
+	instr0[21] = ' '_u8
+	instr0[22] = ' '_u8
+	instr0[23] = ' '_u8
+	instr0[24] = ' '_u8
+
+	-- flags
+	instr1[0] = InstrumentFlag.MANUAL
+	-- sample start
+	instr1[1] = (i1_start >> 16) & 0xFF
+	instr1[2] = (i1_start >> 8) & 0xFF
+	instr1[3] = (i1_start) & 0xFF
+	-- sample end
+	instr1[4] = ((i1_start + i1_count) >> 16) & 0xFF
+	instr1[5] = ((i1_start + i1_count) >> 8) & 0xFF
+	instr1[6] = ((i1_start + i1_count)) & 0xFF
+	-- adsr
+	instr1[13] = 0
+	instr1[14] = 0
+	instr1[15] = 255
+	instr1[16] = 0
+	-- name
+	instr1[17] = 'H'_u8
+	instr1[18] = 'I'_u8
+	instr1[19] = 'H'_u8
+	instr1[20] = 'A'_u8
+	instr1[21] = 'T'_u8
+	instr1[22] = ' '_u8
+	instr1[23] = ' '_u8
+	instr1[24] = ' '_u8
+
+	-- flags
+	instr2[0] = InstrumentFlag.MANUAL
+	-- sample start
+	instr2[1] = (i2_start >> 16) & 0xFF
+	instr2[2] = (i2_start >> 8) & 0xFF
+	instr2[3] = (i2_start) & 0xFF
+	-- sample end
+	instr2[4] = ((i2_start + i2_count) >> 16) & 0xFF
+	instr2[5] = ((i2_start + i2_count) >> 8) & 0xFF
+	instr2[6] = ((i2_start + i2_count)) & 0xFF
+	-- adsr
+	instr2[13] = 0
+	instr2[14] = 0
+	instr2[15] = 255
+	instr2[16] = 0
+	-- name
+	instr2[17] = 'S'_u8
+	instr2[18] = 'N'_u8
+	instr2[19] = 'A'_u8
+	instr2[20] = 'R'_u8
+	instr2[21] = 'E'_u8
+	instr2[22] = ' '_u8
+	instr2[23] = ' '_u8
+	instr2[24] = ' '_u8
+
+	-- flags
+	instr3[0] = InstrumentFlag.MANUAL
+	-- sample start
+	instr3[1] = (i3_start >> 16) & 0xFF
+	instr3[2] = (i3_start >> 8) & 0xFF
+	instr3[3] = (i3_start) & 0xFF
+	-- sample end
+	instr3[4] = ((i3_start + i3_count) >> 16) & 0xFF
+	instr3[5] = ((i3_start + i3_count) >> 8) & 0xFF
+	instr3[6] = ((i3_start + i3_count)) & 0xFF
+	-- adsr
+	instr3[13] = 0
+	instr3[14] = 0
+	instr3[15] = 255
+	instr3[16] = 0
+	-- name
+	instr3[17] = 'O'_u8
+	instr3[18] = 'L'_u8
+	instr3[19] = 'D'_u8
+	instr3[20] = 'S'_u8
+	instr3[21] = 'K'_u8
+	instr3[22] = 'O'_u8
+	instr3[23] = 'O'_u8
+	instr3[24] = 'L'_u8
+	]]
 
 	rl.playAudioStream(self.audio_stream)
 end

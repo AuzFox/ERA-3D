@@ -16,3 +16,6 @@ end
 
 global function stateModelDraw(sm: *StateMachine, vm: *EVM): void
 end
+
+global function stateModelCleanup(sm: *StateMachine, vm: *EVM): void
+end

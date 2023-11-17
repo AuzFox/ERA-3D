@@ -1,7 +1,6 @@
 GENERAL:
 - cleanup+refactor nasty code (looking at you, operatorTypeCheck())
 - implement safeguards on everything
-- refactor memory address+constants (no more magic numbers, better constants for size)
 - code structure refactor
 
 COMPILER:
@@ -22,7 +21,6 @@ VM:
 - implement missing api functions
   - audio bpm+pan+volume getters and setters
   - math functions
-  - matrix functions
   - collision functions
 - complete collision system
 - complete wrapi() and wrapf() negative ranges
@@ -40,4 +38,4 @@ HOST:
 - implement window resizing
 - implement debugger
 - implement boot animation
-- implement ui (terminal?, editors?. etc.)
+- implement ui

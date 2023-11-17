@@ -16,3 +16,6 @@ end
 
 global function stateBootDraw(sm: *StateMachine, vm: *EVM): void
 end
+
+global function stateBootCleanup(sm: *StateMachine, vm: *EVM): void
+end

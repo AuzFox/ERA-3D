@@ -436,6 +436,42 @@ function GPU:print2D(x: int32, y: int32, col: uint32, text: string): void
 	end
 end
 
+-- print2D function for host program, doesn't do formatting
+function GPU:printCString2D(x: int32, y: int32, col: uint32, ctext: cstring): void
+	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
+		-- we're off screen, no need to render
+		return
+	end
+
+	local cur_x: int32 = x
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF),
+	}
+
+	local text: *[0]cchar = (@*[0]cchar)(ctext)
+	local i: uinteger = 0
+	local c: cchar = text[i]
+	while c ~= '\0'_u8 do
+		-- stop if we're going offscreen
+		if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
+			return
+		end
+		
+		if c == '\n'_u8 then
+			cur_x = x
+			y = y + 9
+		else
+			self:drawChar2D(c, &cur_x, y, ray_col)
+		end
+
+		i = i + 1
+		c = text[i]
+	end
+end
+
 -- printHexNibble2D function for host program, doesn't do formatting
 function GPU:printHexNibble2D(x: int32, y: int32, col: uint32, val: uint8): void
 	if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
@@ -672,21 +708,19 @@ function GPU:loadObjBank(bank: uint8): void
 	self.update_tex = true
 end
 
-function GPU:loadTexturesheet(filename: string, bank_index: integer): boolean
-	local img: rl.image = rl.loadImage(filename)
+function GPU:loadTextureData(bank_index: integer, src_x: int32, src_y: int32, dest_x: int32, dest_y: int32, w: int32, h: int32): void
+	local bank_ptr: *[0]rl.color = (@*[0]rl.color)(&self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank_index])
+	local data: *[0]rl.color = (@*[0]rl.color)(core.image_to_import.data)
 
-	if not rl.isImageReady(img) then
-		return false
+	for y = 0, < h do
+		local read_y: int32 = src_y + y
+		local write_y: int32 = dest_y + y
+		for x = 0, < w do
+			local read_x: int32 = src_x + x
+			local write_x: int32 = dest_x + x
+			bank_ptr[w * write_y + write_x] = data[w * read_y + read_x]
+		end
 	end
-
-	if img.format ~= rl.pixelFormat.UNCOMPRESSED_R8G8B8A8 then
-		rl.imageFormat(&img, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
-	end
-	memory.copy(&self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank_index], img.data, MEMORY_TEXMEM_SIZE_BYTES)
-	
-	rl.unloadImage(img)
-
-	return true
 end
 
 function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32): (boolean, uint32)
@@ -943,7 +977,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.ompbank_ptr = ompbank_ptr
 
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
-	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 	--[[

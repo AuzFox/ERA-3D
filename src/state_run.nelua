@@ -52,3 +52,6 @@ global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
     end
     vm.gpu:disableRenderState()
 end
+
+global function stateRunCleanup(sm: *StateMachine, vm: *EVM): void
+end

@@ -17,3 +17,6 @@ end
 
 global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
 end
+
+global function stateCodeCleanup(sm: *StateMachine, vm: *EVM): void
+end
