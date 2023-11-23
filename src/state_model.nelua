@@ -1,20 +1,29 @@
 require("statemachine")
 
--- TODO: add basic ui to load model files
-
 global function stateModelInit(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateModelEnter(sm: *StateMachine, vm: *EVM): void
+    vm.gpu:setRenderTexture(RenderTexture.MODEL)
 end
 
 global function stateModelExit(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateModelUpdate(sm: *StateMachine, vm: *EVM): void
+    if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
+        sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
+        sm.queued_dialog = DialogID.IMPORT_MODEL
+        return
+    end
 end
 
 global function stateModelDraw(sm: *StateMachine, vm: *EVM): void
+    rl.clearBackground({0, 0, 0, 0})
+    vm.gpu:camera2D(-1)
+
+    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((35 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 9, GPU_WHITE, "// TODO: MODEL EDITOR STUFF HERE...")
+    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((30 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT MODEL")
 end
 
 global function stateModelCleanup(sm: *StateMachine, vm: *EVM): void

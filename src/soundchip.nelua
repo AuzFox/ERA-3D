@@ -60,7 +60,7 @@ function SoundChip:setInstrument(track: uint8, instrument: uint8): void
 		sample_start, sample_end, sustain_start, sustain_end = self:getWavMapEntryValues(sample_start)
 	end
 	
-	local range: [2]BKInt = {sample_start, sample_end}
+	local range: [2]BKInt = {sample_start, sample_end + 1}
 	BKSetPtr(bk_track_ptr, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 
 	switch flags & InstrumentFlag.LOOP_MASK do
@@ -72,7 +72,7 @@ function SoundChip:setInstrument(track: uint8, instrument: uint8): void
 			BKSetAttr(bk_track_ptr, BK_SAMPLE_REPEAT, BK_PALINDROME)
 		case InstrumentFlag.LOOP_RANGE then
 			range[0] = sustain_start
-			range[1] = sustain_end
+			range[1] = sustain_end + 1
 			BKSetPtr(bk_track_ptr, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
 	end
 
@@ -260,7 +260,7 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 	local tc: *TrackContext = &self.track_contexts[track]
 	local state: *TrackState = self:getTrackState(track)
 	
-	local range: [2]BKInt = {start, send}
+	local range: [2]BKInt = {start, send + 1}
 	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 
 	switch flags & InstrumentFlag.LOOP_MASK do

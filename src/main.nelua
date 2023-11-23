@@ -7,7 +7,6 @@ require("compiler")
 require("evm")
 require("statemachine")
 require("state_boot")
-require("state_main")
 require("state_code")
 require("state_texture")
 require("state_model")
@@ -91,10 +90,6 @@ local function setupDirectories(): void
 		core.carts_directory = core.data_directory .. "/carts"
 	## end
 
-	print("user dir:", core.user_directory)
-	print("data dir:", core.data_directory)
-	print("carts dir:", core.carts_directory)
-
 	local succees: boolean
 	local errmsg: string
 	local errcode: integer
@@ -125,14 +120,6 @@ local function init(): void
 			stateBootCleanup
 		},
 		{
-			stateMainInit,
-			stateMainEnter,
-			stateMainExit,
-			stateMainUpdate,
-			stateMainDraw,
-			stateMainCleanup
-		},
-		{
 			stateCodeInit,
 			stateCodeEnter,
 			stateCodeExit,
@@ -141,12 +128,12 @@ local function init(): void
 			stateCodeCleanup
 		},
 		{
-			stateTextureInit,
-			stateTextureEnter,
-			stateTextureExit,
-			stateTextureUpdate,
-			stateTextureDraw,
-			stateTextureCleanup
+			stateTrackerInit,
+			stateTrackerEnter,
+			stateTrackerExit,
+			stateTrackerUpdate,
+			stateTrackerDraw,
+			stateTrackerCleanup
 		},
 		{
 			stateModelInit,
@@ -157,12 +144,12 @@ local function init(): void
 			stateModelCleanup
 		},
 		{
-			stateTrackerInit,
-			stateTrackerEnter,
-			stateTrackerExit,
-			stateTrackerUpdate,
-			stateTrackerDraw,
-			stateTrackerCleanup
+			stateTextureInit,
+			stateTextureEnter,
+			stateTextureExit,
+			stateTextureUpdate,
+			stateTextureDraw,
+			stateTextureCleanup
 		},
 		{
 			stateRunInit,
@@ -205,6 +192,14 @@ local function init(): void
 		}
 	}
 
+	core.log_state = LogState.HIDDEN
+	core.animation_type = MenuAnimation.NONE
+	core.anim_time = 0.0
+	core.anim_beginning = 0.0
+	core.anim_target = 0.0
+    core.facing_angle = 0.0
+    core.dialog_size = 0.0
+
 	for i = 0, < MAX_PARTICLES do
 		local p: *TriParticle = &particles[i]
 		randomizeParticle(p)
@@ -213,14 +208,140 @@ local function init(): void
 	sm:init(vm)
 end
 
+local function updateMenuAnimation(): void
+    switch core.animation_type do
+        case MenuAnimation.STATE_SWITCH then
+            if core.anim_time < 0.5 then
+                core.anim_time = core.anim_time + rl.getFrameTime()
+                core.facing_angle = rle.quadOut(core.anim_time, core.anim_beginning, core.anim_target - core.anim_beginning, 0.5)
+            else
+                switch sm.state_id do
+                    case StateID.CODE then
+                        core.facing_angle = 0.0
+                    case StateID.TRACKER then
+                        core.facing_angle = 90.0
+                    case StateID.MODEL then
+                        core.facing_angle = 180.0
+                    case StateID.TEXTURE then
+                        core.facing_angle = 270.0
+                end
+                core.animation_type = MenuAnimation.NONE
+            end
+        case MenuAnimation.DIALOG_OPENCLOSE then
+            if core.anim_time < 0.25 then
+                core.anim_time = core.anim_time + rl.getFrameTime()
+                core.dialog_size = rle.quadOut(core.anim_time, core.anim_beginning, core.anim_target - core.anim_beginning, 0.25)
+            else
+                core.dialog_size = core.anim_target
+                core.animation_type = MenuAnimation.NONE
+            end
+        case MenuAnimation.LOG_OPENCLOSE then
+            if core.anim_time < 0.25 then
+                core.anim_time = core.anim_time + rl.getFrameTime()
+                core.log_offset = rle.quadOut(core.anim_time, core.anim_beginning, core.anim_target - core.anim_beginning, 0.25)
+            else
+                core.log_offset = core.anim_target
+                core.animation_type = MenuAnimation.NONE
+            end
+    end
+end
+
+local function updateLog(): void
+	if rl.isKeyPressed(rl.keyboardKey.GRAVE) then
+		core.queued_log_state = LogState.HIDDEN
+	end
+end
+
+local function updatePopup(): void
+	switch core.popup_state do
+		case PopupState.ANIMATING then
+			if core.popup_timer < 0.25 then
+				core.popup_timer = core.popup_timer + rl.getFrameTime()
+				core.popup_current_factor = rle.quadOut(core.popup_timer, core.popup_beginning_factor, core.popup_target_factor - core.popup_beginning_factor, 0.25)
+			else
+				core.popup_state = (core.popup_target_factor == 1.0) and PopupState.SHOWN or PopupState.HIDDEN
+				core.popup_timer = 0.0
+				core.popup_current_factor = core.popup_target_factor
+			end
+			core.popup_offset = (@uint32)(core.popup_current_factor * 12.0)
+		case PopupState.SHOWN then
+			core.popup_timer = core.popup_timer + rl.getFrameTime()
+
+			if core.popup_timer >= 4.0 then
+				core.popup_state = PopupState.ANIMATING
+				core.popup_timer = 0.0
+				core.popup_beginning_factor = 1.0
+				core.popup_target_factor = 0.0
+			end
+	end
+end
+
 local function run(): void
 	while not rl.windowShouldClose() do
-		if sm.animation_type ~= StateAnimation.NONE then
-			sm:updateAnimation()
+		input.refresh()
+
+		updatePopup()
+
+		if core.animation_type ~= MenuAnimation.NONE then
+			updateMenuAnimation()
+		elseif core.log_state == LogState.SHOWN then
+			updateLog()
 		elseif sm.dialog_id ~= DialogID.NONE then
-			sm:updateDialog()
+			if rl.isKeyPressed(rl.keyboardKey.GRAVE) then
+				core.queued_log_state = LogState.SHOWN
+			else
+				sm:updateDialog()
+			end
 		else
-			sm:updateState()
+			local update_state: boolean = true
+
+			if sm.state_id ~= StateID.RUN and input.is_ctrl_down then
+				if input.pressedRepeat(rl.keyboardKey.LEFT) then
+					sm.queued_state = StateID.STATE_LEFT
+					update_state = false
+				elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+					sm.queued_state = StateID.STATE_RIGHT
+					update_state = false
+				elseif rl.isKeyPressed(rl.keyboardKey.R) then
+					if vm:compile() then
+						vm:resetVM(true)
+						
+						if vm:callHook(Hook.INIT) then
+							sm.queued_state = StateID.RUN
+						else
+							core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
+							core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [`] to view log")
+						end
+					else
+						core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
+						core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [`] to view log")
+					end
+					update_state = false
+				elseif rl.isKeyPressed(rl.keyboardKey.S) then
+					if core.current_cart_path == "" then
+						sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
+						sm.queued_dialog = DialogID.SAVE_CART
+					else
+						if not vm:saveCart(core.current_cart_path) then
+							core:log(LogEntryType.HOST_ERROR, vm.error, true)
+						end
+					end
+					update_state = false
+				elseif rl.isKeyPressed(rl.keyboardKey.O) then
+					sm:resetFileBrowser(core.carts_directory, FileBrowserMode.LOAD)
+					sm.queued_dialog = DialogID.LOAD_CART
+					update_state = false
+				end
+			else
+				if not input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.GRAVE) then
+					core.queued_log_state = LogState.SHOWN
+					update_state = false
+				end
+			end
+
+			if update_state then
+				sm:updateState()
+			end
 		end
 
 		vm.soundchip:updateAudio()
@@ -232,7 +353,7 @@ local function run(): void
 
 		-- draw to state render texture
 		vm.gpu:beginCurrentRenderTexture()
-			if sm.dialog_id ~= DialogID.NONE or sm.animation_type == StateAnimation.DIALOG_OPENCLOSE then
+			if sm.dialog_id ~= DialogID.NONE or core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
 				sm:drawDialog()
 			else
 				sm:drawState()
@@ -304,13 +425,13 @@ local function run(): void
 					rlgl.enableBackfaceCulling()
 				rlgl.popMatrix()
 
-				if sm.animation_type == StateAnimation.STATE_SWITCH then
+				if core.animation_type == MenuAnimation.STATE_SWITCH then
 					-- draw state rendertexture quads
 					rlgl.pushMatrix()
-						rlgl.rotatef(sm.facing_angle, 0.0, 1.0, 0.0)
+						rlgl.rotatef(core.facing_angle, 0.0, 1.0, 0.0)
 						
-						-- main/run
-						vm.gpu:useRenderTexture(RenderTexture.MAIN)
+						-- code/run
+						vm.gpu:useRenderTexture(RenderTexture.CODE)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -337,8 +458,8 @@ local function run(): void
 							rlgl.vertex3f(distance, height, width)
 						rlgl.ending()
 
-						-- code
-						vm.gpu:useRenderTexture(RenderTexture.MAIN)
+						-- model
+						vm.gpu:useRenderTexture(RenderTexture.MODEL)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -372,31 +493,70 @@ local function run(): void
 					vm.gpu:drawCurrentRenderTexture()
 				end
 
-				if sm.dialog_id ~= DialogID.NONE then
-					switch sm.dialog_id do
-						case DialogID.IMPORT_CODE then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SCRIPT")
-						case DialogID.IMPORT_TEXTURE then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "IMPORT TEXTURE")
-						case DialogID.IMPORT_MODEL then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "IMPORT MODEL")
-						case DialogID.IMPORT_SAMPLE then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SAMPLE")
-						case DialogID.LOAD_CART then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "LOAD CART")
-						case DialogID.SAVE_CART then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "SAVE CART")
-					end
-				else
-					switch sm.state_id do
-						case StateID.MAIN then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "MAIN MENU")
-						case StateID.TRACKER then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
-						case StateID.TEXTURE then
-							vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+				if core.log_state == LogState.HIDDEN then
+					if sm.dialog_id ~= DialogID.NONE then
+						switch sm.dialog_id do
+							case DialogID.IMPORT_CODE then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SCRIPT")
+							case DialogID.IMPORT_TEXTURE then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "IMPORT TEXTURE")
+							case DialogID.IMPORT_MODEL then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "IMPORT MODEL")
+							case DialogID.IMPORT_SAMPLE then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SAMPLE")
+							case DialogID.LOAD_CART then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "LOAD CART")
+							case DialogID.SAVE_CART then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "SAVE CART")
+						end
+					else
+						switch sm.state_id do
+							case StateID.CODE then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((11 * 6) /// 2), 0, GPU_WHITE, "CODE EDITOR")
+							case StateID.TRACKER then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
+							case StateID.MODEL then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "MODEL EDITOR")
+							case StateID.TEXTURE then
+								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+						end
 					end
 				end
+			end
+
+			if core.log_state == LogState.SHOWN or core.animation_type == MenuAnimation.LOG_OPENCLOSE then
+				local log_y: int32 = -144 + (@int32)(core.log_offset * 144.0)
+				vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 145, GPU_BLACK)
+				vm.gpu:drawRect2D(0, log_y + 145, GPU_VSCREEN_W, 1, GPU_GRAY)
+
+				local line_y: int32 = log_y
+				local line_index: int32 = util.wrapI(core.log_index - core.log_count, 0, 16)
+				local lines_drawn: int32 = 0
+				for i = 0, < core.log_count do
+					local line_ptr: *[0]cchar = (@*[0]cchar)(&core.log_text[line_index * 81])
+
+					local col: uint32
+					switch core.log_types[line_index] do
+						case LogEntryType.INFO then
+							col = GPU_GREEN
+						case LogEntryType.HOST_ERROR then
+							col = GPU_YELLOW
+						case LogEntryType.COMPILE_ERROR then
+							col = GPU_ORANGE
+						case LogEntryType.RUNTIME_ERROR then
+							col = GPU_RED
+					end
+
+					vm.gpu:printCString2D(0, line_y, col, line_ptr)
+					
+					line_index = util.wrapI(line_index + 1, 0, 16)
+					line_y = line_y + 9
+					lines_drawn = lines_drawn + 1
+				end
+			end
+
+			if core.popup_state ~= PopupState.HIDDEN then
+				vm.gpu:print2D(6, GPU_VSCREEN_H - core.popup_offset, core.popup_color, core.popup_text)
 			end
 		vm.gpu:endRenderTexture()
 
@@ -407,6 +567,23 @@ local function run(): void
 			rl.clearBackground(rl.GRAY)
 			vm.gpu:drawMasterRenderTexture()
 		rl.endDrawing()
+		
+		if core.queued_log_state ~= LogState.NONE then
+			if (core.log_state == LogState.HIDDEN and core.queued_log_state == LogState.SHOWN) or (core.log_state == LogState.SHOWN and core.queued_log_state == LogState.HIDDEN) then
+				core.animation_type = MenuAnimation.LOG_OPENCLOSE
+				core.anim_time = 0.0
+				core.anim_beginning = core.log_offset
+				
+				if core.queued_log_state == LogState.HIDDEN then
+					core.anim_target = 0.0
+				else
+					core.anim_target = 1.0
+				end
+			end
+
+			core.log_state = core.queued_log_state
+			core.queued_log_state = LogState.NONE
+		end
 
 		sm:update()
 	end

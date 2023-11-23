@@ -1,7 +1,5 @@
 require("statemachine")
 
--- TODO: add basic ui to load audio samples
-
 local PIANO_KEYS_COUNT <comptime> = SOUNDCHIP_OCTAVE_SIZE * 2
 
 local Editor = @enum {
@@ -339,17 +337,17 @@ end
 local function doNoteInput(vm: *EVM): boolean
     local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
 
-    if rl.isKeyPressed(rl.keyboardKey.BACKSPACE) then
+    if input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
         row[0] = SOUNDCHIP_EMPTY_VALUE
         row[1] = SOUNDCHIP_EMPTY_VALUE
         row[2] = SOUNDCHIP_EMPTY_VALUE
         return true
-    elseif rl.isKeyPressed(rl.keyboardKey.COMMA) then
+    elseif input.pressedRepeat(rl.keyboardKey.COMMA) then
         row[0] = SOUNDCHIP_NOTE_RELEASE
         row[1] = SOUNDCHIP_EMPTY_VALUE
         row[2] = SOUNDCHIP_EMPTY_VALUE
         return true
-    elseif rl.isKeyPressed(rl.keyboardKey.PERIOD) then
+    elseif input.pressedRepeat(rl.keyboardKey.PERIOD) then
         row[0] = SOUNDCHIP_NOTE_MUTE
         row[1] = SOUNDCHIP_EMPTY_VALUE
         row[2] = SOUNDCHIP_EMPTY_VALUE
@@ -415,16 +413,7 @@ global function stateTrackerExit(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
-    local is_shift_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
-    local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
-    local is_alt_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_ALT) or rl.isKeyDown(rl.keyboardKey.RIGHT_ALT)
-
-    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.LEFT) then
-        sm.queued_state = StateID.MAIN
-        return
-    end
-
-    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
+    if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
         sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
         sm.queued_dialog = DialogID.IMPORT_SAMPLE
         return
@@ -448,50 +437,47 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
     end
 
     if vm.soundchip.audio_state.playing_flags ~= 0 then
-        local ts: *TrackState = vm.soundchip:getTrackState(data.track)
-        data.song_y = ts.song_pos
-        data.pattern_y = ts.pattern_pos
         return
     end
     
-    if rl.isKeyPressed(rl.keyboardKey.MINUS) then
+    if input.pressedRepeat(rl.keyboardKey.MINUS) then
         data.octave = util.midI(0, data.octave - 1, SOUNDCHIP_MAX_OCTAVE)
-    elseif rl.isKeyPressed(rl.keyboardKey.EQUAL) then
+    elseif input.pressedRepeat(rl.keyboardKey.EQUAL) then
         data.octave = util.midI(0, data.octave + 1, SOUNDCHIP_MAX_OCTAVE)
     end
 
     switch data.current_editor do
         case Editor.SONG then
-            if rl.isKeyPressed(rl.keyboardKey.TAB) then
-                if is_shift_down then
+            if input.pressedRepeat(rl.keyboardKey.TAB) then
+                if input.is_shift_down then
                     data.song_x = util.wrapI(data.song_x - 2, 0, 16)
                     data.track = util.wrapI(data.track - 1, 0, 8)
                 else
                     data.song_x = util.wrapI(data.song_x + 2, 0, 16)
                     data.track = util.wrapI(data.track + 1, 0, 8)
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_UP) then
+            elseif input.pressedRepeat(rl.keyboardKey.PAGE_UP) then
                 data.song_y = util.wrapI(data.song_y - 8, 0, 256)
-            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_DOWN) then
+            elseif input.pressedRepeat(rl.keyboardKey.PAGE_DOWN) then
                 data.song_y = util.wrapI(data.song_y + 8, 0, 256)
-            elseif rl.isKeyPressed(rl.keyboardKey.HOME) then
+            elseif input.pressedRepeat(rl.keyboardKey.HOME) then
                 data.song_y = 0
-            elseif rl.isKeyPressed(rl.keyboardKey.END) then
+            elseif input.pressedRepeat(rl.keyboardKey.END) then
                 data.song_y = 255
-            elseif rl.isKeyPressed(rl.keyboardKey.UP) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.UP) then
+                if input.is_alt_down then
                     -- ???
                 else
                     data.song_y = util.wrapI(data.song_y - 1, 0, 256)
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+                if input.is_alt_down then
                     data.current_editor = Editor.PATTERN
                 else
                     data.song_y = util.wrapI(data.song_y + 1, 0, 256)
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.LEFT) then
+                if input.is_alt_down then
                     -- ???
                 else
                     if data.song_x & 1 == 0 then
@@ -499,8 +485,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                     end
                     data.song_x = util.wrapI(data.song_x - 1, 0, 16)
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+                if input.is_alt_down then
                     -- ???
                 else
                     if data.song_x & 1 == 1 then
@@ -519,32 +505,32 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                 end
             end
         case Editor.PATTERN then
-            if rl.isKeyPressed(rl.keyboardKey.TAB) then
-                if is_shift_down then
+            if input.pressedRepeat(rl.keyboardKey.TAB) then
+                if input.is_shift_down then
                     data.song_x = util.wrapI(data.song_x - 2, 0, 16)
                     data.track = util.wrapI(data.track - 1, 0, 8)
                 else
                     data.song_x = util.wrapI(data.song_x + 2, 0, 16)
                     data.track = util.wrapI(data.track + 1, 0, 8)
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_UP) then
+            elseif input.pressedRepeat(rl.keyboardKey.PAGE_UP) then
                 data.pattern_y = data.pattern_y - 16
                 if data.pattern_y < 0 then
                     data.song_y = util.wrapI(data.song_y - 1, 0, 256)
                 end
                 data.pattern_y = util.wrapI(data.pattern_y, 0, 64)
-            elseif rl.isKeyPressed(rl.keyboardKey.PAGE_DOWN) then
+            elseif input.pressedRepeat(rl.keyboardKey.PAGE_DOWN) then
                 data.pattern_y = data.pattern_y + 16
                 if data.pattern_y > 63 then
                     data.song_y = util.wrapI(data.song_y + 1, 0, 256)
                 end
                 data.pattern_y = util.wrapI(data.pattern_y, 0, 64)
-            elseif rl.isKeyPressed(rl.keyboardKey.HOME) then
+            elseif input.pressedRepeat(rl.keyboardKey.HOME) then
                 data.pattern_y = 0
-            elseif rl.isKeyPressed(rl.keyboardKey.END) then
+            elseif input.pressedRepeat(rl.keyboardKey.END) then
                 data.pattern_y = 63
-            elseif rl.isKeyPressed(rl.keyboardKey.UP) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.UP) then
+                if input.is_alt_down then
                     data.current_editor = Editor.SONG
                 else
                     data.pattern_y = data.pattern_y - 1
@@ -553,8 +539,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         data.song_y = util.wrapI(data.song_y - 1, 0, 256)
                     end
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+                if input.is_alt_down then
                     data.current_editor = Editor.INSTRUMENT
                 else
                     data.pattern_y = data.pattern_y + 1
@@ -563,8 +549,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         data.song_y = util.wrapI(data.song_y + 1, 0, 256)
                     end
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.LEFT) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.LEFT) then
+                if input.is_alt_down then
                     -- ???
                 else
                     data.pattern_x = data.pattern_x - 1
@@ -574,8 +560,8 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         data.track = util.wrapI(data.track - 1, 0, 8)
                     end
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+                if input.is_alt_down then
                     -- ???
                 else
                     data.pattern_x = data.pattern_x + 1
@@ -625,10 +611,10 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                 end
             end
         case Editor.INSTRUMENT then
-            if rl.isKeyPressed(rl.keyboardKey.UP) then
-                if is_alt_down then
+            if input.pressedRepeat(rl.keyboardKey.UP) then
+                if input.is_alt_down then
                     data.current_editor = Editor.PATTERN
-                elseif is_shift_down then
+                elseif input.is_shift_down then
                     data.instrument_id = data.instrument_id + 0x10
                     data.instrument_x = 0
                     data.instrument_y = 0
@@ -642,10 +628,10 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         end
                     end
                 end
-            elseif rl.isKeyPressed(rl.keyboardKey.DOWN) then
-                if is_alt_down then
+            elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+                if input.is_alt_down then
                     -- ???
-                elseif is_shift_down then
+                elseif input.is_shift_down then
                     data.instrument_id = data.instrument_id - 0x10
                     data.instrument_x = 0
                     data.instrument_y = 0
@@ -659,11 +645,11 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         end
                     end
                 end
-            elseif is_shift_down and rl.isKeyPressed(rl.keyboardKey.LEFT) then
+            elseif input.is_shift_down and input.pressedRepeat(rl.keyboardKey.LEFT) then
                 data.instrument_id = data.instrument_id - 1
                 data.instrument_x = 0
                 data.instrument_y = 0
-            elseif is_shift_down and rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+            elseif input.is_shift_down and input.pressedRepeat(rl.keyboardKey.RIGHT) then
                 data.instrument_id = data.instrument_id + 1
                 data.instrument_x = 0
                 data.instrument_y = 0
@@ -681,9 +667,9 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
 
                 switch data.instrument_y do
                     case 0 then -- name
-                        if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                        if input.pressedRepeat(rl.keyboardKey.LEFT) then
                             data.instrument_x = util.wrapI(data.instrument_x - 1, 0, 8)
-                        elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                             data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 8)
                         else
                             local c: cint = rl.getCharPressed()
@@ -694,7 +680,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                             end
                         end
                     case 1 then -- sample mode
-                        if rl.isKeyPressed(rl.keyboardKey.LEFT) or rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                        if input.pressedRepeat(rl.keyboardKey.LEFT) or input.pressedRepeat(rl.keyboardKey.RIGHT) then
                             flags = flags ~ InstrumentFlag.MANUAL
                             idata[0] = flags
                             idata[1] = 0
@@ -703,9 +689,9 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         end
                     case 2 then -- sample start+end/wavmap id
                         if flags & InstrumentFlag.MANUAL ~= 0 then
-                            if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                            if input.pressedRepeat(rl.keyboardKey.LEFT) then
                                 data.instrument_x = util.wrapI(data.instrument_x - 1, 0, 12)
-                            elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                            elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                                 data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 12)
                             else
                                 if input.hexEdit(
@@ -718,9 +704,9 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                                 end
                             end
                         else
-                            if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                            if input.pressedRepeat(rl.keyboardKey.LEFT) then
                                 data.instrument_x = util.wrapI(data.instrument_x - 1, 0, 3)
-                            elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                            elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                                 data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 3)
                             else
                                 local byte_index: uinteger
@@ -743,7 +729,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                                     false
                                 ) then
                                     if idata[2] > 0x01 then
-                                        idata[2] = 0x1
+                                        idata[2] = 0x01
                                     end
                                     data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 3)
                                 end
@@ -751,19 +737,19 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                         end
                     case 3 then -- loop mode
                         local loop_mode: uint8 = flags & InstrumentFlag.LOOP_MASK
-                        if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                        if input.pressedRepeat(rl.keyboardKey.LEFT) then
                             loop_mode = util.wrapI(loop_mode - 1, 0, 4)
                             flags = (flags & ~InstrumentFlag.LOOP_MASK) | loop_mode
                             idata[0] = flags
-                        elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                             loop_mode = util.wrapI(loop_mode + 1, 0, 4)
                             flags = (flags & ~InstrumentFlag.LOOP_MASK) | loop_mode
                             idata[0] = flags
                         end
                     case 4 then -- loop range
-                        if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                        if input.pressedRepeat(rl.keyboardKey.LEFT) then
                             data.instrument_x = util.wrapI(data.instrument_x - 1, 0, 12)
-                        elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                             data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 12)
                         else
                             if input.hexEdit(
@@ -776,9 +762,9 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                             end
                         end
                     case 5 then -- adsr
-                        if rl.isKeyPressed(rl.keyboardKey.LEFT) then
+                        if input.pressedRepeat(rl.keyboardKey.LEFT) then
                             data.instrument_x = util.wrapI(data.instrument_x - 1, 0, 8)
-                        elseif rl.isKeyPressed(rl.keyboardKey.RIGHT) then
+                        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
                             data.instrument_x = util.wrapI(data.instrument_x + 1, 0, 8)
                         else
                             if input.hexEdit(
@@ -800,6 +786,14 @@ global function stateTrackerDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:camera2D(-1)
 
     -- TODO: disable editing when in empty phrase/instrument
+
+    vm.gpu:print2D(250, 18, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SAMPLE")
+
+    if vm.soundchip.audio_state.playing_flags ~= 0 then
+        local ts: *TrackState = vm.soundchip:getTrackState(data.track)
+        data.song_y = ts.song_pos
+        data.pattern_y = ts.pattern_pos
+    end
 
     --drawLevels(sm, vm)
     drawSong(sm, vm)

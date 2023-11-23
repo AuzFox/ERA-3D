@@ -1,7 +1,5 @@
 require("statemachine")
 
--- TODO: add basic ui to load texture files
-
 global function stateTextureInit(sm: *StateMachine, vm: *EVM): void
 end
 
@@ -13,14 +11,7 @@ global function stateTextureExit(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
-    local is_ctrl_down: boolean = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
-
-    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.RIGHT) then
-        sm.queued_state = StateID.MAIN -- switch to main state next frame
-        return
-    end
-
-    if is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
+    if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
         sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
         sm.queued_dialog = DialogID.IMPORT_TEXTURE
         return
@@ -31,7 +22,8 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     rl.clearBackground({0, 0, 0, 0})
     vm.gpu:camera2D(-1)
 
-    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((31 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 4, GPU_GREEN, "// TEXTURE EDITOR STUFF HERE...")
+    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((37 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 9, GPU_WHITE, "// TODO: TEXTURE EDITOR STUFF HERE...")
+    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((32 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT TEXTURE")
 end
 
 global function stateTextureCleanup(sm: *StateMachine, vm: *EVM): void

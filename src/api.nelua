@@ -177,7 +177,7 @@ local collision_functions: [4][4]CollisionFunction = {
 -- DEBUG API FUNCTIONS (TODO: remove)
 
 local function apiHalt(vm: *EVM): boolean
-	vm.error = "PROGRAM HALTED -\n"
+	vm.error = "PROGRAM HALTED -"
 	return false
 end
 
@@ -186,7 +186,7 @@ end
 -- getMem8() helper function for apiPrint2D()
 local function getMem8(vm: *EVM, addr: uint32, c: *uint8): boolean
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+		vm.error = string.format("invalid byte read address 0x%08X", addr)
 		return false
 	end
 
@@ -198,10 +198,10 @@ end
 -- getMem32() helper function for apiPrint2D()
 local function getMem32(vm: *EVM, addr: uint32, v: *uint32): boolean
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
+		vm.error = string.format("invalid word read address 0x%08X", addr)
 		return false
 	elseif (addr & 0b11) ~= 0 then
-		vm.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", addr)
+		vm.error = string.format("misaligned word read address 0x%08X", addr)
 		return false
 	end
 
@@ -276,7 +276,7 @@ local function apiPrint2D(vm: *EVM): boolean
 			switch c do
 				case 'i'_u8, 'd'_u8 then
 					if vm.cf.vargc < 1 then
-						vm.error = string.format("RUNTIME ERROR: insufficient vararg bytes for format specifier `%%%c`\n", c)
+						vm.error = string.format("insufficient vararg bytes for format specifier `%%%c`", c)
 						return false
 					end
 
@@ -299,7 +299,7 @@ local function apiPrint2D(vm: *EVM): boolean
 					i = i + 1
 				case 'u'_u8 then
 					if vm.cf.vargc < 1 then
-						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%i`\n"
+						vm.error = "insufficient vararg bytes for format specifier `%i`"
 						return false
 					end
 
@@ -322,7 +322,7 @@ local function apiPrint2D(vm: *EVM): boolean
 					i = i + 1
 				case 'x'_u8 then
 					if vm.cf.vargc < 1 then
-						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%x`\n"
+						vm.error = "insufficient vararg bytes for format specifier `%x`"
 						return false
 					end
 
@@ -345,7 +345,7 @@ local function apiPrint2D(vm: *EVM): boolean
 					i = i + 1
 				case 'X'_u8 then
 					if vm.cf.vargc < 1 then
-						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%X`\n"
+						vm.error = "insufficient vararg bytes for format specifier `%X`"
 						return false
 					end
 
@@ -368,7 +368,7 @@ local function apiPrint2D(vm: *EVM): boolean
 					i = i + 1
 				case 'f'_u8 then
 					if vm.cf.vargc < 1 then
-						vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%f`\n"
+						vm.error = "insufficient vararg bytes for format specifier `%f`"
 						return false
 					end
 
@@ -395,7 +395,7 @@ local function apiPrint2D(vm: *EVM): boolean
 					switch c do
 						case '2'_u8 then
 							if vm.cf.vargc < 2 then
-								vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%v2`\n"
+								vm.error = "insufficient vararg bytes for format specifier `%v2`"
 								return false
 							end
 		
@@ -419,7 +419,7 @@ local function apiPrint2D(vm: *EVM): boolean
 							i = i + 2
 						case '3'_u8 then
 							if vm.cf.vargc < 3 then
-								vm.error = "RUNTIME ERROR: insufficient vararg bytes for format specifier `%v3`\n"
+								vm.error = "insufficient vararg bytes for format specifier `%v3`"
 								return false
 							end
 		
@@ -443,11 +443,11 @@ local function apiPrint2D(vm: *EVM): boolean
 
 							i = i + 2
 						else
-							vm.error = string.format("RUNTIME ERROR: invalid format specifier `%%v%c`\n", c)
+							vm.error = string.format("invalid format specifier `%%v%c`", c)
 							return false
 					end
 				else
-					vm.error = string.format("RUNTIME ERROR: invalid format specifier `%%%c`\n", c)
+					vm.error = string.format("invalid format specifier `%%%c`", c)
 					return false
 			end
 		elseif c == '\n'_u8 then
@@ -469,7 +469,7 @@ local function apiVargc(vm: *EVM): boolean
 
 	if vm.csp < 1 then
 		-- shouldn't happen, but just in case
-		vm.error = string.format("RUNTIME ERROR (DEBUG): cannot call vargc() with empty callstack\n")
+		vm.error = string.format("(DEBUG): cannot call vargc() with empty callstack")
 		return false
 	end
 
@@ -477,7 +477,7 @@ local function apiVargc(vm: *EVM): boolean
 	local frame: *CallFrame = &vm.callstack[vm.csp - 1]
 
 	if not frame.vargf then
-		vm.error = string.format("RUNTIME ERROR: cannot call vargc() from non-vararg function\n")
+		vm.error = string.format("cannot call vargc() from non-vararg function")
 		return false
 	end
 
@@ -494,7 +494,7 @@ local function apiVargv(vm: *EVM): boolean
 
 	if vm.csp < 1 then
 		-- shouldn't happen, but just in case
-		vm.error = string.format("RUNTIME ERROR (DEBUG): cannot call vargv() with empty callstack\n")
+		vm.error = string.format("(DEBUG): cannot call vargv() with empty callstack")
 		return false
 	end
 
@@ -502,17 +502,17 @@ local function apiVargv(vm: *EVM): boolean
 	local frame: *CallFrame = &vm.callstack[vm.csp - 1]
 
 	if not frame.vargf then
-		vm.error = string.format("RUNTIME ERROR: cannot call vargv() from non-vararg function\n")
+		vm.error = string.format("cannot call vargv() from non-vararg function")
 		return false
 	end
 
 	if frame.vargc == 0 then
-		vm.error = string.format("RUNTIME ERROR: vargv() called after end of varargs\n")
+		vm.error = string.format("vargv() called after end of varargs")
 		return false
 	end
 
 	if offset > frame.vargc then
-		vm.error = string.format("RUNTIME ERROR: vararg count exceeded by %d word(s)\n", offset - frame.vargc)
+		vm.error = string.format("vararg count exceeded by %d word(s)", offset - frame.vargc)
 		return false
 	end
 
@@ -1029,7 +1029,7 @@ local function apiVec2LineAngle(vm: *EVM): boolean
 	local a: rl.vector2 = vm:getArgV2(0)
 	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushF(rl.vector2LineAngle(a, b))
+	vm:pushF(rl.vector2.lineAngle(a, b))
 
 	return true
 end
@@ -1042,9 +1042,7 @@ local function apiVec2Lerp(vm: *EVM): boolean
 	local b: rl.vector2 = vm:getArgV2(2)
 	local amount: float32 = vm:getArgF(4)
 
-	a:lerp(b, amount)
-
-	vm:pushV2(a)
+	vm:pushV2(rl.vector2.lerp(a, b, amount))
 
 	return true
 end
@@ -1055,10 +1053,8 @@ local function apiVec2Reflect(vm: *EVM): boolean
 
 	local a: rl.vector2 = vm:getArgV2(0)
 	local b: rl.vector2 = vm:getArgV2(2)
-
-	a:reflect(b)
 	
-	vm:pushV2(a)
+	vm:pushV2(rl.vector2.reflect(a, b))
 	
 	return true
 end
@@ -1069,10 +1065,8 @@ local function apiVec2Rotate(vm: *EVM): boolean
 
 	local v: rl.vector2 = vm:getArgV2(0)
 	local angle: float32 = vm:getArgF(2)
-
-	v:rotate(angle)
 	
-	vm:pushV2(v)
+	vm:pushV2(rl.vector2.rotate(v, angle))
 
 	return true
 end
@@ -1107,9 +1101,7 @@ local function apiVec2Invert(vm: *EVM): boolean
 	
 	local v: rl.vector2 = vm:getArgV2(0)
 
-	v:invert()
-
-	vm:pushV2(v)
+	vm:pushV2(rl.vector2.invert(v))
 
 	return true
 end
@@ -1271,7 +1263,7 @@ local function apiVec3Angle(vm: *EVM): boolean
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
 
-	vm:pushF(a:angle(b))
+	vm:pushF(rl.vector3.angle(a, b))
 
 	return true
 end
@@ -1282,10 +1274,8 @@ local function apiVec3Lerp(vm: *EVM): boolean
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
 	local amount: float32 = vm:getArgF(6)
-
-	a:lerp(b, amount)
 	
-	vm:pushV3(a)
+	vm:pushV3(rl.vector3.lerp(a, b, amount))
 
 	return true
 end
@@ -1296,9 +1286,7 @@ local function apiVec3Reflect(vm: *EVM): boolean
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
 
-	a:reflect(b)
-	
-	vm:pushV3(a)
+	vm:pushV3(rl.vector3.reflect(a, b))
 
 	return true
 end
@@ -1309,10 +1297,8 @@ local function apiVec3Rotate(vm: *EVM): boolean
 	local v: rl.vector3 = vm:getArgV3(0)
 	local axis: rl.vector3 = vm:getArgV3(3)
 	local angle: float32 = vm:getArgF(6)
-
-	v:rotateByAxisAngle(axis, angle)
 	
-	vm:pushV3(v)
+	vm:pushV3(rl.vector3.rotateByAxisAngle(v, axis, angle))
 
 	return true
 end
@@ -1346,9 +1332,7 @@ local function apiVec3Invert(vm: *EVM): boolean
 
 	local v: rl.vector3 = vm:getArgV3(0)
 
-	v:invert()
-	
-	vm:pushV3(v)
+	vm:pushV3(rl.vector3.invert(v))
 
 	return true
 end
@@ -1778,7 +1762,7 @@ local function apiSetTextureMode(vm: *EVM): boolean
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode > 2 then
-		vm.error = string.format("RUNTIME ERROR: attempt to set invalid texture mode `%d`\n", mode)
+		vm.error = string.format("attempt to set invalid texture mode `%d`", mode)
 		return false
 	end
 
@@ -1817,7 +1801,7 @@ local function apiSetCullMode(vm: *EVM): boolean
 		case 2 then
 			rlgl.disableBackfaceCulling()
 		else
-			vm.error = string.format("RUNTIME ERROR: attempt to set invalid cull mode `%d`\n", mode)
+			vm.error = string.format("attempt to set invalid cull mode `%d`", mode)
 			return false
 	end
 
@@ -1980,7 +1964,7 @@ local function apiSetBlendMode(vm: *EVM): boolean
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode > rl.blendMode.SUBTRACT_colorS then
-		vm.error = string.format("RUNTIME ERROR: attempt to set invalid blend mode `%d`\n", mode)
+		vm.error = string.format("attempt to set invalid blend mode `%d`", mode)
 		return false
 	end
 
@@ -2030,7 +2014,7 @@ local function apiSetAmbientFactor(vm: *EVM): boolean
 	local factor: float32 = vm:getArgF(0)
 
 	if factor < 0.0 or factor > 100.0 then
-		vm.error = "RUNTIME ERROR: attempt to set invalid ambient factor\n"
+		vm.error = "attempt to set invalid ambient factor"
 		return false
 	end
 
@@ -2321,7 +2305,7 @@ local function apiDrawObj(vm: *EVM): boolean
 	local id: uint32 = vm:getArgU(0)
 
 	if id > 511 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid OBJMAP entry `%d`\n", id)
+		vm.error = string.format("attempt to load invalid OBJMAP entry `%d`", id)
 		return false
 	end
 
@@ -2350,7 +2334,7 @@ local function apiBeginMesh(vm: *EVM): boolean
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode > 2 then
-		vm.error = string.format("RUNTIME ERROR: attempt to set invalid primitive mode `%d`", mode)
+		vm.error = string.format("attempt to set invalid primitive mode `%d`", mode)
 		return false
 	end
 
@@ -2432,7 +2416,7 @@ local function apiMatrixMode(vm: *EVM): boolean
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode > GPU_MODELVIEW then
-		vm.error = string.format("RUNTIME ERROR: attempt to set invalid matrix mode `%d`", mode)
+		vm.error = string.format("attempt to set invalid matrix mode `%d`", mode)
 		return false
 	end
 
@@ -2447,14 +2431,14 @@ local function apiPushMatrix(vm: *EVM): boolean
 
 	if vm.gpu.matrix_mode == rlgl.PROJECTION then
 		if vm.gpu.proj_matrix_count >= 24 then
-			vm.error = "RUNTIME ERROR: projection matrix stack overflow\n"
+			vm.error = "projection matrix stack overflow"
 			return false
 		end
 
 		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count + 1
 	else
 		if vm.gpu.view_matrix_count >= 24 then
-			vm.error = "RUNTIME ERROR: view matrix stack overflow\n"
+			vm.error = "view matrix stack overflow"
 			return false
 		end
 
@@ -2472,14 +2456,14 @@ local function apiPopMatrix(vm: *EVM): boolean
 
 	if vm.gpu.matrix_mode == rlgl.PROJECTION then
 		if vm.gpu.proj_matrix_count == 0 then
-			vm.error = "RUNTIME ERROR: projection matrix stack underflow\n"
+			vm.error = "projection matrix stack underflow"
 			return false
 		end
 
 		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count - 1
 	else
 		if vm.gpu.view_matrix_count == 0 then
-			vm.error = "RUNTIME ERROR: view matrix stack underflow\n"
+			vm.error = "view matrix stack underflow"
 			return false
 		end
 
@@ -2608,7 +2592,7 @@ local function apiFrustum(vm: *EVM): boolean
 	local far: float32 = vm:getArgF(5)
 
 	if left == right or top == bottom or near == far then
-		vm.error = "RUNTIME ERROR: invalid frustum parameters"
+		vm.error = "invalid frustum parameters"
 		return false
 	end
 
@@ -2629,7 +2613,7 @@ local function apiOrtho(vm: *EVM): boolean
 	local far: float32 = vm:getArgF(5)
 
 	if left == right or top == bottom or near == far then
-		vm.error = "RUNTIME ERROR: invalid ortho parameters"
+		vm.error = "invalid ortho parameters"
 		return false
 	end
 
@@ -2682,7 +2666,7 @@ local function apiPlayWav(vm: *EVM): boolean
 	local volume: uint8 = (@uint8)(vm:getArgU(2))
 
 	if id > 511 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid WAVMAP entry `%d`", id)
+		vm.error = string.format("attempt to load invalid WAVMAP entry `%d`", id)
 		return false
 	end
 
@@ -2792,14 +2776,14 @@ local function apiCheckCollision(vm: *EVM): boolean
 	end
 
 	if a_type > ColType.CYLINDER or a_type > ColType.CYLINDER then
-		vm.error = "RUNTIME ERROR: attempt to call checkCollision() on invalid collision shape type(s)\n"
+		vm.error = "attempt to call checkCollision() on invalid collision shape type(s)"
 		return false
 	end
 
 	local cfunc: CollisionFunction = collision_functions[a_type][b_type]
 	if cfunc == nilptr then
 		vm.error = string.format(
-			"RUNTIME ERROR: no collision function for types `%s` and `%s`\n",
+			"no collision function for types `%s` and `%s`",
 			collision_type_names[a_type],
 			collision_type_names[b_type]
 		)
@@ -2872,7 +2856,7 @@ local function apiLoadTexBank(vm: *EVM): boolean
 	local bank: uint32 = vm:getArgU(0)
 
 	if bank > 3 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid texture bank `%d`", bank)
+		vm.error = string.format("attempt to load invalid texture bank `%d`", bank)
 		return false
 	end
 
@@ -2888,7 +2872,7 @@ local function apiLoadObjBank(vm: *EVM): boolean
 	local bank: uint32 = vm:getArgU(0)
 
 	if bank > 3 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid object bank `%d`", bank)
+		vm.error = string.format("attempt to load invalid object bank `%d`", bank)
 		return false
 	end
 
@@ -2904,7 +2888,7 @@ local function apiLoadWavBank(vm: *EVM): boolean
 	local bank: uint32 = vm:getArgU(0)
 
 	if bank > 1 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid wave bank `%d`", bank)
+		vm.error = string.format("attempt to load invalid wave bank `%d`", bank)
 		return false
 	end
 
@@ -2920,7 +2904,7 @@ local function apiLoadSeqBank(vm: *EVM): boolean
 	local bank: uint32 = vm:getArgU(0)
 
 	if bank > 7 then
-		vm.error = string.format("RUNTIME ERROR: attempt to load invalid sequencer bank `%d`", bank)
+		vm.error = string.format("attempt to load invalid sequencer bank `%d`", bank)
 		return false
 	end
 
@@ -2936,7 +2920,7 @@ local function apiPeek8(vm: *EVM): boolean
 	local addr: uint32 = vm:getArgU(0)
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+		vm.error = string.format("invalid byte read address 0x%08X", addr)
 		return false
 	end
 
@@ -2953,12 +2937,12 @@ local function apiPoke8(vm: *EVM): boolean
 	local val: uint8 = (@uint8)(vm:getArgU(1) & 0xFF)
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid byte write address 0x%08X\n", addr)
+		vm.error = string.format("invalid byte write address 0x%08X", addr)
 		return false
 	end
 
 	if not vm:setMem8(addr, val) then
-		vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
+		vm.error = string.format("cannot write byte to ROM address 0x%08X", addr)
 		return false
 	end
 
@@ -2972,10 +2956,10 @@ local function apiPeek32(vm: *EVM): boolean
 	local addr: uint32 = vm:getArgU(0)
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
+		vm.error = string.format("invalid word read address 0x%08X", addr)
 		return false
 	elseif (addr & 0b11) ~= 0 then
-		vm.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", addr)
+		vm.error = string.format("misaligned word read address 0x%08X", addr)
 		return false
 	end
 
@@ -2992,15 +2976,15 @@ local function apiPoke32(vm: *EVM): boolean
 	local val: uint32 = vm:getArgU(1)
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", addr)
+		vm.error = string.format("invalid word write address 0x%08X", addr)
 		return false
 	elseif (addr & 0b11) ~= 0 then
-		vm.error = string.format("RUNTIME ERROR: misaligned word write address 0x%08X\n", addr)
+		vm.error = string.format("misaligned word write address 0x%08X", addr)
 		return false
 	end
 
 	if not vm:setMem32(addr, val) then
-		vm.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", addr)
+		vm.error = string.format("cannot write word to ROM address 0x%08X", addr)
 		return false
 	end
 
@@ -3016,22 +3000,22 @@ local function apiMemcpy(vm: *EVM): boolean
 	local nbytes: uint32 = vm:getArgU(2)
 
 	if src > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memcpy src address 0x%08X\n", src)
+		vm.error = string.format("invalid memcpy src address 0x%08X", src)
 		return false
 	end
 
 	if src + (nbytes - 1) > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memcpy src end address 0x%08X\n", src + (nbytes - 1))
+		vm.error = string.format("invalid memcpy src end address 0x%08X", src + (nbytes - 1))
 		return false
 	end
 
 	if dest > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memcpy dest address 0x%08X\n", dest)
+		vm.error = string.format("invalid memcpy dest address 0x%08X", dest)
 		return false
 	end
 
 	if dest + (nbytes - 1) > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memcpy dest end address 0x%08X\n", dest + (nbytes - 1))
+		vm.error = string.format("invalid memcpy dest end address 0x%08X", dest + (nbytes - 1))
 		return false
 	end
 
@@ -3046,7 +3030,7 @@ local function apiMemcpy(vm: *EVM): boolean
 			local byte: uint8 = vm:getMem8(src)
 
 			if not vm:setMem8(dest, byte) then
-				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+				vm.error = string.format("cannot write byte to ROM address 0x%08X", dest)
 				return false
 			end
 
@@ -3059,7 +3043,7 @@ local function apiMemcpy(vm: *EVM): boolean
 			local byte: uint8 = vm:getMem8(src)
 
 			if not vm:setMem8(dest, byte) then
-				vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+				vm.error = string.format("cannot write byte to ROM address 0x%08X", dest)
 				return false
 			end
 
@@ -3080,18 +3064,18 @@ local function apiMemset(vm: *EVM): boolean
 	local value: uint8 = vm:getArgU(2) & 0xFF
 
 	if dest > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memset dest address 0x%08X\n", dest)
+		vm.error = string.format("invalid memset dest address 0x%08X", dest)
 		return false
 	end
 
 	if dest + (nbytes - 1) > MEMORY_MAX_ADDR then
-		vm.error = string.format("RUNTIME ERROR: invalid memset dest end address 0x%08X\n", dest + (nbytes - 1))
+		vm.error = string.format("invalid memset dest end address 0x%08X", dest + (nbytes - 1))
 		return false
 	end
 
 	for i = 0, < nbytes do
 		if not vm:setMem8(dest, value) then
-			vm.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", dest)
+			vm.error = string.format("cannot write byte to ROM address 0x%08X", dest)
 			return false
 		end
 
@@ -3305,9 +3289,9 @@ function EVM:registerBuiltins(): void
 	}
 
 	local constant_ids: []Identifier = {
-		{name="true",  type_info={EVMType.INT},                        const_val=1},
-		{name="false", type_info={EVMType.INT},                        const_val=0},
-		{name="null",  type_info={EVMType.VOID + EVMType.POINTER}, const_val=NULL}
+		{name="true",  type_info={EVMType.INT},                    const_val=1},
+		{name="false", type_info={EVMType.INT},                    const_val=0},
+		{name="null",  type_info={EVMType.VOID + EVMType.POINTER}, const_val=MEMORY_NULL}
 	}
 
 	local constructor_ids: []Identifier = {

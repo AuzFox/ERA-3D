@@ -8,7 +8,7 @@ global function stateRunInit(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setRenderTexture(RenderTexture.MAIN)
+    vm.gpu:setRenderTexture(RenderTexture.CODE)
 
     current_wavbank = vm.soundchip.current_wavbank
     current_seqbank = vm.soundchip.current_seqbank
@@ -34,6 +34,8 @@ global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void
     end
     
     if not vm:callHook(Hook.UPDATE) then
+        core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
+        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [`] to view log")
         run_cart = false
         sm:back()
     end
@@ -47,7 +49,8 @@ global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:camera3D(0) -- configure default camera
     vm.gpu:enableRenderState()
     if not vm:callHook(Hook.DRAW) then
-        io.printf(vm.error)
+        core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
+        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [`] to view log")
         sm:back()
     end
     vm.gpu:disableRenderState()

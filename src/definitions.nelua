@@ -2,6 +2,7 @@ require("sequence")
 require("hashmap")
 require("stringbuilder")
 
+require("rayeasings")
 require("blipkit")
 require("raylib")
 require("rlgl")
@@ -398,11 +399,10 @@ global Hook = @enum {
 }
 
 global RenderTexture = @enum {
-	MAIN = 0,
-    CODE,
-    TEXTURE,
-    MODEL,
+    CODE = 0,
     TRACKER,
+    MODEL,
+    TEXTURE,
 	COUNT
 }
 
@@ -458,12 +458,14 @@ global PlayFlag = @enum {
 }
 
 global StateID = @enum {
+	STATE_SAME = 0xFF,
+	STATE_LEFT = 0xFE,
+	STATE_RIGHT = 0xFD,
     BOOT = 0,
-    MAIN,
     CODE,
-    TEXTURE,
-    MODEL,
     TRACKER,
+    MODEL,
+    TEXTURE,
     RUN,
     COUNT
 }
@@ -479,17 +481,13 @@ global DialogID = @enum {
     COUNT
 }
 
-global StateAnimation = @enum {
-    NONE = 0,
-	STATE_SWITCH,
-	DIALOG_OPENCLOSE
-}
-
 global DialogStep = @enum {
     FILE_BROWSER = 0,
 	TEXTURE_POSITION,
 	TEXTURE_CROP,
-	SAMPLE_CONFIG
+	MODEL_CONFIG,
+	SAMPLE_CONFIG,
+	SAMPLE_CROP
 }
 
 global FileBrowserMode = @enum {
@@ -507,6 +505,32 @@ global FileBrowserResult = @enum {
 	CANCEL,
 	SELECTED_FILE,
 	SELECTED_DIRECTORY
+}
+
+global MenuAnimation = @enum {
+    NONE = 0,
+	STATE_SWITCH,
+	DIALOG_OPENCLOSE,
+	LOG_OPENCLOSE
+}
+
+global PopupState = @enum {
+    HIDDEN = 0,
+	ANIMATING,
+	SHOWN
+}
+
+global LogState = @enum {
+    NONE = 0,
+	HIDDEN,
+	SHOWN
+}
+
+global LogEntryType = @enum {
+	INFO = 0,
+	HOST_ERROR,
+	COMPILE_ERROR,
+	RUNTIME_ERROR
 }
 
 -- --------------------------------
@@ -836,17 +860,7 @@ StateMachine = @record {
 	dialog_id: integer,
 	queued_state: integer,
 	queued_dialog: integer,
-	prev_state: integer,
-
-	-- general animation data
-	animation_type: uint32,
-	anim_time: float32,
-	anim_beginning: float32,
-	anim_target: float32,
-	-- 3D menu swapping animation
-	facing_angle: float32,
-	-- dialog open/close animation
-	dialog_size: float32
+	prev_state: integer
 }
 
 -- global data record
@@ -857,11 +871,31 @@ global CoreData = @record {
 	--compiler: Compiler,
 	--sm: Statemachine,
 
+	-- menu animation data
+	animation_type: uint32,
+	anim_time: float32,
+	anim_beginning: float32,
+	anim_target: float32,
+	-- 3D menu swapping animation
+	facing_angle: float32,
+	-- dialog open/close animation
+	dialog_size: float32,
+
+	log_text: [16 * 81]cchar, -- log text buffer, 64x 80-character strings
+	log_types: [64]uint8, -- log line types, 1 LogEntryType per line
 	user_directory: string,
 	data_directory: string,
 	carts_directory: string,
 	current_cart_path: string,
 	current_browser_path: string,
+	popup_text: string,
+	popup_state: integer,
+	popup_timer: float32,
+	popup_beginning_factor: float32,
+	popup_target_factor: float32,
+	popup_current_factor: float32,
+	popup_offset: int32,
+	popup_color: uint32,
 	file_name: [65]uint8, -- used to name a file when saving
 	byte_buffer: [8]uint8,
 	dialog_val0: int32, -- general purpose integer used by dialogs
@@ -872,10 +906,16 @@ global CoreData = @record {
 	image_to_import: rl.image,
 	sample_to_import: rl.wave,
 	model_to_import: rl.model,
+	model_vertex_count: uint32,
+	log_index: integer,
+	log_count: integer,
+	log_offset: float32,
+	log_state: integer,
 	dialog_step: uinteger,
 	browser_index: integer,
 	browser_mode: integer,
 	browser_input_mode: integer, -- setting file name vs selecting dir/file
+	queued_log_state: integer,
 	has_loaded_paths: boolean,
 	has_loaded_image: boolean,
 	has_loaded_sample: boolean,
@@ -887,5 +927,65 @@ global CoreData = @record {
 --function CoreData:__close(): void
 --	-- do cleanup here...
 --end
+
+-- display popup message
+function CoreData:popup(message_type: uint8, text: string): void
+	self.popup_text = text
+	self.popup_state = PopupState.ANIMATING
+	self.popup_timer = 0.0
+	self.popup_target_factor = 1.0
+	self.popup_beginning_factor = 0.0
+	self.popup_current_factor = 0.0
+	self.popup_offset = 0
+
+	switch message_type do
+		case LogEntryType.INFO then
+			self.popup_color = GPU_GREEN
+		case LogEntryType.HOST_ERROR then
+			self.popup_color = GPU_YELLOW
+		case LogEntryType.COMPILE_ERROR then
+			self.popup_color = GPU_ORANGE
+		case LogEntryType.RUNTIME_ERROR then
+			self.popup_color = GPU_RED
+	end
+end
+
+-- add string to log
+function CoreData:log(entry_type: uint8, text: string, make_popup: boolean): void
+	local line_ptr: *[0]cchar = (@*[0]cchar)(&self.log_text[self.log_index * 81])
+	local char_index: uint8 = 0
+
+	for i = 1, <= #text do
+		local c: cchar = text[i]
+
+		if c ~= '\n'_u8 then
+			line_ptr[char_index] = c
+			char_index = char_index + 1
+		end
+
+		if (char_index == 80) or (c == '\n'_u8) or (i == #text) then
+			line_ptr[char_index] = '\0'_u8 -- terminate line
+			self.log_types[self.log_index] = entry_type -- set line type
+			self.log_index = self.log_index + 1
+			
+			-- increment log index and wrap if needed
+			if self.log_index == 16 then
+				self.log_index = 0
+			end
+
+			-- increment log size if needed
+			if self.log_count < 16 then
+				self.log_count = self.log_count + 1
+			end
+
+			line_ptr = (@*[0]cchar)(&self.log_text[self.log_index * 81]) -- update line pointer
+			char_index = 0 -- set cursor to start of line
+		end
+	end
+
+	if make_popup then
+		self:popup(entry_type, text)
+	end
+end
 
 global core: CoreData --<close>

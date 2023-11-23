@@ -44,6 +44,9 @@ global input.hex_keys: [input.HEX_KEYS_COUNT]cint = {
 }
 
 global input.button_map: [input.Button.COUNT * input.PLAYER_COUNT]cint
+global input.is_shift_down: boolean
+global input.is_ctrl_down: boolean
+global input.is_alt_down: boolean
 
 function input.setDefaultButtonMap(): void
 	input.button_map[input.Button.UP]       = rl.keyboardKey.UP
@@ -62,12 +65,22 @@ function input.setDefaultButtonMap(): void
 	input.button_map[input.Button.START]    = rl.keyboardKey.ENTER
 end
 
+function input.refresh(): void
+    input.is_shift_down = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
+    input.is_ctrl_down = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
+    input.is_alt_down = rl.isKeyDown(rl.keyboardKey.LEFT_ALT) or rl.isKeyDown(rl.keyboardKey.RIGHT_ALT)
+end
+
 function input.getButtonKeycode(btn: integer): cint
 	return input.button_map[btn]
 end
 
 function input.setButtonKeycode(btn: integer, keycode: cint): void
 	input.button_map[btn] = keycode
+end
+
+function input.pressedRepeat(key: cint): boolean
+    return rl.isKeyPressed(key) or rl.isKeyPressedRepeat(key)
 end
 
 function input.hexEdit(byte_ptr: *[0]uint8, out_byte: *uint8, nibble_index: uinteger, handle_empty: boolean): boolean

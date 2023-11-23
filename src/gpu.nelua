@@ -418,8 +418,8 @@ function GPU:print2D(x: int32, y: int32, col: uint32, text: string): void
 	while i <= #text do
 		local c: uint8
 
-		-- stop if we're going offscreen
-		if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
+		if y >= GPU_VSCREEN_H or x >= GPU_VSCREEN_W then
+			-- we're off screen, no need to render
 			return
 		end
 
@@ -723,19 +723,12 @@ function GPU:loadTextureData(bank_index: integer, src_x: int32, src_y: int32, de
 	end
 end
 
-function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32): (boolean, uint32)
-	local model: rl.model = rl.loadModel(filename)
-
-	if not rl.isModelReady(model) then
-		print("failed to load model")
-		return false, 0
-	end
-
+function GPU:loadModelData(bank_index: uint32, start_index: uint32): void
 	local vertex_count: uint32
 	local bank_ptr: *[0]IntFloat = &self.objbank_ptr[MEMORY_OBJMEM_SIZE_ELEMENTS * bank_index]
 
-	for i = 0, < model.meshCount do
-		local mesh: rl.mesh = (@*[0]rl.mesh)(model.meshes)[i]
+	for i = 0, < core.model_to_import.meshCount do
+		local mesh: rl.mesh = (@*[0]rl.mesh)(core.model_to_import.meshes)[i]
 		local posptr: *[0]float32 = (@*[0]float32)(mesh.vertices)
 		local uvptr: *[0]float32 = (@*[0]float32)(mesh.texcoords)
 		local colptr: *[0]cuchar = (@*[0]cuchar)(mesh.colors)
@@ -827,10 +820,6 @@ function GPU:loadModel(filename: string, bank_index: uint32, start_index: uint32
 			end
 		end
 	end
-	
-	rl.unloadModel(model)
-	
-	return true, vertex_count
 end
 
 function GPU:resetMatrixStack(): void
@@ -896,7 +885,6 @@ function GPU:enableRenderState(): void
 	end
 
 	rlgl.enableScissorTest()
-	rlgl.scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
 
 	self:setBlendMode(self.blend_mode)
 
@@ -908,7 +896,9 @@ function GPU:disableRenderState(): void
 	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
 	rlgl.disableWireMode()
 	rlgl.disableScissorTest()
-	rlgl.viewport(0, 0, GPU_SCREEN_W, GPU_SCREEN_H)
+
+	-- TODO: properly disable all render state
+
 	self:setBlendMode(rl.blendMode.ALPHA)
 end
 
@@ -977,7 +967,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.ompbank_ptr = ompbank_ptr
 
 	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
-	--rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
 	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
 	--[[
@@ -998,7 +988,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 
 	self.gfx_master_rendertexture = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
 
-	self.gfx_rendertexture_index = RenderTexture.MAIN
+	self.gfx_rendertexture_index = RenderTexture.CODE
 	for i = 0, < RenderTexture.COUNT do
 		self.gfx_rendertextures[i] = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
 	end
@@ -1056,8 +1046,6 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	}
 
 	self:resetGPU()
-
-	--self:loadModel("test_data/viewcube.obj", 0, 0)
 end
 
 function GPU:cleanup(): void

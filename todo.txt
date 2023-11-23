@@ -32,10 +32,9 @@ VM:
 - implement cycle limit (how to deal with incomplete calls?)
 
 HOST:
-- implement asset importing
+- complete all import dialogs
 - implement config file
-- implement carts directory
 - implement window resizing
 - implement debugger
 - implement boot animation
-- implement ui
+- implement editors

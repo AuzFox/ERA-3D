@@ -575,7 +575,7 @@ function EVM:getMemColAABB(addr: uint32, box: *ColAABB): boolean
 	local intf: IntFloat
 
 	if addr + 24 > MEMORY_MAX_ADDR then
-		self.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", addr)
+		self.error = string.format("invalid word write address 0x%08X", addr)
 		return false
 	end
 
@@ -1004,7 +1004,7 @@ function EVM:run(cycles: uinteger): boolean
 				self.lsp = self.lsp + self:next16()
 
 				if self.lsp > MEMORY_LOCALS_SIZE_ELEMENTS then
-					self.error = string.format("RUNTIME ERROR: local variable stack limit exceeded by %d word(s)\n", self.lsp - MEMORY_LOCALS_SIZE_ELEMENTS)
+					self.error = string.format("local variable stack limit exceeded by %d word(s)", self.lsp - MEMORY_LOCALS_SIZE_ELEMENTS)
 					return false
 				end
 			case Opcode.DEL_L then
@@ -1043,10 +1043,10 @@ function EVM:run(cycles: uinteger): boolean
 				local v: uint32
 
 				if ptr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("invalid word read address 0x%08X", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("misaligned word read address 0x%08X", ptr)
 					return false
 				end
 				
@@ -1057,10 +1057,10 @@ function EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self:popI()
 
 				if ptr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("invalid word read address 0x%08X", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("misaligned word read address 0x%08X", ptr)
 					return false
 				end
 
@@ -1069,7 +1069,7 @@ function EVM:run(cycles: uinteger): boolean
 					local addr: uint32 = start + i * 4
 
 					if addr > MEMORY_MAX_ADDR then
-						self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", addr)
+						self.error = string.format("invalid word read address 0x%08X", addr)
 						return false
 					end
 					
@@ -1081,15 +1081,15 @@ function EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self:popI()
 
 				if ptr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid word write address 0x%08X\n", ptr)
+					self.error = string.format("invalid word write address 0x%08X", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("RUNTIME ERROR: misaligned word write address 0x%08X\n", ptr)
+					self.error = string.format("misaligned word write address 0x%08X", ptr)
 					return false
 				end
 				
 				if not self:setMem32((@uint32)(ptr + (@int32)(index) * 4), v) then
-					self.error = string.format("RUNTIME ERROR: cannot write word to ROM address 0x%08X\n", ptr)
+					self.error = string.format("cannot write word to ROM address 0x%08X", ptr)
 					return false
 				end
 			case Opcode.SET_MX then
@@ -1102,10 +1102,10 @@ function EVM:run(cycles: uinteger): boolean
 				local ptr: int32 = self.opstack[(self.osp - 1) - size].i
 
 				if ptr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", ptr)
+					self.error = string.format("invalid word read address 0x%08X", ptr)
 					return false
 				elseif (ptr & 0b11) ~= 0 then
-					self.error = string.format("RUNTIME ERROR: misaligned word read address 0x%08X\n", ptr)
+					self.error = string.format("misaligned word read address 0x%08X", ptr)
 					return false
 				end
 
@@ -1116,7 +1116,7 @@ function EVM:run(cycles: uinteger): boolean
 					local struct_word_index: uint32 = struct_start + i
 
 					if mem_addr > MEMORY_MAX_ADDR then
-						self.error = string.format("RUNTIME ERROR: invalid word read address 0x%08X\n", mem_addr)
+						self.error = string.format("invalid word read address 0x%08X", mem_addr)
 						return false
 					end
 					
@@ -1131,7 +1131,7 @@ function EVM:run(cycles: uinteger): boolean
 				local addr: uint32 = s.data + i
 
 				if addr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X\n", addr)
+					self.error = string.format("invalid byte read address 0x%08X", addr)
 					return false
 				end
 			
@@ -1144,12 +1144,12 @@ function EVM:run(cycles: uinteger): boolean
 				local addr: uint32 = s.data + i
 
 				if addr > MEMORY_MAX_ADDR then
-					self.error = string.format("RUNTIME ERROR: invalid byte write address 0x%08X\n", addr)
+					self.error = string.format("invalid byte write address 0x%08X", addr)
 					return false
 				end
 			
 				if not self:setMem8(addr, c) then
-					self.error = string.format("RUNTIME ERROR: cannot write byte to ROM address 0x%08X\n", addr)
+					self.error = string.format("cannot write byte to ROM address 0x%08X", addr)
 					return false
 				end
 			case Opcode.ADDROF_G then
@@ -1509,14 +1509,14 @@ function EVM:run(cycles: uinteger): boolean
 							local bc: uint8
 
 							if a_addr > MEMORY_MAX_ADDR then
-								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", a_addr)
+								self.error = string.format("invalid byte read address 0x%08X during string comparison", a_addr)
 								return false
 							end
 						
 							ac = self:getMem8(a_addr)
 
 							if b_addr > MEMORY_MAX_ADDR then
-								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
+								self.error = string.format("invalid byte read address 0x%08X during string comparison", b_addr)
 								return false
 							end
 						
@@ -1577,14 +1577,14 @@ function EVM:run(cycles: uinteger): boolean
 							local bc: uint8
 
 							if a_addr > MEMORY_MAX_ADDR then
-								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", a_addr)
+								self.error = string.format("invalid byte read address 0x%08X during string comparison", a_addr)
 								return false
 							end
 						
 							ac = self:getMem8(a_addr)
 
 							if b_addr > MEMORY_MAX_ADDR then
-								self.error = string.format("RUNTIME ERROR: invalid byte read address 0x%08X during string comparison\n", b_addr)
+								self.error = string.format("invalid byte read address 0x%08X during string comparison", b_addr)
 								return false
 							end
 						
@@ -1813,7 +1813,7 @@ function EVM:run(cycles: uinteger): boolean
 				end
 			case Opcode.CALL then
 				if self.csp >= EVM_CALLSTACK_SIZE then
-					self.error = "RUNTIME ERROR: callstack overflow\n"
+					self.error = "callstack overflow"
 					return false
 				end
 
@@ -1821,7 +1821,7 @@ function EVM:run(cycles: uinteger): boolean
 				local argc: uint16 = self:next16()
 
 				if self.asp + argc >= MEMORY_ARGS_SIZE_ELEMENTS then
-					self.error = "RUNTIME ERROR: argstack overflow\n"
+					self.error = "argstack overflow"
 					return false
 				end
 
@@ -1834,7 +1834,7 @@ function EVM:run(cycles: uinteger): boolean
 					self:pushCallframe(0)
 					self.cf.pc = addr
 				else
-					self.error = string.format("RUNTIME ERROR: invalid call address 0x%08X\n", addr)
+					self.error = string.format("invalid call address 0x%08X", addr)
 					return false
 				end
 			case Opcode.RETURN then
@@ -1863,12 +1863,12 @@ function EVM:run(cycles: uinteger): boolean
 				local func: APIFunction = self.api_funcs[index]
 				if func ~= nilptr then
 					if self.csp >= EVM_CALLSTACK_SIZE then
-						self.error = "RUNTIME ERROR: callstack overflow\n"
+						self.error = "callstack overflow"
 						return false
 					end
 
 					if self.asp + argc >= MEMORY_ARGS_SIZE_ELEMENTS then
-						self.error = "RUNTIME ERROR: argstack overflow\n"
+						self.error = "argstack overflow"
 						return false
 					end
 
@@ -1880,12 +1880,12 @@ function EVM:run(cycles: uinteger): boolean
 					end
 					self:popCallframe()
 				else
-					self.error = string.format("RUNTIME ERROR: attempt to call unregistered API function at index %d\n", index)
+					self.error = string.format("attempt to call unregistered API function at index %d", index)
 					return false
 				end
 			else
 				-- invalid opcode
-				self.error = string.format("RUNTIME ERROR: attempt to execute invalid opcode %d\n", op)
+				self.error = string.format("attempt to execute invalid opcode %d", op)
 				return false
 		end
 
@@ -1917,11 +1917,31 @@ function EVM:callHook(hook: integer): boolean
 		self:popCallframe()
 
 		if self.current_hook == Hook.DRAW then
+			self.gpu.viewport_w = GPU_VSCREEN_W
+			self.gpu.viewport_h = GPU_VSCREEN_H
+			rlgl.viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+			rlgl.scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
 			rlgl.drawRenderBatchActive()
 		end
 
 		return result
 	end
+	return true
+end
+
+function EVM:loadSourceFile(filename: string): boolean
+	local sfs, err, errcode = filestream.open(filename)
+	if not sfs:isopen() then
+		self.error = string.format("failed to open script file: %s", err)
+		return false
+	end
+
+	local data: string, err, errcode = sfs:read("a")
+	self.src_len = #data
+	memory.copy(&self.src, data.data, self.src_len)
+
+	sfs:close()
+
 	return true
 end
 
@@ -1964,7 +1984,7 @@ function EVM:saveCart(filename: string): boolean
 	local err: cint
 	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'w'_u8, &err)
 	if zip == nilptr then
-		self.error = string.format("ERROR: failed to save cart `%s`. (error code %d)\n", filename, err)
+		self.error = string.format("failed to save cart: (error code %d)", err)
 		return false
 	end
 	defer
@@ -2001,11 +2021,11 @@ function EVM:saveCart(filename: string): boolean
 			zip_entry_close(zip)
 			close_entry = false
 		else
-			self.error = string.format("ERROR: failed to save src.ec to cart `%s`. (error code %d)\n", filename, err)
+			self.error = string.format("failed to save src.ec to cart: (error code %d)", err)
 			return false
 		end
 	else
-		self.error = string.format("ERROR: failed to save src.ec to cart `%s`. (error code %d)\n", filename, err)
+		self.error = string.format("failed to save src.ec to cart: (error code %d)", err)
 		return false
 	end
 
@@ -2022,11 +2042,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2044,11 +2064,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2066,11 +2086,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2088,11 +2108,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2110,11 +2130,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2132,11 +2152,11 @@ function EVM:saveCart(filename: string): boolean
 				zip_entry_close(zip)
 				close_entry = false
 			else
-				self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 				return false
 			end
 		else
-			self.error = string.format("ERROR: failed to save `%s` to cart `%s`. (error code %d)\n", bank_filename, filename, err)
+			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
 			return false
 		end
 	end
@@ -2151,11 +2171,11 @@ function EVM:saveCart(filename: string): boolean
 			zip_entry_close(zip)
 			close_entry = false
 		else
-			self.error = string.format("ERROR: failed to save rom.bin to cart `%s`. (error code %d)\n", filename, err)
+			self.error = string.format("failed to save rom.bin to cart: (error code %d)", err)
 			return false
 		end
 	else
-		self.error = string.format("ERROR: failed to save rom.bin to cart `%s`. (error code %d)\n", filename, err)
+		self.error = string.format("failed to save rom.bin to cart: (error code %d)", err)
 		return false
 	end
 
@@ -2167,7 +2187,7 @@ function EVM:loadCart(filename: string): boolean
 	local err: cint
 	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'r'_u8, &err)
 	if zip == nilptr then
-		self.error = string.format("ERROR: failed to load cart `%s`. (error code %d)\n", filename, err)
+		self.error = string.format("failed to load cart: (error code %d)", err)
 		return false
 	end
 	defer
@@ -2187,10 +2207,10 @@ function EVM:loadCart(filename: string): boolean
 		size = zip_entry_size(zip)
 
 		if size < 0 then
-			self.error = string.format("ERROR: failed to load src.ec from cart `%s`. (error code %d)\n", filename, err)
+			self.error = string.format("failed to load src.ec from cart: (error code %d)", err)
 			return false
 		elseif size > EVM_SRC_SIZE then
-			self.error = string.format("ERROR: failed to load src.ec from cart `%s`. 1 MiB limit exceeded.\n", filename)
+			self.error = string.format("failed to load src.ec from cart: 1 MiB limit exceeded.")
 			return false
 		else
 			local bytes_read: clong = zip_entry_noallocread(zip, &self.src, size)
@@ -2213,10 +2233,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_TEXMEM_SIZE_BYTES then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 4 MiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 4 MiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2240,10 +2260,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_OBJMEM_SIZE_BYTES then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 3 MiB + 384 KiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 3 MiB + 384 KiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2267,10 +2287,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_OBJMAP_SIZE then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 3 KiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 3 KiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2294,10 +2314,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_WAVMAP_SIZE then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 2 KiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 2 KiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2321,10 +2341,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_WAVMEM_SIZE_BYTES then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 7 MiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 7 MiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2348,10 +2368,10 @@ function EVM:loadCart(filename: string): boolean
 			size = zip_entry_size(zip)
 
 			if size < 0 then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. (error code %d)\n", bank_filename, filename, err)
+				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
 				return false
 			elseif size > MEMORY_SEQMEM_SIZE_BYTES then
-				self.error = string.format("ERROR: failed to load `%s` from cart `%s`. 256 KiB limit exceeded\n", bank_filename, filename)
+				self.error = string.format("failed to load `%s` from cart: 256 KiB limit exceeded", bank_filename)
 				return false
 			else
 				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
@@ -2372,10 +2392,10 @@ function EVM:loadCart(filename: string): boolean
 		size = zip_entry_size(zip)
 
 		if size < 0 then
-			self.error = string.format("ERROR: failed to load rom.bin from cart `%s`. (error code %d)\n", filename, err)
+			self.error = string.format("failed to load rom.bin from cart: (error code %d)", err)
 			return false
 		elseif size > MEMORY_ROM_SIZE_BYTES then
-			self.error = string.format("ERROR: failed to load rom.bin from cart `%s`. 16 MiB limit exceeded.\n", filename)
+			self.error = string.format("failed to load rom.bin from cart: 16 MiB limit exceeded.")
 			return false
 		else
 			local bytes_read: clong = zip_entry_noallocread(zip, &self.cart.rom, size)
@@ -2396,30 +2416,6 @@ function EVM:loadCart(filename: string): boolean
 
 	return true
 end
-
---[[
-function EVM:loadData(src_file: string, tex_file: string): boolean
-	local sfs, err, errcode = filestream.open(src_file)
-	if not sfs:isopen() then
-		self.error = string.format("failed to open file `%s`: %s (error code: %d)\n", src_file, err, errcode)
-		return false
-	end
-
-	local data: string, err, errcode = sfs:read("a")
-	self.src_len = #data
-	memory.copy(&self.src, data.data, self.src_len)
-
-	sfs:close()
-
-	if tex_file ~= "" then
-		if not self.gpu:loadTexturesheet(tex_file, 0) then
-			return false
-		end
-	end
-
-	return true
-end
-]]
 
 function EVM:__gc(): void
 	self.soundchip:cleanup()
