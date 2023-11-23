@@ -58,10 +58,11 @@ global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 18, GPU_GRAY, "[CTRL+R]         : RUN CART")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 27, GPU_GRAY, "[CTRL+O]         : OPEN CART")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 36, GPU_GRAY, "[CTRL+S]         : SAVE CART")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 45, GPU_GRAY, "[`]              : OPEN LOG")
+    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 45, GPU_GRAY, "[CTRL+SHIFT+S]   : SAVE CART AS...")
+    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 54, GPU_GRAY, "[`]              : OPEN LOG")
 
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 63, GPU_WHITE, "// TODO: CODE EDITOR STUFF HERE...")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 72, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SCRIPT")
+    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 72, GPU_WHITE, "// TODO: CODE EDITOR STUFF HERE...")
+    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 81, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SCRIPT")
 end
 
 global function stateCodeCleanup(sm: *StateMachine, vm: *EVM): void

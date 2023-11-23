@@ -950,6 +950,11 @@ function CoreData:popup(message_type: uint8, text: string): void
 	end
 end
 
+function CoreData:clearLog(): void
+	self.log_index = 0
+	self.log_count = 0
+end
+
 -- add string to log
 function CoreData:log(entry_type: uint8, text: string, make_popup: boolean): void
 	local line_ptr: *[0]cchar = (@*[0]cchar)(&self.log_text[self.log_index * 81])

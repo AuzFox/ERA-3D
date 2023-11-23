@@ -619,7 +619,9 @@ global function dialogLoadCartUpdate(sm: *StateMachine, vm: *EVM): void
                 case FileBrowserResult.CANCEL then
                     sm.queued_dialog = DialogID.NONE
                 case FileBrowserResult.SELECTED_FILE then
-                    if vm:loadCart((@string)(core.file_paths.paths[core.browser_index])) then
+                    local file_path: string = (@string)(core.file_paths.paths[core.browser_index])
+                    if vm:loadCart(file_path) then
+                        core.current_cart_path = file_path:copy()
                         sm.queued_dialog = DialogID.NONE
                         core:log(LogEntryType.INFO, "cart loaded", true)
                     else

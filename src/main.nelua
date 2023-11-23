@@ -249,6 +249,8 @@ end
 local function updateLog(): void
 	if rl.isKeyPressed(rl.keyboardKey.GRAVE) then
 		core.queued_log_state = LogState.HIDDEN
+	elseif rl.isKeyPressed(rl.keyboardKey.C) then
+		core:clearLog()
 	end
 end
 
@@ -318,12 +320,19 @@ local function run(): void
 					end
 					update_state = false
 				elseif rl.isKeyPressed(rl.keyboardKey.S) then
-					if core.current_cart_path == "" then
+					if input.is_shift_down then
 						sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
 						sm.queued_dialog = DialogID.SAVE_CART
 					else
-						if not vm:saveCart(core.current_cart_path) then
-							core:log(LogEntryType.HOST_ERROR, vm.error, true)
+						if core.current_cart_path == "" then
+							sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
+							sm.queued_dialog = DialogID.SAVE_CART
+						else
+							if vm:saveCart(core.current_cart_path) then
+								core:log(LogEntryType.INFO, "cart saved", true)
+							else
+								core:log(LogEntryType.HOST_ERROR, vm.error, true)
+							end
 						end
 					end
 					update_state = false
@@ -352,15 +361,17 @@ local function run(): void
 		end
 
 		-- draw to state render texture
-		vm.gpu:beginCurrentRenderTexture()
-			if sm.dialog_id ~= DialogID.NONE or core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
-				sm:drawDialog()
-			else
-				sm:drawState()
-			end
-		vm.gpu:endRenderTexture()
-		
-		vm.gpu:resetMatrixStack()
+		if core.log_state ~= LogState.SHOWN then
+			vm.gpu:beginCurrentRenderTexture()
+				if sm.dialog_id ~= DialogID.NONE or core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
+					sm:drawDialog()
+				else
+					sm:drawState()
+				end
+			vm.gpu:endRenderTexture()
+			
+			vm.gpu:resetMatrixStack()
+		end
 
 		-- draw to master render texture
 		vm.gpu:beginMasterRenderTexture()
@@ -526,7 +537,7 @@ local function run(): void
 
 			if core.log_state == LogState.SHOWN or core.animation_type == MenuAnimation.LOG_OPENCLOSE then
 				local log_y: int32 = -144 + (@int32)(core.log_offset * 144.0)
-				vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 145, GPU_BLACK)
+				vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 145, GPU_BLACK & 0xFFFFFFC0)
 				vm.gpu:drawRect2D(0, log_y + 145, GPU_VSCREEN_W, 1, GPU_GRAY)
 
 				local line_y: int32 = log_y
