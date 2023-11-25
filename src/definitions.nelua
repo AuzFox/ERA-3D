@@ -887,6 +887,7 @@ global CoreData = @record {
 	data_directory: string,
 	carts_directory: string,
 	current_cart_path: string,
+	current_cart_name: string,
 	current_browser_path: string,
 	popup_text: string,
 	popup_state: integer,

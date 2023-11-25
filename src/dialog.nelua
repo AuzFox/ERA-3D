@@ -1,5 +1,7 @@
 require("statemachine")
 
+-- TODO: sort files in path list
+
 local function fileBrowserChangeDirectory(dir: cstring, vm: *EVM): void
     -- copy prev path into stringbuilder
     local str: *[0]cchar = (@*[0]cchar)(dir)
@@ -622,6 +624,7 @@ global function dialogLoadCartUpdate(sm: *StateMachine, vm: *EVM): void
                     local file_path: string = (@string)(core.file_paths.paths[core.browser_index])
                     if vm:loadCart(file_path) then
                         core.current_cart_path = file_path:copy()
+                        core.current_cart_name = (@string)(rl.getFileName(file_path)):copy()
                         sm.queued_dialog = DialogID.NONE
                         core:log(LogEntryType.INFO, "cart loaded", true)
                     else
@@ -655,6 +658,8 @@ global function dialogSaveCartUpdate(sm: *StateMachine, vm: *EVM): void
                     else
                         file_name_str = file_name_str .. ".e3d"
                     end
+
+                    core.current_cart_name = file_name_str:copy()
 
                     ## if ccinfo.is_windows then
                         core.current_cart_path = (@string)(core.current_browser_path) .. "\\" .. file_name_str

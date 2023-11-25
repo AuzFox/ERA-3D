@@ -3891,7 +3891,7 @@ local function program(vm: *EVM): void
 	end
 
 	if not declared then
-		vm.error = string.format("\nno hook functions defined")
+		vm.error = string.format("no hook functions defined\ndefine `void init()`, `void update(float delta_time)`, or `void draw()`")
 		vm.compile_err = true
 	end
 end

@@ -199,6 +199,7 @@ local function init(): void
 	core.anim_target = 0.0
     core.facing_angle = 0.0
     core.dialog_size = 0.0
+	core.current_cart_name = "UNTITLED CART"
 
 	for i = 0, < MAX_PARTICLES do
 		local p: *TriParticle = &particles[i]
@@ -521,6 +522,8 @@ local function run(): void
 								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "SAVE CART")
 						end
 					else
+						vm.gpu:print2D(GPU_VSCREEN_W - (#core.current_cart_name * 6), 0, GPU_WHITE, core.current_cart_name)
+
 						switch sm.state_id do
 							case StateID.CODE then
 								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((11 * 6) /// 2), 0, GPU_WHITE, "CODE EDITOR")
