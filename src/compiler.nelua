@@ -1,5 +1,6 @@
 require("string")
 require("coroutine")
+require("io")
 
 require("definitions")
 
@@ -353,10 +354,20 @@ function EVM:emitF(val: float32): void
 end
 
 local function getChar(vm: *EVM): byte
-	if vm.src_index < vm.src_len then
-		vm.token = vm.src[vm.src_index]
-	else
+	if vm.line > #core.src_lines then
 		vm.token = 0
+		return vm.token
+	end
+	
+	if vm.line ~= vm.prev_line then
+		vm.current_src_line = core.src_lines[vm.line]
+		vm.prev_line = vm.line
+	end
+
+	if vm.src_index >= #vm.current_src_line then
+		vm.token = '\n'_u8
+	else
+		vm.token = vm.current_src_line[vm.src_index]
 	end
 	
 	return vm.token
@@ -371,6 +382,7 @@ local function next(vm: *EVM): void
 
 		if vm.token == '\n'_u8 then
 			vm.line = vm.line + 1
+			vm.src_index = 1
 		elseif (vm.token >= 'a'_u8 and vm.token <= 'z'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'Z'_u8) or (vm.token == '_'_u8) then
 			-- identifier
 			vm.sb:clear()
@@ -511,6 +523,10 @@ local function next(vm: *EVM): void
 								vm.compile_err = true
 								coroutine.yield()
 						end
+					elseif vm.token == '\n'_u8 then
+						vm.error = string.format("line %d:\nstring literals cannot contain unescaped newline characters", vm.line)
+						vm.compile_err = true
+						coroutine.yield()
 					end
 					
 					if start == '"'_u8 then
@@ -583,6 +599,7 @@ local function next(vm: *EVM): void
 								end
 							elseif vm.token == '\n'_u8 then
 								vm.line = vm.line + 1
+								vm.src_index = 1
 							end
 						elseif vm.token == '/'_u8 then
 							vm.src_index = vm.src_index + 1
@@ -592,10 +609,12 @@ local function next(vm: *EVM): void
 								vm.mlcomment_level = vm.mlcomment_level + 1
 							elseif vm.token == '\n'_u8 then
 								vm.line = vm.line + 1
+								vm.src_index = 1
 							end
 						elseif vm.token == '\n'_u8 then
 							vm.src_index = vm.src_index + 1
 							vm.line = vm.line + 1
+							vm.src_index = 1
 						else
 							vm.src_index = vm.src_index + 1
 						end
@@ -3043,7 +3062,6 @@ local function statement(vm: *EVM): void
 		match(vm, ')'_u8)
 		
 		-- loop body
-
 		statement(vm)
 		
 		-- save our spot again
@@ -3051,10 +3069,11 @@ local function statement(vm: *EVM): void
 		-- but we'll be back! ...again!
 		local end_prev_token: uinteger = vm.prev_token
 		local end_index: uinteger = vm.prev_src_index
-		local end_line: uinteger = vm.line
+		local end_line: uinteger = vm.line - 1
 
 		vm.prev_token = step_prev_token
 		vm.src_index = step_index
+		vm.prev_line = 0
 		vm.line = step_line
 		
 		-- ok, we're back
@@ -3090,11 +3109,11 @@ local function statement(vm: *EVM): void
 
 		-- and now we can jump back to the end of the loop body
 		vm.prev_token = end_prev_token
+		vm.prev_line = 0
+		vm.line = end_line
 		vm.src_index = end_index
 		
 		next(vm)
-
-		vm.line = end_line
 
 		-- cleanup any loop init variables allocated
 		local size: uinteger = vm:getScopeLocalsSize()
@@ -3870,8 +3889,8 @@ local function program(vm: *EVM): void
 	end
 
 	vm.line = 1
-	vm.src_index = 0
-	vm.prev_src_index = 0
+	vm.src_index = 1
+	vm.prev_src_index = 1
 	vm:pushScope() -- global scope
 	
 	next(vm)

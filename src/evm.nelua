@@ -1,4 +1,5 @@
 require("io")
+require("allocators.gc")
 
 require("zip")
 
@@ -1935,10 +1936,25 @@ function EVM:loadSourceFile(filename: string): boolean
 		self.error = string.format("failed to open script file: %s", err)
 		return false
 	end
+	
+	-- read file line-by-line into src_lines
+	core:clearSrc()
+	for data in sfs:lines() do
+		-- get new line
+		local line: sequence(uint8) = core:getNewLine()
 
-	local data: string, err, errcode = sfs:read("a")
-	self.src_len = #data
-	memory.copy(&self.src, data.data, self.src_len)
+		-- fill line
+		line:clear() -- remove terminator
+		for i = 1, <= #data do
+			line:push(data[i])
+		end
+		line:push('\0'_u8)
+
+		-- add line to src_lines
+		core.src_lines:push(line)
+	end
+
+	core.current_line = core.src_lines[1]
 
 	sfs:close()
 
@@ -2016,20 +2032,33 @@ function EVM:saveCart(filename: string): boolean
 	if err == ZIP_OK then
 		close_entry = true
 
-		err = zip_entry_write(zip, &self.src, self.src_len)
-		if err == ZIP_OK then
-			zip_entry_close(zip)
-			close_entry = false
-		else
-			self.error = string.format("failed to save src.ec to cart: (error code %d)", err)
-			return false
+		for i = 1, <= #core.src_lines do
+			local line: sequence(uint8) = core.src_lines[i]
+
+			-- get pointer to line data
+			local ptr: *[0]uint8 = (@span(uint8))(line).data
+
+			if i < #core.src_lines then
+				line[#line] = '\n'_u8 -- replace terminator with newline
+				err = zip_entry_write(zip, ptr, #line)
+				line[#line] = '\0'_u8 -- restore terminator
+			else
+				err = zip_entry_write(zip, ptr, #line)
+			end
+			if err ~= ZIP_OK then
+				self.error = string.format("failed to save src.ec to cart: (error code %d)", err)
+				return false
+			end
 		end
+
+		zip_entry_close(zip)
+		close_entry = false
 	else
 		self.error = string.format("failed to save src.ec to cart: (error code %d)", err)
 		return false
 	end
 
-	-- read texbank[0-3].bin
+	-- write texbank[0-3].bin
 	for i = 0, < 4 do
 		local bank_filename: string = string.format("texbank%d.bin", i)
 		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.texbank[i * MEMORY_TEXMEM_SIZE_ELEMENTS])
@@ -2201,6 +2230,7 @@ function EVM:loadCart(filename: string): boolean
 	local size: isize
 
 	-- read src.ec
+	core:clearSrc()
 	err = zip_entry_open(zip, "src.ec")
 	if err == ZIP_OK then
 		close_entry = true
@@ -2213,14 +2243,43 @@ function EVM:loadCart(filename: string): boolean
 			self.error = string.format("failed to load src.ec from cart: 1 MiB limit exceeded.")
 			return false
 		else
-			local bytes_read: clong = zip_entry_noallocread(zip, &self.src, size)
-			self.src_len = bytes_read
+			-- allocate text buffer if needed
+			if core.text_buffer == nilptr then
+				core.text_buffer = (@*[0]uint8)(gc_allocator:alloc(1024 * 1024, GCFlags.LEAF))
+			end
 
+			-- read all text into buffer
+			local bytes_read: clong = zip_entry_noallocread(zip, core.text_buffer, size)
 			zip_entry_close(zip)
 			close_entry = false
+			
+			-- split text buffer into src lines
+			local line: sequence(uint8) = core:getNewLine()
+			line:clear() -- remove terminator
+			local c: uint8 = '\0'_u8
+			for i = 0, < bytes_read do
+				c = core.text_buffer[i]
+
+				if c == '\n'_u8 or c == '\0'_u8 then
+					line:push('\0'_u8)
+					core.src_lines:push(line)
+					
+					if i ~= bytes_read - 1 then
+						line = core:getNewLine()
+						line:clear() -- remove terminator
+					end
+				else
+					line:push(c)
+				end
+			end
+
+			if c ~= '\n'_u8 and c ~= '\0'_u8 then
+				line:push('\0'_u8)
+				core.src_lines:push(line)
+			end
+
+			core.current_line = core.src_lines[1]
 		end
-	else
-		self.src_len = 0
 	end
 
 	-- read texbank[0-3].bin

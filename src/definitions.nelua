@@ -1,5 +1,6 @@
 require("sequence")
 require("hashmap")
+require("span")
 require("stringbuilder")
 
 require("rayeasings")
@@ -185,6 +186,8 @@ global Token = @enum {
 	INT_LITERAL = 128, -- start at 128 to avoid conflicts with ASCII chars
 	FLOAT_LITERAL,
 	STRING_LITERAL,
+	COMMENT, -- only used for code editor syntax highlighting
+	UNKNOWN, -- only used for code editor syntax highlighting
 	VOID,
 	INT,
 	FLOAT,
@@ -785,10 +788,10 @@ EVM = @record {
     wavmap_ptr: *[0]uint8,
     
     -- compiler vars
-    src: [EVM_SRC_SIZE]uint8,
-    src_len: uinteger,
-    src_index: uinteger,
+    src_index: uinteger, -- line character index
     prev_src_index: uinteger,
+    prev_line: uinteger,
+	current_src_line: sequence(uint8),
     token: uinteger,
     token_val: uinteger,
     token_valf: float32,
@@ -883,6 +886,16 @@ global CoreData = @record {
 
 	log_text: [16 * 81]cchar, -- log text buffer, 64x 80-character strings
 	log_types: [64]uint8, -- log line types, 1 LogEntryType per line
+
+	text_buffer: *[0]uint8,
+	src_lines: sequence(sequence(uint8)),
+	recycled_lines: sequence(sequence(uint8)),
+	current_line: sequence(uint8),
+    line_index: int32,
+    char_index: int32,
+	start_line: int32, -- line index to start drawing from
+	start_char: int32, -- char index to start drawing from
+
 	user_directory: string,
 	data_directory: string,
 	carts_directory: string,
@@ -992,6 +1005,103 @@ function CoreData:log(entry_type: uint8, text: string, make_popup: boolean): voi
 	if make_popup then
 		self:popup(entry_type, text)
 	end
+end
+
+function CoreData:changeCharacterIndex(new_index: int32): void
+	self.char_index = math.clamp(new_index, 1, #self.current_line)
+
+	if self.char_index < self.start_char + 1 then
+		self.start_char = math.max(self.char_index - 1, 1)
+	elseif self.char_index > self.start_char + 78 then
+		self.start_char = math.clamp(self.char_index - 78, 1, math.max(1, #self.current_line - 79))
+	end
+end
+
+function CoreData:changeCodeLine(index: int32): void
+    self.line_index = math.clamp(index, 1, #self.src_lines)
+    self.current_line = self.src_lines[self.line_index]
+    self:changeCharacterIndex(self.char_index)
+
+	if self.line_index < self.start_line + 1 then
+		self.start_line = math.max(self.line_index - 1, 1)
+	elseif self.line_index > self.start_line + 36 then
+		self.start_line = math.clamp(self.line_index - 36, 1, math.max(1, #self.src_lines - 37))
+	end
+end
+
+function CoreData:getNewLine(): sequence(uint8)
+    if #self.recycled_lines > 0 then
+        return self.recycled_lines:pop()
+    else
+        return {'\0'_u8}
+    end
+end
+
+function CoreData:appendLine(): void
+    self.src_lines:push(self:getNewLine())
+end
+
+function CoreData:insertLine(index: usize): void
+    self.src_lines:insert(index, self:getNewLine())
+end
+
+function CoreData:deleteLine(index: usize): void
+    local line: sequence(uint8) = self.src_lines:remove(index)
+    line:clear()
+    line:push('\0'_u8)
+    self.recycled_lines:push(line)
+end
+
+function CoreData:insertChar(c: uint8): void
+    self.current_line:insert(self.char_index, c)
+    self:changeCharacterIndex(self.char_index + 1)
+end
+
+function CoreData:deleteChar(forward: boolean): void
+    if forward then
+        if self.char_index < #self.current_line then
+            self.current_line:remove(self.char_index)
+        elseif self.char_index == #self.current_line and self.line_index < #self.src_lines then
+            -- append next line to end of current
+            local next_line: sequence(uint8) = self.src_lines[self.line_index + 1]
+    
+            self.current_line:pop() -- remove terminator
+            for i = 1, <= #next_line do
+                self.current_line:push(next_line[i])
+            end
+    
+            self:deleteLine(self.line_index + 1)
+        end
+    else
+        if self.char_index > 1 then
+            self:changeCharacterIndex(self.char_index - 1)
+            self.current_line:remove(self.char_index)
+        elseif self.char_index == 1 and self.line_index > 1 then
+            -- append current line to end of previous
+            local prev_line: sequence(uint8) = self.src_lines[self.line_index - 1]
+            local new_index: int32 = (@int32)(#prev_line)
+    
+            prev_line:pop() -- remove terminator
+            for i = 1, < #self.current_line do
+                prev_line:push(self.current_line[i])
+            end
+            prev_line:push('\0'_u8)
+    
+            self:deleteLine(self.line_index)
+            self:changeCodeLine(self.line_index - 1)
+            self:changeCharacterIndex(new_index)
+        end
+    end
+end
+
+function CoreData:clearSrc(): void
+	for i = #self.src_lines, >= 1, -1 do
+		self:deleteLine(i)
+	end
+	self.line_index = 1
+	self.char_index = 1
+	self.start_line = 1
+	self.start_char = 1
 end
 
 global core: CoreData --<close>

@@ -12,6 +12,7 @@ COMPILER:
 - implement function pointers
 - implement unsigned int comparison operators?
 - implement global variable initialization
+- implement ROM data embedding
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
 VM:

@@ -15,7 +15,7 @@ require("state_run")
 require("dialog")
 require("input")
 
-local MAX_PARTICLES <comptime> = 32
+local MAX_PARTICLES <comptime> = 24
 
 local TriParticle = @record {
 	position: rl.vector3,
@@ -75,7 +75,7 @@ local function randomizeParticle(p: *TriParticle): void
 		0.1 + math.random() * (1.0 - 0.1),
 		0.1 + math.random() * (1.0 - 0.1)
 	}
-	p.age_factor = 0.5 + math.random() * (1.0 - 0.5)
+	p.age_factor = 0.08 + math.random() * (0.16 - 0.08)
 	p.age = 0.0
 end
 
@@ -266,7 +266,7 @@ local function updatePopup(): void
 				core.popup_timer = 0.0
 				core.popup_current_factor = core.popup_target_factor
 			end
-			core.popup_offset = (@uint32)(core.popup_current_factor * 12.0)
+			core.popup_offset = (@uint32)(core.popup_current_factor * 9.0)
 		case PopupState.SHOWN then
 			core.popup_timer = core.popup_timer + rl.getFrameTime()
 
@@ -403,7 +403,7 @@ local function run(): void
 								local p: *TriParticle = &particles[i]
 
 								p.age = p.age + rl.getFrameTime() * p.age_factor
-								if p.age > 4.0 then
+								if p.age > 3.0 then
 									randomizeParticle(p)
 								else
 									p.position = p.position + (@rl.vector3){0.0, rl.getFrameTime() * p.age_factor, 0.0}
@@ -420,7 +420,7 @@ local function run(): void
 								rlgl.rotatef(p.rotation.y, 0, 1, 0)
 								rlgl.rotatef(p.rotation.x, 1, 0, 0)
 
-								local alpha: cuchar = 255 - (cuchar)((math.min(p.age, 1.75) / 1.75) * 255.0)
+								local alpha: cuchar = 255 - (cuchar)((math.min(p.age, 1.5) / 1.5) * 255.0)
 
 								rlgl.color4ub(0xFF, 0x00, 0x00, alpha)
 								rlgl.vertex3f(0.0, 0.1, 0.0)
@@ -570,6 +570,7 @@ local function run(): void
 			end
 
 			if core.popup_state ~= PopupState.HIDDEN then
+				vm.gpu:drawRect2D(0, GPU_VSCREEN_H - core.popup_offset, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
 				vm.gpu:print2D(6, GPU_VSCREEN_H - core.popup_offset, core.popup_color, core.popup_text)
 			end
 		vm.gpu:endRenderTexture()

@@ -1,8 +1,543 @@
 require("statemachine")
 
--- NOTE: consider using a gap buffer to implement editor
+-- TODO: consider reimplementing editor using piece table/tree
+
+-- syntax highlighting variables
+local sh_line: sequence(uint8)
+local sh_line_index: uint32
+local sh_max_line_index: uint32
+local sh_char_index: uint32
+local sh_token: uint8
+local sh_mlcomment_level: uinteger
+local sh_token_val: uinteger
+local sh_token_valf: float32
+
+local function getChar(): uint8
+	if sh_char_index >= #sh_line then
+		if sh_line_index < sh_max_line_index then
+			sh_token = '\n'_u8
+		else
+			sh_token = 0
+		end
+	else
+		sh_token = sh_line[sh_char_index]
+	end
+
+	return sh_token
+end
+
+local function nextToken(vm: *EVM): void
+	if sh_mlcomment_level > 0 then
+		while true do
+			getChar()
+			if sh_token == 0 then
+				break
+			elseif sh_token == '*'_u8 then
+				sh_char_index = sh_char_index + 1
+				getChar()
+				if sh_token == '/'_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_mlcomment_level = sh_mlcomment_level - 1
+					if sh_mlcomment_level == 0 then
+						break
+					end
+				elseif sh_token == '\n'_u8 then
+					sh_line_index = sh_line_index + 1
+					sh_line = core.src_lines[sh_line_index]
+					sh_char_index = 1
+				end
+			elseif sh_token == '/'_u8 then
+				sh_char_index = sh_char_index + 1
+				getChar()
+				if sh_token == '*'_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_mlcomment_level = sh_mlcomment_level + 1
+				elseif sh_token == '\n'_u8 then
+					sh_line_index = sh_line_index + 1
+					sh_line = core.src_lines[sh_line_index]
+					sh_char_index = 1
+				end
+			elseif sh_token == '\n'_u8 then
+				sh_line_index = sh_line_index + 1
+				sh_line = core.src_lines[sh_line_index]
+				sh_char_index = 1
+			else
+				sh_char_index = sh_char_index + 1
+			end
+		end
+
+		sh_token = Token.COMMENT
+		return
+	end
+
+    while getChar() ~= 0 do
+		sh_char_index = sh_char_index + 1
+
+		if sh_token == '\n'_u8 then
+			sh_line_index = sh_line_index + 1
+			sh_line = core.src_lines[sh_line_index]
+			sh_char_index = 1
+		elseif (sh_token >= 'a'_u8 and sh_token <= 'z'_u8) or (sh_token >= 'A'_u8 and sh_token <= 'Z'_u8) or (sh_token == '_'_u8) then
+			-- identifier
+			vm.sb:clear()
+			vm.sb:writebyte(sh_token)
+
+			while true do
+				getChar()
+				if (sh_token >= 'a'_u8 and sh_token <= 'z'_u8) or (sh_token >= 'A'_u8 and sh_token <= 'Z'_u8) or (sh_token >= '0'_u8 and sh_token <= '9'_u8) or (sh_token == '_'_u8) then
+					sh_char_index = sh_char_index + 1
+					vm.sb:writebyte(sh_token)
+				else
+					break
+				end
+			end
+			
+			vm.current_id_name = vm.sb:view()
+			vm:lookupID(vm.current_id_name)
+
+			if vm.has_id then
+				sh_token = vm.current_id.token
+				return
+			else
+				sh_token = Token.ID
+				return
+			end
+		elseif sh_token >= '0'_u8 and sh_token <= '9'_u8 then
+			local isfloat: boolean = false
+			-- number
+			sh_token_val = sh_token - '0'_u8
+			if sh_token_val == 0 and getChar() == 'x'_u8 then
+				-- hex
+				sh_char_index = sh_char_index + 1
+				while true do
+					getChar()
+					if (sh_token >= '0'_u8 and sh_token <= '9'_u8) or (sh_token >= 'a'_u8 and sh_token <= 'f'_u8) or (sh_token >= 'A'_u8 and sh_token <= 'F'_u8) then
+						sh_token_val = sh_token_val * 16 + (sh_token & 15)
+						if sh_token >= 'A'_u8 then
+							sh_token_val = sh_token_val + 9
+						end
+						sh_char_index = sh_char_index + 1
+					elseif sh_token == '_'_u8 then
+						sh_char_index = sh_char_index + 1
+					else
+						break
+					end
+				end
+			elseif sh_token_val == 0 and getChar() == 'b'_u8 then
+				-- binary
+				sh_char_index = sh_char_index + 1
+				while true do
+					getChar()
+					if sh_token == '0'_u8 or sh_token == '1'_u8 then
+						sh_token_val = (sh_token_val * 2) + (sh_token - '0'_u8)
+						sh_char_index = sh_char_index + 1
+					elseif sh_token == '_'_u8 then
+						sh_char_index = sh_char_index + 1
+					else
+						break
+					end
+				end
+			else
+				-- decimal
+				local fract: float32 = 1.0
+				while true do
+					getChar()
+					if sh_token >= '0'_u8 and sh_token <= '9'_u8 then
+						if isfloat then
+							fract = fract / 10.0
+							sh_token_valf = (sh_token_valf * 10) + (@float32)(sh_token - '0'_u8)
+						else
+							sh_token_val = (sh_token_val * 10) + (sh_token - '0'_u8)
+						end
+						sh_char_index = sh_char_index + 1
+					elseif sh_token == '.'_u8 then
+						if not isfloat then
+							isfloat = true
+							sh_token_valf = (@float32)(sh_token_val)
+							sh_char_index = sh_char_index + 1
+						end
+					elseif sh_token == '_'_u8 then
+						sh_char_index = sh_char_index + 1
+					else
+						if isfloat then
+							sh_token_valf = sh_token_valf * fract
+						end
+						break
+					end
+				end
+			end
+			if isfloat then
+				sh_token = Token.FLOAT_LITERAL
+			else
+				sh_token = Token.INT_LITERAL
+			end
+			return
+		elseif sh_token == '"'_u8 or sh_token == '\''_u8 then
+			-- string/char literal
+			local start: uinteger = sh_token
+
+			while true do
+				getChar()
+				if sh_token ~= 0 and sh_token ~= start then
+					sh_token_val = sh_token
+					sh_char_index = sh_char_index + 1
+					if sh_token == '\\'_u8 then -- escape code
+						getChar()
+						sh_char_index = sh_char_index + 1
+						switch sh_token do
+							case '\\'_u8 then -- \\
+								sh_token_val = '\\'_u8
+							case 'n'_u8 then -- \n
+								sh_token_val = '\n'_u8
+							else
+								-- invalid escape sequence
+								sh_token_val = '\\'_u8
+						end
+					elseif sh_token == '\n'_u8 then
+						sh_line_index = sh_line_index + 1
+						sh_line = core.src_lines[sh_line_index]
+						sh_char_index = 1
+						break
+					end
+				else
+					break
+				end
+			end
+
+			sh_char_index = sh_char_index + 1
+
+			if start == '"'_u8 then
+				sh_token = Token.STRING_LITERAL
+			else
+				sh_token = Token.INT_LITERAL
+			end
+
+			return
+		elseif sh_token == '/'_u8 then
+			local nxt: uinteger = getChar()
+			switch nxt do
+				case '/'_u8 then -- single line comment
+					sh_char_index = sh_char_index + 1
+					while true do
+						getChar()
+						if sh_token ~= 0 and sh_token ~= '\n'_u8 then
+							sh_char_index = sh_char_index + 1
+						else
+							break
+						end
+					end
+					
+					sh_token = Token.COMMENT
+					return
+				case '*'_u8 then -- multi-line comment
+					sh_mlcomment_level = 1
+					sh_char_index = sh_char_index + 1
+
+					while true do
+						getChar()
+						if sh_token == 0 then
+							sh_mlcomment_level = 0
+							break
+						elseif sh_token == '*'_u8 then
+							sh_char_index = sh_char_index + 1
+							getChar()
+							if sh_token == '/'_u8 then
+								sh_char_index = sh_char_index + 1
+								sh_mlcomment_level = sh_mlcomment_level - 1
+								if sh_mlcomment_level == 0 then
+									break
+								end
+							elseif sh_token == '\n'_u8 then
+								sh_line_index = sh_line_index + 1
+								sh_line = core.src_lines[sh_line_index]
+								sh_char_index = 1
+							elseif sh_token == 0 then
+								sh_mlcomment_level = 0
+								break
+							end
+						elseif sh_token == '/'_u8 then
+							sh_char_index = sh_char_index + 1
+							getChar()
+							if sh_token == '*'_u8 then
+								sh_char_index = sh_char_index + 1
+								sh_mlcomment_level = sh_mlcomment_level + 1
+							elseif sh_token == '\n'_u8 then
+								sh_line_index = sh_line_index + 1
+								sh_line = core.src_lines[sh_line_index]
+								sh_char_index = 1
+							elseif sh_token == 0 then
+								sh_mlcomment_level = 0
+								break
+							end
+						elseif sh_token == '\n'_u8 then
+							sh_line_index = sh_line_index + 1
+							sh_line = core.src_lines[sh_line_index]
+							sh_char_index = 1
+						else
+							sh_char_index = sh_char_index + 1
+						end
+					end
+
+					sh_token = Token.COMMENT
+					return
+				else
+					sh_token = Token.DIV
+					return
+			end
+		elseif sh_token == '='_u8 then
+			if getChar() == '='_u8 then
+				sh_char_index = sh_char_index + 1
+				sh_token = Token.EQ
+			else
+				sh_token = Token.ASSIGN
+			end
+			
+			return
+		elseif sh_token == '+'_u8 then
+			sh_token = Token.ADD
+			return
+		elseif sh_token == '-'_u8 then
+			if getChar() == '>'_u8 then
+				sh_char_index = sh_char_index + 1
+				sh_token = Token.ARROW
+			else
+				sh_token = Token.SUB
+			end
+			
+			return
+		elseif sh_token == '*'_u8 then
+			sh_token = Token.MUL
+			return
+		elseif sh_token == '!'_u8 then
+			if getChar() == '='_u8 then
+				sh_char_index = sh_char_index + 1
+				sh_token = Token.NE
+			else
+				sh_token = Token.LNOT
+			end
+			
+			return
+		elseif sh_token == '<'_u8 then
+			local nxt: uinteger = getChar()
+			switch nxt do
+				case '='_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_token = Token.LE
+				case '<'_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_token = Token.LSHIFT
+				else
+					sh_token = Token.LT
+			end
+			
+			return
+		elseif sh_token == '>'_u8 then
+			local nxt: uinteger = getChar()
+			switch nxt do
+				case '='_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_token = Token.GE
+				case '>'_u8 then
+					sh_char_index = sh_char_index + 1
+					if getChar() == '>'_u8 then
+						sh_char_index = sh_char_index + 1
+						sh_token = Token.ARSHIFT
+					else
+						sh_token = Token.RSHIFT
+					end
+				else
+					sh_token = Token.GT
+			end
+			
+			return
+		elseif sh_token == '|'_u8 then
+			if getChar() == '|'_u8 then
+				sh_char_index = sh_char_index + 1
+				sh_token = Token.LOR
+			else
+				sh_token = Token.OR
+			end
+			
+			return
+		elseif sh_token == '&'_u8 then
+			if getChar() == '&'_u8 then
+				sh_char_index = sh_char_index + 1
+				sh_token = Token.LAND
+			else
+				sh_token = Token.AND
+			end
+			
+			return
+		elseif sh_token == '^'_u8 then
+			sh_token = Token.XOR
+			return
+		elseif sh_token == '~'_u8 then
+			sh_token = Token.NOT
+			return
+		elseif sh_token == '%'_u8 then
+			sh_token = Token.MOD
+			return
+		elseif sh_token == '['_u8 then
+			sh_token = Token.BRAK
+			return
+		elseif sh_token == '?'_u8 then
+			sh_token = Token.COND
+			return
+		elseif sh_token == '.'_u8 then
+			if getChar() == '.'_u8 then
+				sh_char_index = sh_char_index + 1
+				if getChar() == '.'_u8 then
+					sh_char_index = sh_char_index + 1
+					sh_token = Token.VARARGS
+				else
+					sh_token = Token.UNKNOWN
+				end
+			else
+				sh_token = Token.DOT
+			end
+			
+			return
+		elseif (sh_token == ';'_u8 or sh_token == '{'_u8 or sh_token == '}'_u8 or sh_token == '('_u8 or sh_token == ')'_u8 or sh_token == ']'_u8 or sh_token == ','_u8 or sh_token == ':'_u8) then
+			return
+		end
+	end
+end
+
+local function drawCode(vm: *EVM): void
+    -- scan src_lines for yet-unclosed multiline comments
+    sh_mlcomment_level = 0
+    if core.start_line > 1 then
+        for li = 1, < core.start_line do
+            local l: sequence(uint8) = core.src_lines[li]
+            for ci = 1, <= #l do
+                local c: uint8 = l[ci]
+
+                if c == '/'_u8 then
+                    if (ci < #l) and (l[ci + 1] == '*'_u8) then
+                        sh_mlcomment_level = sh_mlcomment_level + 1
+                        ci = ci + 1
+                    end
+                elseif c == '*'_u8 then
+                    if (ci < #l) and (l[ci + 1] == '/'_u8) and (sh_mlcomment_level > 0) then
+                        sh_mlcomment_level = sh_mlcomment_level - 1
+                        ci = ci + 1
+                    end
+                end
+            end
+        end
+    end
+
+    -- draw code with syntax highlighting
+	sh_line_index = core.start_line
+	sh_line = core.src_lines[sh_line_index]
+	sh_char_index = 1
+	sh_max_line_index = math.min(#core.src_lines, core.start_line + 38)
+	local draw_line: sequence(uint8) = sh_line
+	local draw_line_index: uinteger = sh_line_index
+	local draw_char_index: uinteger = 1
+    local horizontal_offset: int32 = (core.start_char - 1) * -6 -- shift line to the left for horizontal scrolling
+	local char_x: int32 = horizontal_offset
+    local line_y: int32 = 9
+
+	local cursor_y: int32 = 9 + ((core.line_index - core.start_line) * 9)
+	vm.gpu:drawRect2D(0, cursor_y, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
+    vm.gpu:drawRect2D(horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
+    
+	while true do
+        -- get next token
+        nextToken(vm)
+		if sh_token == 0 then
+			break
+		end
+
+        -- get token color
+		local color: uint32
+		switch sh_token do
+			case Token.COMMENT then
+				color = GPU_GRAY
+			case Token.STRUCT, Token.ENUM, Token.IF, Token.ELSE, Token.WHILE, Token.FOR, Token.BREAK, Token.CONTINUE, Token.RETURN, Token.SIZEOF then
+				color = GPU_PINK
+			case Token.VOID, Token.INT, Token.FLOAT, Token.VEC2, Token.VEC3, Token.STRING, Token.STRUCT_ID then
+				color = GPU_BLUE
+			case Token.INT_LITERAL, Token.FLOAT_LITERAL, Token.STRING_LITERAL then
+				color = GPU_ORANGE
+			case Token.ID then
+				if vm.has_id then
+					if vm.current_id.class == Class.API then
+						color = GPU_GREEN
+					elseif vm.current_id.class == Class.CONSTANT then
+						color = GPU_ORANGE
+					end
+				else
+					color = GPU_WHITE
+				end
+			case Token.UNKNOWN then
+				color = GPU_RED
+			else
+				color = GPU_WHITE
+		end
+
+		local ray_col: rl.color = {
+			(@cuchar)(color >> 24),
+			(@cuchar)((color & 0xFF0000) >> 16),
+			(@cuchar)((color & 0x00FF00) >> 8),
+			(@cuchar)(color & 0xFF),
+		}
+
+		-- draw chars until we catch up to the current tokenizer position
+		while true do
+			if (draw_line_index == sh_line_index) and (draw_char_index == sh_char_index) then
+				break
+			end
+
+			if draw_char_index == #draw_line then
+				draw_line_index = draw_line_index + 1
+				if draw_line_index >= sh_max_line_index + 1 then
+					break
+				end
+				draw_line = core.src_lines[draw_line_index]
+				draw_char_index = 1
+				char_x = horizontal_offset
+				line_y = line_y + 9
+			else
+				local c: uint8 = draw_line[draw_char_index]
+				vm.gpu:drawChar2D(c, &char_x, line_y, ray_col)
+				draw_char_index = draw_char_index + 1
+			end
+		end
+    end
+
+	--[[
+    while lines_drawn < 38 do
+        if i == core.line_index then
+            vm.gpu:drawRect2D(0, line_y, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
+            vm.gpu:drawRect2D(horizontal_offset + ((core.char_index - 1) * 6), line_y, 6, 9, core.cursor_color)
+        end
+
+        if i > #core.src_lines then
+            break
+        end
+        
+        local line: sequence(uint8) = core.src_lines[i]
+        if #line > 1 then
+            vm.gpu:printCString2D(horizontal_offset, line_y, text_color, (@span(uint8))(line).data)
+        end
+
+        line_y = line_y + 9
+        lines_drawn = lines_drawn + 1
+        i = i + 1
+    end
+	]]--
+end
 
 global function stateCodeInit(sm: *StateMachine, vm: *EVM): void
+    core:appendLine()
+
+    core.start_line = 1
+    core.start_char = 1
+    core.line_index = 1
+    core.char_index = 1
+    core.current_line = core.src_lines[1]
 end
 
 global function stateCodeEnter(sm: *StateMachine, vm: *EVM): void
@@ -17,6 +552,104 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
         sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
         sm.queued_dialog = DialogID.IMPORT_CODE
         return
+    end
+
+    if input.is_ctrl_down and input.pressedRepeat(rl.keyboardKey.D) then
+        core:insertLine(core.line_index + 1)
+        local new_line: sequence(uint8) = core.src_lines[core.line_index + 1]
+        new_line:pop() -- remove terminator
+
+        for i = 1, <= #core.current_line do
+            new_line:push(core.current_line[i])
+        end
+
+        core:changeCodeLine(core.line_index + 1)
+        return
+    end
+
+    if input.pressedRepeat(rl.keyboardKey.LEFT) then
+        if core.char_index == 1 then
+            if core.line_index > 1 then
+                core:changeCodeLine(core.line_index - 1)
+                core:changeCharacterIndex(#core.current_line)
+            end
+        else
+            core:changeCharacterIndex(core.char_index - 1)
+        end
+    elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+        if core.char_index == #core.current_line then
+            if core.line_index < #core.src_lines then
+                core:changeCodeLine(core.line_index + 1)
+                core:changeCharacterIndex(1)
+            end
+        else
+            core:changeCharacterIndex(core.char_index + 1)
+        end
+    elseif input.pressedRepeat(rl.keyboardKey.UP) then
+        if input.is_alt_down then
+            if core.line_index > 1 then
+                local temp: sequence(uint8) = core.src_lines[core.line_index - 1]
+                core.src_lines[core.line_index - 1] = core.current_line
+                core.src_lines[core.line_index] = temp
+                core:changeCodeLine(core.line_index - 1)
+            end
+        else
+            if core.line_index > 1 then
+                core:changeCodeLine(core.line_index - 1)
+            else
+                core:changeCharacterIndex(1)
+            end
+        end
+    elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+        if input.is_alt_down then
+            if core.line_index < #core.src_lines then
+                local temp: sequence(uint8) = core.src_lines[core.line_index + 1]
+                core.src_lines[core.line_index + 1] = core.current_line
+                core.src_lines[core.line_index] = temp
+                core:changeCodeLine(core.line_index + 1)
+            end
+        else
+            if core.line_index < #core.src_lines then
+                core:changeCodeLine(core.line_index + 1)
+            else
+                core:changeCharacterIndex(#core.current_line)
+            end
+        end
+    elseif input.pressedRepeat(rl.keyboardKey.ENTER) then
+        -- split current line at cursor
+        core:insertLine(core.line_index + 1)
+        local new_line: sequence(uint8) = core.src_lines[core.line_index + 1]
+        new_line:pop() -- remove terminator
+
+        while core.char_index < #core.current_line do
+            local c: uint8 = core.current_line:remove(core.char_index)
+            new_line:push(c)
+        end
+        new_line:push('\0'_u8)
+
+        core:changeCodeLine(core.line_index + 1)
+        core:changeCharacterIndex(1)
+    elseif input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
+        core:deleteChar(false)
+    elseif input.pressedRepeat(rl.keyboardKey.DELETE) then
+        core:deleteChar(true)
+    elseif input.pressedRepeat(rl.keyboardKey.TAB) then
+        core:insertChar(' '_u8)
+        core:insertChar(' '_u8)
+    elseif input.pressedRepeat(rl.keyboardKey.PAGE_UP) then
+        core:changeCodeLine(core.line_index - 37)
+    elseif input.pressedRepeat(rl.keyboardKey.PAGE_DOWN) then
+        core:changeCodeLine(core.line_index + 37)
+    elseif input.pressedRepeat(rl.keyboardKey.HOME) then
+        core:changeCharacterIndex(1)
+    elseif input.pressedRepeat(rl.keyboardKey.END) then
+        core:changeCharacterIndex(#core.current_line)
+    else
+        local c: cint = rl.getCharPressed()
+        while c ~= 0 do
+            core:insertChar(c)
+            c = rl.getCharPressed()
+        end
     end
 
     --[[
@@ -53,6 +686,22 @@ global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
     rl.clearBackground({0, 0, 0, 0})
     vm.gpu:camera2D(-1)
 
+    drawCode(vm)
+
+    -- status bar
+    if core.popup_state == PopupState.HIDDEN then
+        local char_count: int32
+        local int_x: int32 = 36
+
+        vm.gpu:drawRect2D(0, GPU_VSCREEN_H - 9, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
+        vm.gpu:print2D(6, GPU_VSCREEN_H - 9, GPU_WHITE, "LINE")
+        vm.gpu:printInt2D(36, GPU_VSCREEN_H - 9, GPU_WHITE, core.line_index, &char_count)
+        int_x = int_x + char_count * 6
+        vm.gpu:print2D(int_x, GPU_VSCREEN_H - 9, GPU_WHITE, "/")
+        vm.gpu:printInt2D(int_x + 6, GPU_VSCREEN_H - 9, GPU_WHITE, #core.src_lines, nilptr)
+    end
+
+    --[[
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (25 * 6) /// 2, GPU_VSCREEN_HALF_H - 9, GPU_WHITE, "WELCOME TO ERA-3D v0.0.0!")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H +  9, GPU_GRAY, "[CTRL+LEFT/RIGHT]: NAVIGATE MENUS")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 18, GPU_GRAY, "[CTRL+R]         : RUN CART")
@@ -63,6 +712,7 @@ global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
 
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 72, GPU_WHITE, "// TODO: CODE EDITOR STUFF HERE...")
     vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 81, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SCRIPT")
+    ]]
 end
 
 global function stateCodeCleanup(sm: *StateMachine, vm: *EVM): void
