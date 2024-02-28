@@ -1,5 +1,6 @@
 require("io")
 require("allocators.gc")
+require("C.stdio")
 
 require("zip")
 
@@ -286,6 +287,7 @@ function EVM:resetVM(reset_all: boolean): void
 	self.osp = 0
 	self.csp = 0
 	self.init_time = rl.getTime()
+	self.memcard_initialized = false
 
 	if reset_all then
 		self.soundchip:resetSoundchip()
@@ -372,7 +374,11 @@ function EVM:getMem8(addr: uint32): uint8
 	elseif addr <= MEMORY_ROM_MAX_ADDR then
 		return self.cart.rom[addr - MEMORY_ROM_START_ADDR]
 	elseif addr <= MEMORY_MEMCARD_MAX_ADDR then
-		return 0
+		if self.memcard_initialized then
+			return self.memcard[addr - MEMORY_MEMCARD_START_ADDR]
+		else
+			return 0
+		end
 	else
 		return 0
 	end
@@ -431,7 +437,11 @@ function EVM:setMem8(addr: uint32, val: uint8): boolean
 	elseif addr <= MEMORY_ROM_MAX_ADDR then
 		return false
 	elseif addr <= MEMORY_MEMCARD_MAX_ADDR then
-		return true
+		if self.memcard_initialized then
+			self.soundchip.seqmem[addr - MEMORY_SEQMEM_START_ADDR] = val
+		else
+			return false
+		end
 	else
 		return false
 	end
@@ -493,7 +503,12 @@ function EVM:getMem32(addr: uint32): uint32
 		addr = addr - MEMORY_ROM_START_ADDR
 		return ((@uint32)(self.cart.rom[addr]) << 24) | ((@uint32)(self.cart.rom[addr + 1]) << 16) | ((@uint32)(self.cart.rom[addr + 2]) << 8) | (@uint32)(self.cart.rom[addr + 3])
 	elseif addr <= MEMORY_MEMCARD_MAX_ADDR then
-		return 0
+		if self.memcard_initialized then
+			addr = addr - MEMORY_MEMCARD_START_ADDR
+			return ((@uint32)(self.memcard[addr]) << 24) | ((@uint32)(self.memcard[addr + 1]) << 16) | ((@uint32)(self.memcard[addr + 2]) << 8) | (@uint32)(self.memcard[addr + 3])
+		else
+			return 0
+		end
 	else
 		return 0
 	end
@@ -562,7 +577,15 @@ function EVM:setMem32(addr: uint32, val: uint32): boolean
 	elseif addr <= MEMORY_ROM_MAX_ADDR then
 		return false
 	elseif addr <= MEMORY_MEMCARD_MAX_ADDR then
-		return true
+		if self.memcard_initialized then
+			addr = addr - MEMORY_MEMCARD_START_ADDR
+			self.memcard[addr] = val >> 24
+			self.memcard[addr + 1] = (val & 0xFF0000) >> 16
+			self.memcard[addr + 2] = (val & 0x00FF00) >> 8
+			self.memcard[addr + 3] = val & 0xFF
+		else
+			return false
+		end
 	else
 		return false
 	end
@@ -713,6 +736,65 @@ function EVM:nextF(): float32
 	local v: IntFloat = {u=self:next32()}
 
 	return v.f
+end
+
+function EVM:clearMemCard(): void
+	memory.zero(&self.memcard[0], MEMORY_MEMCARD_SIZE_BYTES)
+end
+
+function EVM:saveMemCard(): boolean
+	local filepath: string
+	## if ccinfo.is_windows then
+		filepath = core.memcards_directory .. "\\" .. self.memcard_id
+	## elseif ccinfo.is_linux then
+		filepath = core.memcards_directory .. "/" .. self.memcard_id
+	## end
+
+	local fp: *C.FILE = C.fopen(filepath, "wb")
+	if fp == nilptr then
+		return false
+	end
+
+	C.fwrite(&self.memcard[0], 1, MEMORY_MEMCARD_SIZE_BYTES, fp)
+	C.fclose(fp)
+	return true
+end
+
+function EVM:loadMemCard(new_id: string): boolean
+	local new_card_filepath: string
+	## if ccinfo.is_windows then
+		new_card_filepath = core.memcards_directory .. "\\" .. new_id
+	## elseif ccinfo.is_linux then
+		new_card_filepath = core.memcards_directory .. "/" .. new_id
+	## end
+
+	if self.memcard_id ~= "" then
+		if self.memcard_id ~= new_id then
+			self:saveMemCard()
+		else
+			self.memcard_initialized = true
+			return true
+		end
+	end
+
+	if fs.isfile(new_card_filepath) then
+		local fp: *C.FILE = C.fopen(new_card_filepath, "rb")
+		if fp == nilptr then
+			self.memcard_id = ""
+			self.memcard_initialized = false
+			self.error = string.format("failed to open memcard `%s`", new_id)
+			return false
+		end
+
+		C.fread(&self.memcard[0], 1, MEMORY_MEMCARD_SIZE_BYTES, fp)
+		C.fclose(fp)
+	else
+		self:clearMemCard()
+	end
+
+	self.memcard_id = new_id
+	self.memcard_initialized = true
+	return true
 end
 
 function EVM:dumpBytecode(): void
@@ -2491,6 +2573,8 @@ global function newVM(): *EVM
 	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank, &vm.cart.wmpbank)
 
 	vm:resetVM(false)
+
+	vm.memcard_id = ""
 
 	return vm
 end

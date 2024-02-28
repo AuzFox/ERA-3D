@@ -84,10 +84,12 @@ local function setupDirectories(): void
 		core.user_directory = os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH")
 		core.data_directory = core.user_directory .. "\\AppData\\Roaming\\era-3d"
 		core.carts_directory = core.data_directory .. "\\carts"
+		core.memcards_directory = core.data_directory .. "\\memcards"
 	## elseif ccinfo.is_linux then
 		core.user_directory = os.getenv("HOME")
 		core.data_directory = core.user_directory .. "/.era-3d"
 		core.carts_directory = core.data_directory .. "/carts"
+		core.memcards_directory = core.data_directory .. "/memcards"
 	## end
 
 	local succees: boolean
@@ -101,6 +103,10 @@ local function setupDirectories(): void
 	if not fs.isdir(core.carts_directory) then
 		succees, errmsg, errcode = fs.mkdir(core.carts_directory)
 		print("mkdir", core.carts_directory, succees, errmsg, errcode)
+	end
+	if not fs.isdir(core.memcards_directory) then
+		succees, errmsg, errcode = fs.mkdir(core.memcards_directory)
+		print("mkdir", core.memcards_directory, succees, errmsg, errcode)
 	end
 end
 
@@ -601,6 +607,10 @@ local function run(): void
 		end
 
 		sm:update()
+	end
+
+	if vm.memcard_id ~= "" then
+		vm:saveMemCard()
 	end
 
 	sm:cleanup()

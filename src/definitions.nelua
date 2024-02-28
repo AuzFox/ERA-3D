@@ -57,7 +57,7 @@ global EVM_API_FUNCS_SIZE <comptime> = 65536
 		SEQBANK[0-7]        (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
 		ROM                 (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
 	MEMORY CARD:
-		MEMCARD             (256KiB        ) 0x05800000 - 0x0583FFFF (persistent save data (256KiB per registered cart ID))
+		MEMCARD             (4KiB          ) 0x05800000 - 0x05800FFF (persistent save data (4KiB per registered cart ID))
 ]]
 
 -- memory size and address constants
@@ -87,7 +87,7 @@ local mem_regions = {
 	{name='ROM',     size=16*MiB,             element_size=1},
 
 	-- memory card
-	{name='MEMCARD', size=256*KiB, element_size=1}
+	{name='MEMCARD', size=4*KiB, element_size=1}
 }
 ]]
 
@@ -772,6 +772,7 @@ EVM = @record {
     callstack: [EVM_CALLSTACK_SIZE]CallFrame,
     api_funcs: [EVM_API_FUNCS_SIZE]APIFunction,
     sysmem: [MEMORY_SYSMEM_SIZE_ELEMENTS]uint8,
+	memcard: [MEMORY_MEMCARD_SIZE_ELEMENTS]uint8,
     cf: CallFrame,
     rom_len: uinteger,
     bytecode_len: uinteger,
@@ -831,7 +832,9 @@ EVM = @record {
     soundchip: SoundChip,
     gpu: GPU,
     error: string,
-    init_time: float64
+    init_time: float64,
+	memcard_id: string,
+	memcard_initialized: boolean
 }
 
 global State <forwarddecl> = @record {}
@@ -899,6 +902,7 @@ global CoreData = @record {
 	user_directory: string,
 	data_directory: string,
 	carts_directory: string,
+	memcards_directory: string,
 	current_cart_path: string,
 	current_cart_name: string,
 	current_browser_path: string,

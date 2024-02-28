@@ -23,6 +23,7 @@ function EVM:getMem8(addr: uint32): uint8 <forwarddecl> end
 function EVM:setMem8(addr: uint32, val: uint8): boolean <forwarddecl> end
 function EVM:getMem32(addr: uint32): uint32 <forwarddecl> end
 function EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
+function EVM:loadMemCard(new_id: string): boolean <forwarddecl> end
 
 function EVM:getMemColAABB(addr: uint32, box: *ColAABB): boolean <forwarddecl> end
 
@@ -782,6 +783,18 @@ local function apiCos(vm: *EVM): boolean
 	local v: float32 = vm:getArgF(0)
 
 	vm:pushF(math.cos(v))
+
+	return true
+end
+
+local function apiPowf(vm: *EVM): boolean
+	-- signature:
+	-- float powf(float a, float b);
+	
+	local a: float32 = vm:getArgF(0)
+	local b: float32 = vm:getArgF(1)
+
+	vm:pushF(a^b)
 
 	return true
 end
@@ -3082,7 +3095,42 @@ local function apiMemset(vm: *EVM): boolean
 		dest = dest + 1
 	end
 
-	return true;
+	return true
+end
+
+local function apiInitMemCard(vm: *EVM): boolean
+	-- signature:
+	-- void initMemCard(string id);
+
+	local buffer: [17]uint8
+	local id_str: EVMString = vm:getArgStr(0)
+
+	-- validate and copy id_str
+	if (id_str.len == 0 or id_str.len > 16) or (id_str.data > MEMORY_MAX_ADDR) then
+		vm.error = "invalid id string passed to initMemCard()"
+		return false
+	end
+
+	for i: uint32 = 0, < id_str.len do
+		local read_addr: uint32 = id_str.data + i
+		if read_addr > MEMORY_MAX_ADDR then
+			vm.error = string.format("invalid byte read address 0x%08X", read_addr)
+			return false
+		end
+
+		local c: uint8 = vm:getMem8(read_addr)
+		if (c >= 'a'_u8 and c <= 'z'_u8) or (c >= 'A'_u8 and c <= 'Z'_u8) or (c >= '0'_u8 and c <= '9'_u8) or c == '_'_u8 then
+			buffer[i] = c
+		else
+			vm.error = "invalid id string passed to initMemCard()"
+			return false
+		end
+	end
+	buffer[id_str.len] = '\0'_u8
+	local new_id: string = {&buffer[0], id_str.len}
+	new_id = string.copy(new_id)
+
+	return vm:loadMemCard(new_id)
 end
 
 function EVM:registerBuiltins(): void
@@ -3500,6 +3548,15 @@ function EVM:registerAPI(): void
 			type_info={EVMType.FLOAT},
 			argdata={{EVMType.FLOAT}},
 			func=apiCos
+		},
+		{
+			name="powf",
+			type_info={EVMType.FLOAT},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiPowf
 		},
 		{
 			name="floor",
@@ -4656,6 +4713,12 @@ function EVM:registerAPI(): void
 			},
 			func=apiMemset
 		},
+		{
+			name="initMemCard",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.STRING, self.struct_string}},
+			func=apiInitMemCard
+		}
 	}
 
 	self.api_ids:reserve(#api_ids + 2)

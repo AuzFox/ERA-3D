@@ -31,6 +31,7 @@ local function nextToken(vm: *EVM): void
 		while true do
 			getChar()
 			if sh_token == 0 then
+				sh_mlcomment_level = 0
 				break
 			elseif sh_token == '*'_u8 then
 				sh_char_index = sh_char_index + 1
@@ -45,6 +46,9 @@ local function nextToken(vm: *EVM): void
 					sh_line_index = sh_line_index + 1
 					sh_line = core.src_lines[sh_line_index]
 					sh_char_index = 1
+				elseif sh_token == 0 then
+					sh_mlcomment_level = 0
+					break
 				end
 			elseif sh_token == '/'_u8 then
 				sh_char_index = sh_char_index + 1
@@ -56,6 +60,9 @@ local function nextToken(vm: *EVM): void
 					sh_line_index = sh_line_index + 1
 					sh_line = core.src_lines[sh_line_index]
 					sh_char_index = 1
+				elseif sh_token == 0 then
+					sh_mlcomment_level = 0
+					break
 				end
 			elseif sh_token == '\n'_u8 then
 				sh_line_index = sh_line_index + 1
@@ -178,7 +185,10 @@ local function nextToken(vm: *EVM): void
 
 			while true do
 				getChar()
-				if sh_token ~= 0 and sh_token ~= start then
+				if sh_token == 0 then
+					sh_token = Token.UNKNOWN
+					return
+				elseif sh_token ~= start then
 					sh_token_val = sh_token
 					sh_char_index = sh_char_index + 1
 					if sh_token == '\\'_u8 then -- escape code
@@ -197,7 +207,9 @@ local function nextToken(vm: *EVM): void
 						sh_line_index = sh_line_index + 1
 						sh_line = core.src_lines[sh_line_index]
 						sh_char_index = 1
-						break
+
+						sh_token = Token.UNKNOWN
+						return
 					end
 				else
 					break
@@ -457,7 +469,7 @@ local function drawCode(vm: *EVM): void
 				color = GPU_GRAY
 			case Token.STRUCT, Token.ENUM, Token.IF, Token.ELSE, Token.WHILE, Token.FOR, Token.BREAK, Token.CONTINUE, Token.RETURN, Token.SIZEOF then
 				color = GPU_PINK
-			case Token.VOID, Token.INT, Token.FLOAT, Token.VEC2, Token.VEC3, Token.STRING, Token.STRUCT_ID then
+			case Token.VOID, Token.INT, Token.FLOAT, Token.VEC2, Token.VEC3, Token.STRING, Token.STRUCT_ID, Token.VARARGS then
 				color = GPU_BLUE
 			case Token.INT_LITERAL, Token.FLOAT_LITERAL, Token.STRING_LITERAL then
 				color = GPU_ORANGE
@@ -506,28 +518,6 @@ local function drawCode(vm: *EVM): void
 			end
 		end
     end
-
-	--[[
-    while lines_drawn < 38 do
-        if i == core.line_index then
-            vm.gpu:drawRect2D(0, line_y, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
-            vm.gpu:drawRect2D(horizontal_offset + ((core.char_index - 1) * 6), line_y, 6, 9, core.cursor_color)
-        end
-
-        if i > #core.src_lines then
-            break
-        end
-        
-        local line: sequence(uint8) = core.src_lines[i]
-        if #line > 1 then
-            vm.gpu:printCString2D(horizontal_offset, line_y, text_color, (@span(uint8))(line).data)
-        end
-
-        line_y = line_y + 9
-        lines_drawn = lines_drawn + 1
-        i = i + 1
-    end
-	]]--
 end
 
 global function stateCodeInit(sm: *StateMachine, vm: *EVM): void

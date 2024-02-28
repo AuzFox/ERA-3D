@@ -12,6 +12,7 @@ COMPILER:
 - implement function pointers
 - implement unsigned int comparison operators?
 - implement global variable initialization
+- implement ROM string start address directive
 - implement ROM data embedding
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
@@ -27,7 +28,6 @@ VM:
 - complete wrapi() and wrapf() negative ranges
 - implement debug opcodes
 - implement memory allocator and api for vm heap
-- implement memory card system and api
 - implement cartridge data loading/saving api
 - implement triangle rendering limit
 - implement cycle limit (how to deal with incomplete calls?)
