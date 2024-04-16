@@ -903,6 +903,8 @@ function EVM:dumpBytecode(): void
 				index = self:next16()
 				local addr: uint32 = self:next32()
 				io.printf("PUSH_STRING %d 0x%08X\n", index, addr)
+			case Opcode.SAVE_FPTR then
+				io.printf("SAVE_FPTR\n")
 			case Opcode.DISCARD then
 				io.printf("DISCARD %d\n", self:next16())
 			case Opcode.NOT then
@@ -965,6 +967,8 @@ function EVM:dumpBytecode(): void
 				io.printf("LNOT\n")
 			case Opcode.LNOTP then
 				io.printf("LNOTP\n")
+			case Opcode.LNOTFP then
+				io.printf("LNOTFP\n")
 			case Opcode.EQ then
 				io.printf("EQ\n")
 			case Opcode.EQF then
@@ -1027,12 +1031,22 @@ function EVM:dumpBytecode(): void
 				io.printf("JUMP_NULLD 0x%04X\n", self:next16())
 			case Opcode.JUMP_NNULLD then
 				io.printf("JUMP_NNULLD 0x%04X\n", self:next16())
+			case Opcode.JUMP_FPNULL then
+				io.printf("JUMP_FPNULL 0x%04X\n", self:next16())
+			case Opcode.JUMP_FPNULLD then
+				io.printf("JUMP_FPNULLD 0x%04X\n", self:next16())
+			case Opcode.JUMP_FPNNULLD then
+				io.printf("JUMP_FPNNULLD 0x%04X\n", self:next16())
 			case Opcode.CALL then
 				index = self:next16()
 				local argc: uint16 = self:next16()
 				io.printf("CALL 0x%04X %d\n", index, argc)
-			case Opcode.CALL_PTR then
-				io.printf("CALL_PTR\n")
+			case Opcode.CALL_FPTR then
+				index = self:next16()
+				io.printf("CALL_FPTR %d\n", index)
+			case Opcode.CALL_SAVED_FPTR then
+				index = self:next16()
+				io.printf("CALL_SAVED_FPTR %d\n", index)
 			case Opcode.RETURN then
 				io.printf("RETURN\n")
 			case Opcode.VARGP then
@@ -1046,6 +1060,8 @@ function EVM:dumpBytecode(): void
 				io.printf("ITOB\n")
 			case Opcode.PTOB then
 				io.printf("PTOB\n")
+			case Opcode.FPTOB then
+				io.printf("FPTOB\n")
 			case Opcode.API then
 				index = self:next16()
 				local argc: uint16 = self:next16()
@@ -1266,6 +1282,8 @@ function EVM:run(cycles: uinteger): boolean
 				index = self:next16()
 				local addr: uint32 = self:next32()
 				self:pushStr({index, addr})
+			case Opcode.SAVE_FPTR then
+				self.saved_fptr = self:popU()
 			case Opcode.DISCARD then
 				self:discard(self:next16())
 			case Opcode.NOT then
@@ -1549,6 +1567,21 @@ function EVM:run(cycles: uinteger): boolean
 			case Opcode.LNOTP then
 				local v: uint32 = self:popU()
 				self:pushU(v > MEMORY_MAX_ADDR and 1 or 0)
+			case Opcode.LNOTFP then
+				local v: uint32 = self:popU()
+				local tag: uint32 = v & 0xF0000000
+				local addr: uint32 = v & 0x0FFFFFFF
+				local valid: boolean = false
+
+				if addr <= 0xFFFF then
+					if tag == 0x10000000 and self.funcmap:has(addr) then
+						valid = true
+					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
+						valid = true
+					end
+				end
+
+				self:pushU(not valid and 1 or 0)
 			case Opcode.EQ then
 				local b: uint32 = self:popU()
 				local a: uint32 = self:popU()
@@ -1894,6 +1927,70 @@ function EVM:run(cycles: uinteger): boolean
 				else
 					self.osp = self.osp - 1
 				end
+			case Opcode.JUMP_FPNULL then
+				index = self:next16()
+				local v: uint32 = self:popU()
+				local tag: uint32 = v & 0xF0000000
+				local addr: uint32 = v & 0x0FFFFFFF
+				local valid: boolean = false
+
+				if addr <= 0xFFFF then
+					if tag == 0x10000000 and self.funcmap:has(addr) then
+						valid = true
+					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
+						valid = true
+					end
+				end
+
+				if not valid then
+					self.cf.pc = index
+				end
+			case Opcode.JUMP_FPNULLD then
+				-- jump if fptr null but only discard value if branch is not taken
+				-- used by && operator
+				index = self:next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+				local tag: uint32 = v & 0xF0000000
+				local addr: uint32 = v & 0x0FFFFFFF
+				local valid: boolean = false
+
+				if addr <= 0xFFFF then
+					if tag == 0x10000000 and self.funcmap:has(addr) then
+						valid = true
+					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
+						valid = true
+					end
+				end
+
+				if not valid then
+					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 0
+				else
+					self.osp = self.osp - 1
+				end
+			case Opcode.JUMP_FPNNULLD then
+				-- jump if fptr not null but only discard value if branch is not taken
+				-- used by || operator
+				index = self:next16()
+				local v: uint32 = self.opstack[self.osp - 1].u
+				local tag: uint32 = v & 0xF0000000
+				local addr: uint32 = v & 0x0FFFFFFF
+				local valid: boolean = false
+
+				if addr <= 0xFFFF then
+					if tag == 0x10000000 and self.funcmap:has(addr) then
+						valid = true
+					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
+						valid = true
+					end
+				end
+
+				if valid then
+					self.cf.pc = index
+					self.opstack[self.osp - 1].u = 1
+				else
+					self.osp = self.osp - 1
+				end
 			case Opcode.CALL then
 				if self.csp >= EVM_CALLSTACK_SIZE then
 					self.error = "callstack overflow"
@@ -1911,13 +2008,116 @@ function EVM:run(cycles: uinteger): boolean
 				self:pushArgs(argc)
 				self:pushCallframe(argc)
 				self.cf.pc = index
-			case Opcode.CALL_PTR then
+			case Opcode.CALL_FPTR then
+				index = self:next16()
 				local addr: uint32 = self:popU()
-				if addr < EVM_BYTECODE_SIZE then
-					self:pushCallframe(0)
-					self.cf.pc = addr
+
+				if addr & 0x0FFFFFFF > 0xFFFF then
+					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
+					return false
+				end
+
+				if addr & 0xF0000000 == 0x10000000 then
+					if self.csp >= EVM_CALLSTACK_SIZE then
+						self.error = "callstack overflow"
+						return false
+					end
+	
+					if self.asp + index >= MEMORY_ARGS_SIZE_ELEMENTS then
+						self.error = "argstack overflow"
+						return false
+					end
+
+					if not self.funcmap:has(addr & 0xFFFF) then
+						self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
+						return false
+					end
+	
+					self:pushArgs(index)
+					self:pushCallframe(index)
+					self.cf.pc = addr & 0xFFFF
+				elseif addr & 0xF0000000 == 0x20000000 then
+					local func: APIFunction = self.api_funcs[addr & 0xFFFF]
+					if func ~= nilptr then
+						if self.csp >= EVM_CALLSTACK_SIZE then
+							self.error = "callstack overflow"
+							return false
+						end
+
+						if self.asp + index >= MEMORY_ARGS_SIZE_ELEMENTS then
+							self.error = "argstack overflow"
+							return false
+						end
+
+						self:pushArgs(index)
+						self:pushCallframe(index)
+						if not func(self) then
+							self:popCallframe()
+							return false
+						end
+						self:popCallframe()
+					else
+						self.error = string.format("attempt to call unregistered API function at index %d", addr & 0xFFFF)
+						return false
+					end
 				else
-					self.error = string.format("invalid call address 0x%08X", addr)
+					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
+					return false
+				end
+			case Opcode.CALL_SAVED_FPTR then
+				index = self:next16()
+				local addr: uint32 = self.saved_fptr
+
+				if addr & 0x0FFFFFFF > 0xFFFF then
+					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
+					return false
+				end
+
+				if addr & 0xF0000000 == 0x10000000 then
+					if self.csp >= EVM_CALLSTACK_SIZE then
+						self.error = "callstack overflow"
+						return false
+					end
+	
+					if self.asp + index >= MEMORY_ARGS_SIZE_ELEMENTS then
+						self.error = "argstack overflow"
+						return false
+					end
+
+					if not self.funcmap:has(addr & 0xFFFF) then
+						self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
+						return false
+					end
+	
+					self:pushArgs(index)
+					self:pushCallframe(index)
+					self.cf.pc = addr & 0xFFFF
+				elseif addr & 0xF0000000 == 0x20000000 then
+					local func: APIFunction = self.api_funcs[addr & 0xFFFF]
+					if func ~= nilptr then
+						if self.csp >= EVM_CALLSTACK_SIZE then
+							self.error = "callstack overflow"
+							return false
+						end
+
+						if self.asp + index >= MEMORY_ARGS_SIZE_ELEMENTS then
+							self.error = "argstack overflow"
+							return false
+						end
+
+						self:pushArgs(index)
+						self:pushCallframe(index)
+						if not func(self) then
+							self:popCallframe()
+							return false
+						end
+						self:popCallframe()
+					else
+						self.error = string.format("attempt to call unregistered API function at index %d", addr & 0xFFFF)
+						return false
+					end
+				else
+					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
 					return false
 				end
 			case Opcode.RETURN then
@@ -1940,6 +2140,21 @@ function EVM:run(cycles: uinteger): boolean
 				self:pushU(self:popU() ~= 0 and 1 or 0)
 			case Opcode.PTOB then
 				self:pushU(self:popU() <= MEMORY_MAX_ADDR and 1 or 0)
+			case Opcode.FPTOB then
+				local raw_addr: uint32 = self:popU()
+				local tag: uint32 = raw_addr & 0xF0000000
+				local addr: uint32 = raw_addr & 0x0FFFFFFF
+				local result: uint32 = 0
+
+				if addr <= 0xFFFF then
+					if tag == 0x10000000 and self.funcmap:has(addr) then
+						result = 1
+					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
+						result = 1
+					end
+				end
+
+				self:pushU(result)
 			case Opcode.API then
 				index = self:next16()
 				local argc: uint16 = self:next16()
@@ -2140,136 +2355,118 @@ function EVM:saveCart(filename: string): boolean
 		return false
 	end
 
-	-- write texbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("texbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.texbank[i * MEMORY_TEXMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
+	-- write texbank.bin
+	err = zip_entry_open(zip, "texbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
 
-			err = zip_entry_write(zip, bank_ptr, MEMORY_TEXMEM_SIZE_BYTES)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.texbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_TEXBANK_SIZE_BYTES)
+		if err == ZIP_OK then
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save texbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save texbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
-	-- write objbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("objbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.objbank[i * MEMORY_OBJMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
+	-- write objbank.bin
+	err = zip_entry_open(zip, "objbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.objbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_OBJBANK_SIZE_BYTES)
 		if err == ZIP_OK then
-			close_entry = true
-
-			err = zip_entry_write(zip, bank_ptr, MEMORY_OBJMEM_SIZE_BYTES)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save objbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save objbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
-	-- write ompbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("ompbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.ompbank[i * MEMORY_OBJMAP_SIZE])
-		err = zip_entry_open(zip, bank_filename)
+	-- write ompbank.bin
+	err = zip_entry_open(zip, "ompbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.ompbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_OMPBANK_SIZE_BYTES)
 		if err == ZIP_OK then
-			close_entry = true
-
-			err = zip_entry_write(zip, bank_ptr, MEMORY_OBJMAP_SIZE)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save ompbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save ompbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
-	-- write wmpbank[0-1].bin
-	for i = 0, < 2 do
-		local bank_filename: string = string.format("wmpbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.wmpbank[i * MEMORY_WAVMAP_SIZE])
-		err = zip_entry_open(zip, bank_filename)
+	-- write wmpbank.bin
+	err = zip_entry_open(zip, "wmpbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.wmpbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_WMPBANK_SIZE_BYTES)
 		if err == ZIP_OK then
-			close_entry = true
-
-			err = zip_entry_write(zip, bank_ptr, MEMORY_WAVMAP_SIZE)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save wmpbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save wmpbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
-	-- read wavbank[0-1].bin
-	for i = 0, < 2 do
-		local bank_filename: string = string.format("wavbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.wavbank[i * MEMORY_WAVMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
+	-- write wavbank.bin
+	err = zip_entry_open(zip, "wavbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.wavbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_WAVBANK_SIZE_BYTES)
 		if err == ZIP_OK then
-			close_entry = true
-
-			err = zip_entry_write(zip, bank_ptr, MEMORY_WAVMEM_SIZE_BYTES)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save wavbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save wavbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
-	-- write seqbank[0-7].bin
-	for i = 0, < 8 do
-		local bank_filename: string = string.format("seqbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.seqbank[i * MEMORY_SEQMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
+	-- write seqbank.bin
+	err = zip_entry_open(zip, "seqbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		
+		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.temp_cart.seqbank[0])
+		err = zip_entry_write(zip, bank_ptr, MEMORY_SEQBANK_SIZE_BYTES)
 		if err == ZIP_OK then
-			close_entry = true
-
-			err = zip_entry_write(zip, bank_ptr, MEMORY_SEQMEM_SIZE_BYTES)
-			if err == ZIP_OK then
-				zip_entry_close(zip)
-				close_entry = false
-			else
-				self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
-				return false
-			end
+			zip_entry_close(zip)
+			close_entry = false
 		else
-			self.error = string.format("failed to save `%s` to cart: (error code %d)", bank_filename, err)
+			self.error = string.format("failed to save seqbank.bin to cart: (error code %d)", err)
 			return false
 		end
+	else
+		self.error = string.format("failed to save seqbank.bin to cart: (error code %d)", err)
+		return false
 	end
 
 	-- write rom.bin
@@ -2364,166 +2561,148 @@ function EVM:loadCart(filename: string): boolean
 		end
 	end
 
-	-- read texbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("texbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.texbank[i * MEMORY_TEXMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
+	-- read texbank.bin
+	local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.texbank[0])
+	err = zip_entry_open(zip, "texbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
 
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_TEXMEM_SIZE_BYTES then
-				self.error = string.format("failed to load `%s` from cart: 4 MiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+		if size < 0 then
+			self.error = string.format("failed to load texbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_TEXBANK_SIZE_BYTES then
+			self.error = "failed to load texbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_TEXMEM_SIZE_BYTES)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_TEXBANK_SIZE_BYTES)
 	end
 
-	-- read objbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("objbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.objbank[i * MEMORY_OBJMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
+	-- read objbank.bin
+	bank_ptr = (@*[0]uint8)(&self.cart.objbank[0])
+	err = zip_entry_open(zip, "objbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
 
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_OBJMEM_SIZE_BYTES then
-				self.error = string.format("failed to load `%s` from cart: 3 MiB + 384 KiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+		if size < 0 then
+			self.error = string.format("failed to load objbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_OBJBANK_SIZE_BYTES then
+			self.error = "failed to load objbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_OBJMEM_SIZE_BYTES)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_OBJBANK_SIZE_BYTES)
 	end
 
-	-- read ompbank[0-3].bin
-	for i = 0, < 4 do
-		local bank_filename: string = string.format("ompbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.ompbank[i * MEMORY_OBJMAP_SIZE])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
-
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_OBJMAP_SIZE then
-				self.error = string.format("failed to load `%s` from cart: 3 KiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+	-- read ompbank.bin
+	bank_ptr = (@*[0]uint8)(&self.cart.ompbank[0])
+	err = zip_entry_open(zip, "ompbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
+		
+		if size < 0 then
+			self.error = string.format("failed to load ompbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_OMPBANK_SIZE_BYTES then
+			self.error = "failed to load ompbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_OBJMAP_SIZE)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_OMPBANK_SIZE_BYTES)
 	end
 
-	-- read wmpbank[0-1].bin
-	for i = 0, < 2 do
-		local bank_filename: string = string.format("wmpbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.wmpbank[i * MEMORY_WAVMAP_SIZE])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
+	-- read wmpbank.bin
+	bank_ptr = (@*[0]uint8)(&self.cart.wmpbank[0])
+	err = zip_entry_open(zip, "wmpbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
 
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_WAVMAP_SIZE then
-				self.error = string.format("failed to load `%s` from cart: 2 KiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+		if size < 0 then
+			self.error = string.format("failed to load wmpbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_WMPBANK_SIZE_BYTES then
+			self.error = "failed to load wmpbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_WAVMAP_SIZE)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_WMPBANK_SIZE_BYTES)
 	end
 
-	-- read wavbank[0-1].bin
-	for i = 0, < 2 do
-		local bank_filename: string = string.format("wavbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.wavbank[i * MEMORY_WAVMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
+	-- read wavbank.bin
+	bank_ptr = (@*[0]uint8)(&self.cart.wavbank[0])
+	err = zip_entry_open(zip, "wavbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
 
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_WAVMEM_SIZE_BYTES then
-				self.error = string.format("failed to load `%s` from cart: 7 MiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+		if size < 0 then
+			self.error = string.format("failed to load wavbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_WAVBANK_SIZE_BYTES then
+			self.error = "failed to load wavbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_WAVMEM_SIZE_BYTES)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_WAVBANK_SIZE_BYTES)
 	end
 
-	-- read seqbank[0-7].bin
-	for i = 0, < 8 do
-		local bank_filename: string = string.format("seqbank%d.bin", i)
-		local bank_ptr: *[0]uint8 = (@*[0]uint8)(&self.cart.seqbank[i * MEMORY_SEQMEM_SIZE_ELEMENTS])
-		err = zip_entry_open(zip, bank_filename)
-		if err == ZIP_OK then
-			close_entry = true
-			size = zip_entry_size(zip)
+	-- read seqbank.bin
+	bank_ptr = (@*[0]uint8)(&self.cart.seqbank[0])
+	err = zip_entry_open(zip, "seqbank.bin")
+	if err == ZIP_OK then
+		close_entry = true
+		size = zip_entry_size(zip)
 
-			if size < 0 then
-				self.error = string.format("failed to load `%s` from cart: (error code %d)", bank_filename, err)
-				return false
-			elseif size > MEMORY_SEQMEM_SIZE_BYTES then
-				self.error = string.format("failed to load `%s` from cart: 256 KiB limit exceeded", bank_filename)
-				return false
-			else
-				local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
-				
-				zip_entry_close(zip)
-				close_entry = false
-			end
+		if size < 0 then
+			self.error = string.format("failed to load seqbank.bin from cart: (error code %d)", err)
+			return false
+		elseif size > MEMORY_SEQBANK_SIZE_BYTES then
+			self.error = "failed to load seqbank.bin from cart: size limit exceeded"
+			return false
 		else
-			-- clear bank
-			memory.set(bank_ptr, 0, MEMORY_SEQMEM_SIZE_BYTES)
+			local bytes_read: clong = zip_entry_noallocread(zip, bank_ptr, size)
+			
+			zip_entry_close(zip)
+			close_entry = false
 		end
+	else
+		-- clear bank
+		memory.set(bank_ptr, 0, MEMORY_SEQBANK_SIZE_BYTES)
 	end
 
 	-- read rom.bin

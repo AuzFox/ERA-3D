@@ -409,7 +409,7 @@ local function nextToken(vm: *EVM): void
 			end
 			
 			return
-		elseif (sh_token == ';'_u8 or sh_token == '{'_u8 or sh_token == '}'_u8 or sh_token == '('_u8 or sh_token == ')'_u8 or sh_token == ']'_u8 or sh_token == ','_u8 or sh_token == ':'_u8) then
+		elseif (sh_token == ';'_u8 or sh_token == '{'_u8 or sh_token == '}'_u8 or sh_token == '('_u8 or sh_token == ')'_u8 or sh_token == ']'_u8 or sh_token == ','_u8 or sh_token == ':'_u8 or sh_token == '`'_u8) then
 			return
 		end
 	end

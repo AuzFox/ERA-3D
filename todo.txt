@@ -9,7 +9,6 @@ COMPILER:
 - implement function/struct forward declarations
 - implement array initializers
 - implement compound assignment operators
-- implement function pointers
 - implement unsigned int comparison operators?
 - implement global variable initialization
 - implement ROM string start address directive
@@ -35,7 +34,6 @@ VM:
 HOST:
 - complete all import dialogs
 - implement config file
-- implement window resizing
 - implement debugger
 - implement boot animation
 - implement editors

@@ -136,11 +136,8 @@ global GPU_PALETTE: []uint32 = {
 -- screen dimentions (vscreen is console's virtual resolution)
 global GPU_VSCREEN_W <comptime> = 480
 global GPU_VSCREEN_H <comptime> = 360
-global GPU_SCREEN_SCALE <comptime> = 2
 global GPU_VSCREEN_HALF_W <comptime> = (GPU_VSCREEN_W /// 2)
 global GPU_VSCREEN_HALF_H <comptime> = (GPU_VSCREEN_H /// 2)
-global GPU_SCREEN_W <comptime> = (GPU_VSCREEN_W * GPU_SCREEN_SCALE)
-global GPU_SCREEN_H <comptime> = (GPU_VSCREEN_H * GPU_SCREEN_SCALE)
 
 global GPU_LINES <comptime> = 0
 global GPU_TRIANGLES <comptime> = 1
@@ -195,8 +192,8 @@ global Token = @enum {
 	VEC3,
 	STRUCT_ID, -- struct type id
 	STRING,
+	FUNC_POINTER, -- function pointer type
 	STRUCT,
-	FUNCTION,
 	ENUM,
 	ID,
 	ELSE,
@@ -271,6 +268,7 @@ global Opcode = @enum {
 	PUSH_VEC2_ZERO,
 	PUSH_VEC3_ZERO,
 	PUSH_STRING,
+	SAVE_FPTR,
 	DISCARD,
 	NOT,
 	OR,
@@ -302,6 +300,7 @@ global Opcode = @enum {
 	MODF,
 	LNOT,
 	LNOTP,
+	LNOTFP,
 	EQ,
 	EQF,
 	EQV,
@@ -333,14 +332,19 @@ global Opcode = @enum {
 	JUMP_NULL,
 	JUMP_NULLD,
 	JUMP_NNULLD,
+	JUMP_FPNULL,
+	JUMP_FPNULLD,
+	JUMP_FPNNULLD,
 	CALL,
-	CALL_PTR,
+	CALL_FPTR,
+	CALL_SAVED_FPTR,
 	RETURN,
 	VARGP,
 	FTOI,
 	ITOF,
 	ITOB, -- int to bool, used by || and && operators
 	PTOB, -- pointer to bool, used by || and && operators
+	FPTOB, -- function pointer to bool, used by || and && operators
 	API
 }
 
@@ -544,6 +548,8 @@ global EVM <forwarddecl> = @record {}
 
 global Identifier <forwarddecl> = @record {}
 
+global FuncPointerInfo <forwarddecl> = @record {}
+
 global APIFunction: type = @function(vm: *EVM): boolean
 
 -- union used to store values of different types
@@ -588,8 +594,15 @@ global Struct = @record {
 }
 
 global TypeInfo = @record {
-    type_id: uinteger,
-    structref: *Struct -- only used when base_type is EVMType.STRUCT
+	type_id: uinteger,
+	structref: *Struct, -- only used when type_id is EVMType.STRUCT
+	fptr_info: *FuncPointerInfo -- only used when type_id is EVMType.FUNC_POINTER
+}
+
+FuncPointerInfo = @record {
+	return_type: TypeInfo,
+	argdata: sequence(TypeInfo), -- used to track function pointer argument types
+	is_varargs: boolean
 }
 
 global LoopInfo = @record {
@@ -702,7 +715,14 @@ global GPU = @record {
 	ambient_color: rl.vector3,
 	blend_mode: cint,
 	viewport_w: cint,
-	viewport_h: cint
+	viewport_h: cint,
+	screen_w: int32,
+	screen_h: int32,
+	prev_screen_x: cint,
+	prev_screen_y: cint,
+	prev_screen_w: cint,
+	prev_screen_h: cint,
+	is_fullscreen: boolean
 }
 
 global SoundChip <forwarddecl> = @record {}
@@ -782,6 +802,7 @@ EVM = @record {
     ap: uinteger, -- ap for current function
     osp: uinteger,
     csp: uinteger,
+	saved_fptr: uint32, -- temporary register for function pointers (used when calling a fptr from an expression)
     hook_addresses: [3]uint16,
     hook_flags: [3]boolean,
     current_hook: uinteger,
@@ -825,6 +846,7 @@ EVM = @record {
     loop_break_stack: sequence(uint16),
     loop_step_stack: sequence(uint16),
     loop_del_l_stack: sequence(uint16),
+	funcmap: hashmap(uint32, boolean), -- used to determine if bytecode function pointers are legit
     
     -- general vars
     cart: Cart,

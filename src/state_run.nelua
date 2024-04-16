@@ -35,7 +35,7 @@ global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void
     
     if not vm:callHook(Hook.UPDATE) then
         core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
-        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [`] to view log")
+        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
         run_cart = false
         sm:back()
     end
@@ -50,7 +50,7 @@ global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:enableRenderState()
     if not vm:callHook(Hook.DRAW) then
         core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
-        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [`] to view log")
+        core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
         sm:back()
     end
     vm.gpu:disableRenderState()

@@ -2788,7 +2788,7 @@ local function apiCheckCollision(vm: *EVM): boolean
 		return false
 	end
 
-	if a_type > ColType.CYLINDER or a_type > ColType.CYLINDER then
+	if a_type > ColType.CYLINDER or b_type > ColType.CYLINDER then
 		vm.error = "attempt to call checkCollision() on invalid collision shape type(s)"
 		return false
 	end

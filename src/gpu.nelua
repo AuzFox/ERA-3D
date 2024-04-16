@@ -187,7 +187,7 @@ void main()
 ]]
 
 local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
-local master_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_SCREEN_W), (@float32)(GPU_SCREEN_H)}
+local master_dest_rect: rl.rectangle = {0.0, 0.0, 0.0, 0.0}
 local sub_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), (@float32)(GPU_VSCREEN_H)}
 local light_attrib_locs: [GPU_LIGHTS_COUNT][LightAttribute.COUNT]cint
 
@@ -899,6 +899,52 @@ function GPU:resetMatrixStack(): void
 	end
 end
 
+function GPU:toggleFullscreen(): void
+	-- "fullscreen" in this context just means a borderless window that matches the size of the monitor
+	if not self.is_fullscreen then
+		local pos: rl.vector2 = rl.getWindowPosition()
+		self.prev_screen_x = (@cint)(pos.x)
+		self.prev_screen_y = (@cint)(pos.y)
+		self.prev_screen_w = rl.getScreenWidth()
+		self.prev_screen_h = rl.getScreenHeight()
+
+		local monitor: cint = rl.getCurrentMonitor()
+		rl.setWindowPosition(0, 0)
+		rl.setWindowSize(rl.getMonitorWidth(monitor), rl.getMonitorHeight(monitor))
+	else
+		rl.setWindowSize(self.prev_screen_w, self.prev_screen_h)
+		rl.setWindowPosition(self.prev_screen_x, self.prev_screen_y)
+	end
+
+	rl.toggleBorderlessWindowed()
+	self.is_fullscreen = not self.is_fullscreen
+end
+
+function GPU:refreshScreenSize(): void
+	local render_w: int32 = (@int32)(rl.getRenderWidth())
+	local render_h: int32 = (@int32)(rl.getRenderHeight())
+	local scale_x: int32 = render_w /// GPU_VSCREEN_W
+	local scale_y: int32 = render_h /// GPU_VSCREEN_H
+	local final_scale: int32
+	
+	if scale_x == scale_y then
+		final_scale = scale_x
+	else
+		if scale_x < scale_y then
+			final_scale = scale_x
+		else
+			final_scale = scale_y
+		end
+	end
+	
+	master_dest_rect.x = (@float32)((render_w /// 2) - ((final_scale * GPU_VSCREEN_W) /// 2))
+	master_dest_rect.y = (@float32)((render_h /// 2) - ((final_scale * GPU_VSCREEN_H) /// 2))
+	master_dest_rect.width = final_scale * (@float32)(GPU_VSCREEN_W)
+	master_dest_rect.height = final_scale * (@float32)(GPU_VSCREEN_H)
+	self.screen_w = (@int32)(master_dest_rect.width)
+	self.screen_h = (@int32)(master_dest_rect.height)
+end
+
 function GPU:beginCurrentRenderTexture(): void
 	rl.beginTextureMode(self.gfx_rendertextures[self.gfx_rendertexture_index])
 end
@@ -1027,10 +1073,11 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.objbank_ptr = objbank_ptr
 	self.ompbank_ptr = ompbank_ptr
 
-	rl.setConfigFlags(rl.configFlags.VSYNC_HINT) -- enable vsync
+	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_RESIZABLE | rl.configFlags.WINDOW_HIGHDPI)
 	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
 
-	rl.initWindow(GPU_SCREEN_W, GPU_SCREEN_H, "ERA-3D")
+	rl.initWindow(GPU_VSCREEN_W * 2, GPU_VSCREEN_H * 2, "ERA-3D")
+	rl.setWindowMinSize(GPU_VSCREEN_W, GPU_VSCREEN_H)
 	--[[
 	if rl.isWindowReady() then
 		-- kinda gross "hack" to check if we need the HighDPI flag

@@ -795,8 +795,8 @@ function rl.setWindowFocused(): void <cimport'SetWindowFocused', cinclude'raylib
 function rl.getWindowHandle(): pointer <cimport'GetWindowHandle', cinclude'<raylib.h>', nodecl> end -- Get native window handle
 function rl.getScreenWidth(): cint <cimport'GetScreenWidth', cinclude'<raylib.h>', nodecl> end -- Get current screen width
 function rl.getScreenHeight(): cint <cimport'GetScreenHeight', cinclude'<raylib.h>', nodecl> end -- Get current screen height
-function rl.getRenderWidth(): void <cimport'GetRenderWidth', cinclude'raylib.h', nodecl> end-- Get current render width (it considers HiDPI)
-function rl.getRenderHeight(): void <cimport'GetRenderHeight', cinclude'raylib.h', nodecl> end-- Get current render height (it considers HiDPI)
+function rl.getRenderWidth(): cint <cimport'GetRenderWidth', cinclude'raylib.h', nodecl> end-- Get current render width (it considers HiDPI)
+function rl.getRenderHeight(): cint <cimport'GetRenderHeight', cinclude'raylib.h', nodecl> end-- Get current render height (it considers HiDPI)
 function rl.getMonitorCount(): cint <cimport'GetMonitorCount', cinclude'<raylib.h>', nodecl> end -- Get number of connected monitors
 function rl.getCurrentMonitor(): cint <cimport'GetCurrentMonitor', cinclude'<raylib.h>', nodecl> end -- Get number of connected monitors
 function rl.getMonitorPosition(monitor: cint): rl.vector2 <cimport'GetMonitorPosition', cinclude'<raylib.h>', nodecl> end -- Get specified monitor position
