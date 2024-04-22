@@ -19,17 +19,14 @@ function SoundChip:getInstrument(id: uinteger): *[0]uint8
 end
 
 function SoundChip:getWavMapEntryValues(id: uint32): (uint32, uint32, uint32, uint32)
-	-- TODO: keep pointer to current wavmap bank (system memory vs cart bank)
-	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[(84 + (MEMORY_OBJMAP_SIZE)) + (id * 16)])
+	--local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[(84 + (MEMORY_OBJMAP_SIZE)) + (id * 16)])
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.wavmap_data[id * 16])
 	local start: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
 	local send: uint32 = ((@uint32)(entry_ptr[4]) << 24) | ((@uint32)(entry_ptr[5]) << 16) | ((@uint32)(entry_ptr[6]) << 8) | (@uint32)(entry_ptr[7])
 	local susstart: uint32 = ((@uint32)(entry_ptr[8]) << 24) | ((@uint32)(entry_ptr[9]) << 16) | ((@uint32)(entry_ptr[10]) << 8) | (@uint32)(entry_ptr[11])
 	local susend: uint32 = ((@uint32)(entry_ptr[12]) << 24) | ((@uint32)(entry_ptr[13]) << 16) | ((@uint32)(entry_ptr[14]) << 8) | (@uint32)(entry_ptr[15])
 
 	return start, send, susstart, susend
-end
-
-function SoundChip:setBPM(): void
 end
 
 function SoundChip:setInstrument(track: uint8, instrument: uint8): void
@@ -137,6 +134,28 @@ local function trackCallback(info: *BKCallbackInfo, userdata: pointer): BKEnum
 
 		if (state.playflags & PlayFlag.MUTE) ~= 0 then
 			BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, 0)
+		else
+			local percentage: float32 = (@float32)(state.volume) / 255.0
+			local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+			BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, value)
+		end
+
+		if state.pan > 0 then
+			if state.pan > 100 then
+				state.pan = 100
+			end
+			local percentage: float32 = (@float32)(state.pan) / 100.0
+			local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+			BKSetAttr(&tc.bk_track, BK_PANNING, value)
+		elseif state.pan < 0 then
+			if state.pan < -100 then
+				state.pan = -100
+			end
+			local percentage: float32 = (@float32)(state.pan) / -100.0
+			local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+			BKSetAttr(&tc.bk_track, BK_PANNING, value)
+		else
+			BKSetAttr(&tc.bk_track, BK_PANNING, 0)
 		end
 
 		if state.pattern_id == SOUNDCHIP_EMPTY_VALUE then
@@ -278,8 +297,9 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 	end
 	
 	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, 0, 0, BK_MAX_VOLUME, 4)
-		
+	
 	BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4)
+	state.volume = 0x3F
 	if volume ~= SOUNDCHIP_EMPTY_VALUE then
 		local percentage: float32 = (@float32)(volume) / 254.0
 		local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
@@ -326,6 +346,36 @@ function SoundChip:unmuteTrack(track: uint8): void
 	state.playflags = state.playflags & ~PlayFlag.MUTE
 end
 
+function SoundChip:getTrackVolume(track: uint8): uint8
+	local state: *TrackState = self:getTrackState(track)
+	return state.volume
+end
+
+function SoundChip:setTrackVolume(track: uint8, volume: uint8): void
+	local state: *TrackState = self:getTrackState(track)
+	state.volume = volume
+end
+
+function SoundChip:getTrackPan(track: uint8): int32
+	local state: *TrackState = self:getTrackState(track)
+	return (@int32)(state.pan)
+end
+
+function SoundChip:setTrackPan(track: uint8, pan: int32): void
+	local state: *TrackState = self:getTrackState(track)
+	state.pan = (@int8)(pan)
+end
+
+function SoundChip:getTrackBPM(track: uint8): uint8
+	local state: *TrackState = self:getTrackState(track)
+	return state.bpm
+end
+
+function SoundChip:setTrackBPM(track: uint8, bpm: uint8): void
+	local state: *TrackState = self:getTrackState(track)
+	state.bpm = bpm
+end
+
 function SoundChip:updateAudio(): void
 	if rl.isAudioStreamProcessed(self.audio_stream) then
 		BKContextGenerate(&self.bk_context, &self.aobmem[0], SOUNDCHIP_FRAMES_PER_UPDATE)
@@ -368,9 +418,11 @@ function SoundChip:setBankPointers(wavbank_index: uint8, seqbank_index: uint8): 
 
 	if self.current_wavbank == SoundchipBank.SYSTEM then
 		wp = &self.wavmem[0]
+		self.wavmap_data = (@*[0]uint8)(&self.sysmem_ptr[84 + MEMORY_OBJMAP_SIZE])
 	else
 		local index: uinteger = self.current_wavbank - SoundchipBank.WAVBANK0
 		wp = &self.wavbank_ptr[MEMORY_WAVMEM_SIZE_ELEMENTS * index]
+		self.wavmap_data = (@*[0]uint8)(&self.wmpbank_ptr[MEMORY_WAVMAP_SIZE * index])
 	end
 
 	setBKDataPointer(&self.bk_data, wp, MEMORY_WAVMEM_SIZE_BYTES, 2, self.bk_data_flags)
@@ -427,7 +479,7 @@ function SoundChip:resetSoundchip(): void
 		local state: *TrackState = self:getTrackState(i)
 		state.playflags = 0
 		state.bpm = 154
-		state.volume = 127
+		state.volume = 0x3F
 		state.pan = 0
 		state.song_id = 0
 		state.song_pos = 0

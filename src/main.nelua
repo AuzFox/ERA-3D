@@ -287,7 +287,13 @@ end
 
 local function run(): void
 	while not rl.windowShouldClose() do
-		input.refresh()
+		vm.gpu:refreshScreenSize()
+		input.refresh(
+			(@int32)(vm.gpu.master_dest_rect.x),
+			(@int32)(vm.gpu.master_dest_rect.y),
+			vm.gpu.screen_w,
+			vm.gpu.screen_h
+		)
 
 		if rl.isKeyPressed(rl.keyboardKey.F11) then
 			vm.gpu:toggleFullscreen()
@@ -308,49 +314,56 @@ local function run(): void
 		else
 			local update_state: boolean = true
 
-			if sm.state_id ~= StateID.RUN and input.is_ctrl_down then
-				if input.pressedRepeat(rl.keyboardKey.LEFT) then
-					sm.queued_state = StateID.STATE_LEFT
+			if sm.state_id ~= StateID.RUN then
+				if input.clickedRect(0, false, GPU_VSCREEN_W - 48, 0, 48, 9) then
+					sm.queued_state = StateID.CODE + ((input.mouse_x - (GPU_VSCREEN_W - 48)) /// 12)
 					update_state = false
-				elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
-					sm.queued_state = StateID.STATE_RIGHT
-					update_state = false
-				elseif rl.isKeyPressed(rl.keyboardKey.R) then
-					if vm:compile() then
-						vm:resetVM(true)
-						
-						if vm:callHook(Hook.INIT) then
-							sm.queued_state = StateID.RUN
+				elseif input.is_ctrl_down then
+					if input.pressedRepeat(rl.keyboardKey.LEFT) then
+						sm.queued_state = StateID.STATE_LEFT
+						update_state = false
+					elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+						sm.queued_state = StateID.STATE_RIGHT
+						update_state = false
+					elseif rl.isKeyPressed(rl.keyboardKey.R) then
+						if vm:compile() then
+							vm:resetVM(true)
+							
+							vm.cycle_count = 0
+							if vm:callHook(Hook.INIT) then
+								sm.queued_state = StateID.RUN
+								--print("init()", vm.cycle_count)
+							else
+								core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
+								core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
+							end
 						else
-							core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
-							core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
+							core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
+							core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [CTRL+ENTER] to view log")
 						end
-					else
-						core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
-						core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [CTRL+ENTER] to view log")
-					end
-					update_state = false
-				elseif rl.isKeyPressed(rl.keyboardKey.S) then
-					if input.is_shift_down then
-						sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
-						sm.queued_dialog = DialogID.SAVE_CART
-					else
-						if core.current_cart_path == "" then
+						update_state = false
+					elseif rl.isKeyPressed(rl.keyboardKey.S) then
+						if input.is_shift_down then
 							sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
 							sm.queued_dialog = DialogID.SAVE_CART
 						else
-							if vm:saveCart(core.current_cart_path) then
-								core:log(LogEntryType.INFO, "cart saved", true)
+							if core.current_cart_path == "" then
+								sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
+								sm.queued_dialog = DialogID.SAVE_CART
 							else
-								core:log(LogEntryType.HOST_ERROR, vm.error, true)
+								if vm:saveCart(core.current_cart_path) then
+									core:log(LogEntryType.INFO, "cart saved", true)
+								else
+									core:log(LogEntryType.HOST_ERROR, vm.error, true)
+								end
 							end
 						end
+						update_state = false
+					elseif rl.isKeyPressed(rl.keyboardKey.O) then
+						sm:resetFileBrowser(core.carts_directory, FileBrowserMode.LOAD)
+						sm.queued_dialog = DialogID.LOAD_CART
+						update_state = false
 					end
-					update_state = false
-				elseif rl.isKeyPressed(rl.keyboardKey.O) then
-					sm:resetFileBrowser(core.carts_directory, FileBrowserMode.LOAD)
-					sm.queued_dialog = DialogID.LOAD_CART
-					update_state = false
 				end
 			end
 
@@ -366,9 +379,8 @@ local function run(): void
 
 		vm.soundchip:updateAudio()
 
-		if sm.state_id == StateID.RUN and vm.gpu.update_tex then
-			rl.updateTexture(vm.gpu.gfx_texture, &vm.gpu.texmem)
-			vm.gpu.update_tex = false
+		if vm.gpu.update_tex then
+			vm.gpu:updateTexture()
 		end
 
 		-- draw to state render texture
@@ -385,7 +397,6 @@ local function run(): void
 		end
 
 		-- draw to master render texture
-		vm.gpu:refreshScreenSize()
 		vm.gpu:beginMasterRenderTexture()
 			vm.gpu:clear(GPU_BLACK)
 
@@ -516,36 +527,31 @@ local function run(): void
 					vm.gpu:drawCurrentRenderTexture()
 				end
 
-				if core.log_state == LogState.HIDDEN then
-					if sm.dialog_id ~= DialogID.NONE then
+				vm.gpu:drawRect2D(0, 0, GPU_VSCREEN_W, 9, GPU_GRAY & 0xFFFFFFC0)
+				vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((#core.current_cart_name /// 2) * 6), 0, GPU_LGRAY, core.current_cart_name)
+
+				if sm.dialog_id ~= DialogID.NONE then
+					if core.log_state == LogState.HIDDEN then
 						switch sm.dialog_id do
 							case DialogID.IMPORT_CODE then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SCRIPT")
+								vm.gpu:print2D(GPU_VSCREEN_W - 13 * 6, 0, GPU_WHITE, "IMPORT SCRIPT")
 							case DialogID.IMPORT_TEXTURE then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "IMPORT TEXTURE")
+								vm.gpu:print2D(GPU_VSCREEN_W - 14 * 6, 0, GPU_WHITE, "IMPORT TEXTURE")
 							case DialogID.IMPORT_MODEL then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "IMPORT MODEL")
+								vm.gpu:print2D(GPU_VSCREEN_W - 12 * 6, 0, GPU_WHITE, "IMPORT MODEL")
 							case DialogID.IMPORT_SAMPLE then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((13 * 6) /// 2), 0, GPU_WHITE, "IMPORT SAMPLE")
+								vm.gpu:print2D(GPU_VSCREEN_W - 13 * 6, 0, GPU_WHITE, "IMPORT SAMPLE")
 							case DialogID.LOAD_CART then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "LOAD CART")
+								vm.gpu:print2D(GPU_VSCREEN_W - 9 * 6, 0, GPU_WHITE, "LOAD CART")
 							case DialogID.SAVE_CART then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((9 * 6) /// 2), 0, GPU_WHITE, "SAVE CART")
-						end
-					else
-						vm.gpu:print2D(GPU_VSCREEN_W - (#core.current_cart_name * 6), 0, GPU_WHITE, core.current_cart_name)
-
-						switch sm.state_id do
-							case StateID.CODE then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((11 * 6) /// 2), 0, GPU_WHITE, "CODE EDITOR")
-							case StateID.TRACKER then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((7 * 6) /// 2), 0, GPU_WHITE, "TRACKER")
-							case StateID.MODEL then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((12 * 6) /// 2), 0, GPU_WHITE, "MODEL EDITOR")
-							case StateID.TEXTURE then
-								vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((14 * 6) /// 2), 0, GPU_WHITE, "TEXTURE EDITOR")
+								vm.gpu:print2D(GPU_VSCREEN_W - 9 * 6, 0, GPU_WHITE, "SAVE CART")
 						end
 					end
+				else
+					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 48, 0, (sm.state_id == StateID.CODE) and core.cursor_color or GPU_LGRAY, Icon.STATE_CODE)
+					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 36, 0, (sm.state_id == StateID.TRACKER) and core.cursor_color or GPU_LGRAY, Icon.STATE_TRACKER)
+					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 24, 0, (sm.state_id == StateID.MODEL) and core.cursor_color or GPU_LGRAY, Icon.STATE_MODEL)
+					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 12, 0, (sm.state_id == StateID.TEXTURE) and core.cursor_color or GPU_LGRAY, Icon.STATE_TEXTURE)
 				end
 			end
 

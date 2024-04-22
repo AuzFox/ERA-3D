@@ -171,7 +171,6 @@ local collision_functions: [4][4]CollisionFunction = {
 	string strfmt(string fmt, ...);
 	
 	// i/o
-	initMemoryCard(string id);
 	swapCart()?
 ]]
 
@@ -2672,7 +2671,7 @@ end
 
 local function apiPlayWav(vm: *EVM): boolean
 	-- signature:
-	-- void playWav(int track, int id);
+	-- void playWav(int track, int id, int volume);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local id: uint32 = vm:getArgU(1)
@@ -2704,6 +2703,18 @@ local function apiPlayWavEx(vm: *EVM): boolean
 	return true
 end
 
+local function apiPauseTrack(vm: *EVM): boolean
+	-- signature:
+	-- void pauseTrack(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	local mask: uint8 = 0x80 >> track
+
+	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags & ~mask
+
+	return true
+end
+
 local function apiPauseTracks(vm: *EVM): boolean
 	-- signature:
 	-- void pauseTracks(int mask);
@@ -2715,6 +2726,18 @@ local function apiPauseTracks(vm: *EVM): boolean
 	return true
 end
 
+local function apiResumeTrack(vm: *EVM): boolean
+	-- signature:
+	-- void resumeTrack(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	local mask: uint8 = 0x80 >> track
+	
+	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags | mask
+
+	return true
+end
+
 local function apiResumeTracks(vm: *EVM): boolean
 	-- signature:
 	-- void resumeTracks(int mask);
@@ -2722,6 +2745,17 @@ local function apiResumeTracks(vm: *EVM): boolean
 	local mask: uint32 = vm:getArgU(0)
 
 	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags | (@uint8)(mask)
+
+	return true
+end
+
+local function apiStopTrack(vm: *EVM): boolean
+	-- signature:
+	-- void stopTrack(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	
+	vm.soundchip:stopTrack(track)
 
 	return true
 end
@@ -2741,6 +2775,17 @@ local function apiStopTracks(vm: *EVM): boolean
 	return true
 end
 
+local function apiMuteTrack(vm: *EVM): boolean
+	-- signature:
+	-- void muteTrack(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	
+	vm.soundchip:muteTrack(track)
+
+	return true
+end
+
 local function apiMuteTracks(vm: *EVM): boolean
 	-- signature:
 	-- void muteTracks(int mask);
@@ -2756,6 +2801,17 @@ local function apiMuteTracks(vm: *EVM): boolean
 	return true
 end
 
+local function apiUnmuteTrack(vm: *EVM): boolean
+	-- signature:
+	-- void unmuteTrack(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	
+	vm.soundchip:unmuteTrack(track)
+
+	return true
+end
+
 local function apiUnmuteTracks(vm: *EVM): boolean
 	-- signature:
 	-- void unmuteTracks(int mask);
@@ -2767,6 +2823,81 @@ local function apiUnmuteTracks(vm: *EVM): boolean
 			vm.soundchip:unmuteTrack(i)
 		end
 	end
+
+	return true
+end
+
+local function apiGetTrackVolume(vm: *EVM): boolean
+	-- signature:
+	-- int getTrackVolume(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+
+	vm:pushU(vm.soundchip:getTrackVolume(track))
+	
+	return true
+end
+
+local function apiSetTrackVolume(vm: *EVM): boolean
+	-- signature:
+	-- void setTrackVolume(int track, int volume);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	local volume: uint8 = (@uint8)(vm:getArgU(1))
+
+	vm.soundchip:setTrackVolume(track, volume)
+
+	return true
+end
+
+local function apiGetTrackPan(vm: *EVM): boolean
+	-- signature:
+	-- int getTrackPan(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+
+	vm:pushI(vm.soundchip:getTrackPan(track))
+	
+	return true
+end
+
+local function apiSetTrackPan(vm: *EVM): boolean
+	-- signature:
+	-- void setTrackPan(int track, int pan);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	local pan: int32 = vm:getArgI(1)
+
+	if pan > 100 then
+		pan = 100
+	elseif pan < -100 then
+		pan = -100
+	end
+
+	vm.soundchip:setTrackPan(track, pan)
+
+	return true
+end
+
+local function apiGetTrackBPM(vm: *EVM): boolean
+	-- signature:
+	-- int getTrackBPM(int track);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+
+	vm:pushU(vm.soundchip:getTrackBPM(track))
+	
+	return true
+end
+
+local function apiSetTrackBPM(vm: *EVM): boolean
+	-- signature:
+	-- void setTrackBPM(int track, int bpm);
+
+	local track: uint8 = (@uint8)(vm:getArgU(0))
+	local bpm: uint8 = (@uint8)(vm:getArgU(1))
+
+	vm.soundchip:setTrackBPM(track, bpm)
 
 	return true
 end
@@ -4591,10 +4722,22 @@ function EVM:registerAPI(): void
 			func=apiPlayWavEx
 		},
 		{
+			name="pauseTrack",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiPauseTrack
+		},
+		{
 			name="pauseTracks",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiPauseTracks
+		},
+		{
+			name="resumeTrack",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiResumeTrack
 		},
 		{
 			name="resumeTracks",
@@ -4603,10 +4746,22 @@ function EVM:registerAPI(): void
 			func=apiResumeTracks
 		},
 		{
+			name="stopTrack",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiStopTrack
+		},
+		{
 			name="stopTracks",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiStopTracks
+		},
+		{
+			name="muteTrack",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiMuteTrack
 		},
 		{
 			name="muteTracks",
@@ -4615,10 +4770,61 @@ function EVM:registerAPI(): void
 			func=apiMuteTracks
 		},
 		{
+			name="unmuteTrack",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiUnmuteTrack
+		},
+		{
 			name="unmuteTracks",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiUnmuteTracks
+		},
+		{
+			name="getTrackVolume",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiGetTrackVolume
+		},
+		{
+			name="setTrackVolume",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiSetTrackVolume
+		},
+		{
+			name="getTrackPan",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiGetTrackPan
+		},
+		{
+			name="setTrackPan",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiSetTrackPan
+		},
+		{
+			name="getTrackBPM",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiGetTrackBPM
+		},
+		{
+			name="setTrackBPM",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiSetTrackBPM
 		},
 		{
 			name="checkCollision",

@@ -1077,7 +1077,7 @@ function EVM:dumpBytecode(): void
 	self.cf = prev_cf
 end
 
-function EVM:run(cycles: uinteger): boolean
+function EVM:run(max_cycles: uint64): boolean
 	local index: uint16
 	local running: boolean = true
 
@@ -2189,9 +2189,12 @@ function EVM:run(cycles: uinteger): boolean
 
 		if self.cf.pc >= self.bytecode_len then
 			running = false
-		elseif cycles > 0 then
-			cycles = cycles - 1
-			running = cycles > 0
+		end
+
+		self.cycle_count = self.cycle_count + 1
+		if self.cycle_count > max_cycles then
+			self.error = string.format("vm cycle limit exceeded")
+			return false
 		end
 	end
 	
@@ -2211,7 +2214,7 @@ function EVM:callHook(hook: integer): boolean
 		end
 
 		self:pushCallframe(argc)
-		local result: boolean = self:run(0)
+		local result: boolean = self:run(VM_MAX_CYCLES)
 		self:popCallframe()
 
 		if self.current_hook == Hook.DRAW then

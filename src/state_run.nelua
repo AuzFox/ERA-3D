@@ -1,5 +1,7 @@
 require("statemachine")
 
+local current_texbank: uint8
+local current_objbank: uint8
 local current_wavbank: uint8
 local current_seqbank: uint8
 local run_cart: boolean
@@ -10,6 +12,14 @@ end
 global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
     vm.gpu:setRenderTexture(RenderTexture.CODE)
 
+    current_texbank = vm.gpu.current_texbank
+    current_objbank = vm.gpu.current_objbank
+    vm.gpu:setBankPointers(
+        GPUBank.SYSTEM,
+        GPUBank.SYSTEM
+    )
+    vm.gpu.update_tex = true
+    
     current_wavbank = vm.soundchip.current_wavbank
     current_seqbank = vm.soundchip.current_seqbank
     vm.soundchip:setBankPointers(
@@ -21,6 +31,12 @@ global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateRunExit(sm: *StateMachine, vm: *EVM): void
+    vm.gpu:setBankPointers(
+        current_texbank,
+        current_objbank
+    )
+    vm.gpu.update_tex = true
+    
     vm.soundchip:setBankPointers(
         current_wavbank,
         current_seqbank
@@ -39,6 +55,7 @@ global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void
         run_cart = false
         sm:back()
     end
+    --print("update()", vm.cycle_count)
 end
 
 global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
@@ -54,6 +71,8 @@ global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
         sm:back()
     end
     vm.gpu:disableRenderState()
+    --print("draw()", vm.cycle_count)
+    vm.cycle_count = 0
 end
 
 global function stateRunCleanup(sm: *StateMachine, vm: *EVM): void

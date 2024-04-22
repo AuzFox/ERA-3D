@@ -95,21 +95,21 @@ local function drawLevels(sm: *StateMachine, vm: *EVM): void
 end
 
 local function drawSong(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:print2D(18, 9, GPU_WHITE, "SEQBANK")
-    vm.gpu:printHexNibble2D(66, 9, GPU_WHITE, vm.soundchip.current_seqbank - SoundchipBank.SEQBANK0)
+    vm.gpu:print2D(18, 18, GPU_WHITE, "SEQBANK")
+    vm.gpu:printHexNibble2D(66, 18, GPU_WHITE, vm.soundchip.current_seqbank - SoundchipBank.SEQBANK0)
 
     local selcol: uint32 = (data.current_editor == Editor.SONG) and core.cursor_color or GPU_GRAY
-    vm.gpu:drawRect2D(4, 7, 112, 1, selcol)
-    vm.gpu:drawRect2D(4, 8, 1, 83, selcol)
-    vm.gpu:drawRect2D(115, 8, 1, 83, selcol)
-    vm.gpu:drawRect2D(4, 91, 112, 1, selcol)
+    vm.gpu:drawRect2D(4, 16, 112, 1, selcol)
+    vm.gpu:drawRect2D(4, 17, 1, 83, selcol)
+    vm.gpu:drawRect2D(115, 17, 1, 83, selcol)
+    vm.gpu:drawRect2D(4, 100, 112, 1, selcol)
 
     local start_row: int32 = util.midI(0, data.song_y - 3, 248)
 
     for x = 0, < SOUNDCHIP_TRACK_COUNT do
         for y = 0, < 8 do
             local startx: int32 = 18 + x * 12
-            local starty: int32 = 18 + y * 9
+            local starty: int32 = 27 + y * 9
             local row: int32
             local byte_val: uint8 = vm.soundchip.song_data[8 * (start_row + y) + x]
 
@@ -146,7 +146,7 @@ end
 
 local function drawPatterns(sm: *StateMachine, vm: *EVM): void
     local start_track: int32 = util.midI(0, data.track - 1, 4)
-    local start_pattern_y: int32 = 108
+    local start_pattern_y: int32 = 117
 
     for i = 0, < 4 do
         local start_pattern_x: int32 = 6 + (i * 13 * 6)
@@ -223,21 +223,21 @@ end
 
 local function drawInstrument(sm: *StateMachine, vm: *EVM): void
     local selcol: uint32 = (data.current_editor == Editor.INSTRUMENT) and core.cursor_color or GPU_GRAY
-    vm.gpu:drawRect2D(4, 259, 154, 1, selcol)
-    vm.gpu:drawRect2D(4, 260, 1, 65, selcol)
-    vm.gpu:drawRect2D(157, 260, 1, 65, selcol)
-    vm.gpu:drawRect2D(4, 325, 154, 1, selcol)
+    vm.gpu:drawRect2D(4, 268, 154, 1, selcol)
+    vm.gpu:drawRect2D(4, 269, 1, 65, selcol)
+    vm.gpu:drawRect2D(157, 269, 1, 65, selcol)
+    vm.gpu:drawRect2D(4, 334, 154, 1, selcol)
 
-    vm.gpu:print2D(6, 261, GPU_WHITE, "INSTRUMENT")
+    vm.gpu:print2D(6, 270, GPU_WHITE, "INSTRUMENT")
 
     if data.instrument_id == SOUNDCHIP_EMPTY_VALUE then
-        vm.gpu:print2D(71, 261, GPU_GRAY, "..")
+        vm.gpu:print2D(71, 270, GPU_GRAY, "..")
     else
-        vm.gpu:printHexByte2D(71, 261, GPU_LGRAY, data.instrument_id)
+        vm.gpu:printHexByte2D(71, 270, GPU_LGRAY, data.instrument_id)
 
         local label_x: int32 = 6
         local value_x: int32 = 78
-        local current_y: int32 = 270
+        local current_y: int32 = 279
         local idata: *[0]uint8 = vm.soundchip:getInstrument(data.instrument_id)
         local flags: uint8 = idata[0]
         local sample_start: uint32 = ((@uint32)(idata[1]) << 16) | ((@uint32)(idata[2]) << 8) | (@uint32)(idata[3])
@@ -255,19 +255,19 @@ local function drawInstrument(sm: *StateMachine, vm: *EVM): void
         -- draw cursor
         switch data.instrument_y do
             case 0 then -- name
-                vm.gpu:drawRect2D(value_x + data.instrument_x * 6, 270, 6, 9, selcol)
+                vm.gpu:drawRect2D(value_x + data.instrument_x * 6, 279, 6, 9, selcol)
             case 1 then -- sample mode
-                vm.gpu:drawRect2D(value_x, 279, 36, 9, selcol)
+                vm.gpu:drawRect2D(value_x, 288, 36, 9, selcol)
             case 2 then -- sample start+end/wavmap id
-                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 288, 6, 9, selcol)
+                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 297, 6, 9, selcol)
             case 3 then -- loop mode
-                vm.gpu:drawRect2D(value_x, 297, 48, 9, selcol)
+                vm.gpu:drawRect2D(value_x, 306, 48, 9, selcol)
             case 4 then -- loop range
-                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 306, 6, 9, selcol)
+                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 315, 6, 9, selcol)
             case 5 then -- adsr
-                local y: int32 = 306
+                local y: int32 = 315
                 if flags & InstrumentFlag.LOOP_MASK == InstrumentFlag.LOOP_RANGE then
-                    y = 315
+                    y = 324
                 end
                 vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 2) * 18) + ((data.instrument_x & 1) * 6), y, 6, 9, selcol)
         end

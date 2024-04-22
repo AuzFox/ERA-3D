@@ -187,9 +187,14 @@ void main()
 ]]
 
 local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
-local master_dest_rect: rl.rectangle = {0.0, 0.0, 0.0, 0.0}
 local sub_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), (@float32)(GPU_VSCREEN_H)}
 local light_attrib_locs: [GPU_LIGHTS_COUNT][LightAttribute.COUNT]cint
+local icon_table: [Icon.COUNT]rl.rectangle = {
+	{198, 0, 12, 9}, -- STATE_CODE
+	{210, 0, 12, 9}, -- STATE_TRACKER
+	{222, 0, 12, 9}, -- STATE_MODEL
+	{234, 0, 12, 9}, -- STATE_TEXTURE
+}
 
 function GPU:clear(col: uint32): void
 	local alpha: cuchar = (@cuchar)(col & 0xFF)
@@ -397,7 +402,7 @@ function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
 	local src_rect: rl.rectangle = {srcx, srcy, 6.0, 9.0}
 	local dest_rect: rl.rectangle = {fx, fy, 6.0, 9.0}
 
-	rl.drawTexturePro(self.gfx_font_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, color)
+	rl.drawTexturePro(self.gfx_ui_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, color)
 end
 
 -- print2D function for host program, doesn't do formatting
@@ -435,6 +440,32 @@ function GPU:print2D(x: int32, y: int32, col: uint32, text: string): void
 
 		i = i + 1
 	end
+end
+
+function GPU:measureInt(value: int32): int32
+	if value == 0 then
+		return 1
+	end
+	
+	local count: int32 = 0
+	local bvalue: int64
+	local negative: boolean = value < 0
+	if negative then
+		bvalue = -(@int64)(value)
+	else
+		bvalue = (@int64)(value)
+	end
+
+	while bvalue ~= 0 do
+		bvalue = bvalue /// 10
+		count = count + 1
+	end
+	
+	if negative then
+		count = count + 1
+	end
+
+	return count
 end
 
 function GPU:printInt2D(x: int32, y: int32, col: uint32, value: int32, out_char_count: *int32): void
@@ -597,6 +628,20 @@ function GPU:printHexByte2D(x: int32, y: int32, col: uint32, val: uint8): void
 	self:drawChar2D(lsn, &cur_x, y, ray_col)
 end
 
+function GPU:drawIcon2D(x: int32, y: int32, col: uint32, icon_index: uint32): void
+	local icon_src_rect: rl.rectangle = icon_table[icon_index]
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF)
+	}
+
+	local dest_rect: rl.rectangle = {(@float32)(x), (@float32)(y), icon_src_rect.width, icon_src_rect.height}
+
+	rl.drawTexturePro(self.gfx_ui_texture, icon_src_rect, dest_rect, {0.0, 0.0}, 0.0, ray_col)
+end
+
 function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
 	local fx0: float32 = (@float32)(x)
 	local fy0: float32 = (@float32)(y)
@@ -606,19 +651,19 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 		(@cuchar)(col >> 24),
 		(@cuchar)((col & 0xFF0000) >> 16),
 		(@cuchar)((col & 0x00FF00) >> 8),
-		(@cuchar)(col & 0xFF),
+		(@cuchar)(col & 0xFF)
 	}
 
 	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
-function GPU:uploadOBJMEMVertex(index: uint32): void
+function GPU:uploadMemVertex(index: uint32): void
 	local word_index: uinteger = index * 9
 
-	self:vertColor(self.objmem[word_index + 8].u)
-	self:vertUV({self.objmem[word_index + 6].f, self.objmem[word_index + 7].f})
-	self:vertNormal({self.objmem[word_index + 3].f, self.objmem[word_index + 4].f, self.objmem[word_index + 5].f})
-	self:vertex({self.objmem[word_index].f, self.objmem[word_index + 1].f, self.objmem[word_index + 2].f})
+	self:vertColor(self.model_data[word_index + 8].u)
+	self:vertUV({self.model_data[word_index + 6].f, self.model_data[word_index + 7].f})
+	self:vertNormal({self.model_data[word_index + 3].f, self.model_data[word_index + 4].f, self.model_data[word_index + 5].f})
+	self:vertex({self.model_data[word_index].f, self.model_data[word_index + 1].f, self.model_data[word_index + 2].f})
 end
 
 function GPU:drawObjEx(mode: uint32, start: uint32, n: uint32): void
@@ -631,24 +676,24 @@ function GPU:drawObjEx(mode: uint32, start: uint32, n: uint32): void
 			case GPU_LINES then
 				for i = 0, < n do
 					local line_start: uint32 = start + (i * 2)
-					self:uploadOBJMEMVertex(line_start)
-					self:uploadOBJMEMVertex(line_start + 1)
+					self:uploadMemVertex(line_start)
+					self:uploadMemVertex(line_start + 1)
 				end
 			case GPU_TRIANGLES then
 				for i = 0, < n do
 					local tri_start: uint32 = start + (i * 3)
-					self:uploadOBJMEMVertex(tri_start)
-					self:uploadOBJMEMVertex(tri_start + 1)
-					self:uploadOBJMEMVertex(tri_start + 2)
+					self:uploadMemVertex(tri_start)
+					self:uploadMemVertex(tri_start + 1)
+					self:uploadMemVertex(tri_start + 2)
 				end
 			case GPU_QUADS then
 				for i = 0, < n do
 					-- get vertices
 					local quad_start: uint32 = start + (i * 4)
-					self:uploadOBJMEMVertex(quad_start)
-					self:uploadOBJMEMVertex(quad_start + 1)
-					self:uploadOBJMEMVertex(quad_start + 2)
-					self:uploadOBJMEMVertex(quad_start + 3)
+					self:uploadMemVertex(quad_start)
+					self:uploadMemVertex(quad_start + 1)
+					self:uploadMemVertex(quad_start + 2)
+					self:uploadMemVertex(quad_start + 3)
 				end
 		end
 	self:endMesh()
@@ -656,7 +701,8 @@ end
 
 function GPU:drawObj(id: uint32): void
 	-- get objmap entry pointer
-	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[84 + (id * 12)])
+	--local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.sysmem_ptr[84 + (id * 12)])
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.objmap_data[id * 12])
 
 	-- get mode
 	local mode: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
@@ -668,6 +714,13 @@ function GPU:drawObj(id: uint32): void
 	local n: uint32 = ((@uint32)(entry_ptr[8]) << 24) | ((@uint32)(entry_ptr[9]) << 16) | ((@uint32)(entry_ptr[10]) << 8) | (@uint32)(entry_ptr[11])
 
 	self:drawObjEx(mode, start, n)
+end
+
+function GPU:drawGFXTexture(srcx: int32, srcy: int32, srcw: int32, srch: int32, destx: int32, desty: int32, destw: int32, desth: int32): void
+	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
+	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(destw), (@float32)(desth) };
+
+	rl.drawTexturePro(self.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
@@ -748,6 +801,34 @@ function GPU:setLightColor(id: uint32, col: uint32): void
 		(@float32)((col >> 8) & 0xFF) / 255.0
 	}
 	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.COLOR], &self.lights[id].color, rl.shaderUniformDataType.UNIFORM_VEC3)
+end
+
+function GPU:setPixel(x: int32, y: int32, col: uint32): void
+	if x < 0 or x > 1023 or y < 0 or y > 1023 then
+		return
+	end
+
+	self.texture_data[y * 1024 + x] = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF)
+	}
+	self.update_tex = true
+end
+
+function GPU:getPixel(x: int32, y: int32): uint32
+	if x < 0 or x > 1023 or y < 0 or y > 1023 then
+		return 0
+	end
+
+	local ray_col: rl.color = self.texture_data[y * 1024 + x]
+	local r: uint32 = (@uint32)(ray_col.r)
+	local g: uint32 = (@uint32)(ray_col.g)
+	local b: uint32 = (@uint32)(ray_col.b)
+	local a: uint32 = (@uint32)(ray_col.a)
+	
+	return (r << 24) | (g << 16) | (b << 8) | a
 end
 
 function GPU:loadTexBank(bank: uint8): void
@@ -937,12 +1018,12 @@ function GPU:refreshScreenSize(): void
 		end
 	end
 	
-	master_dest_rect.x = (@float32)((render_w /// 2) - ((final_scale * GPU_VSCREEN_W) /// 2))
-	master_dest_rect.y = (@float32)((render_h /// 2) - ((final_scale * GPU_VSCREEN_H) /// 2))
-	master_dest_rect.width = final_scale * (@float32)(GPU_VSCREEN_W)
-	master_dest_rect.height = final_scale * (@float32)(GPU_VSCREEN_H)
-	self.screen_w = (@int32)(master_dest_rect.width)
-	self.screen_h = (@int32)(master_dest_rect.height)
+	self.master_dest_rect.x = (@float32)((render_w /// 2) - ((final_scale * GPU_VSCREEN_W) /// 2))
+	self.master_dest_rect.y = (@float32)((render_h /// 2) - ((final_scale * GPU_VSCREEN_H) /// 2))
+	self.master_dest_rect.width = final_scale * (@float32)(GPU_VSCREEN_W)
+	self.master_dest_rect.height = final_scale * (@float32)(GPU_VSCREEN_H)
+	self.screen_w = (@int32)(self.master_dest_rect.width)
+	self.screen_h = (@int32)(self.master_dest_rect.height)
 end
 
 function GPU:beginCurrentRenderTexture(): void
@@ -962,7 +1043,7 @@ function GPU:drawCurrentRenderTexture(): void
 end
 
 function GPU:drawMasterRenderTexture(): void
-	rl.drawTexturePro(self.gfx_master_rendertexture.texture, src_rect, master_dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+	rl.drawTexturePro(self.gfx_master_rendertexture.texture, src_rect, self.master_dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 end
 
 function GPU:useRenderTexture(index: uinteger): void
@@ -1007,6 +1088,32 @@ function GPU:disableRenderState(): void
 	-- TODO: properly disable all render state
 
 	self:setBlendMode(rl.blendMode.ALPHA)
+end
+
+function GPU:setBankPointers(texbank_index: uint8, objbank_index: uint8): void
+	self.current_texbank = texbank_index
+	self.current_objbank = objbank_index
+
+	if self.current_texbank == GPUBank.SYSTEM then
+		self.texture_data = (@*[0]rl.color)(&self.texmem)
+	else
+		local index: uinteger = self.current_texbank - GPUBank.TEXBANK0
+		self.texture_data = (@*[0]rl.color)(&self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * index])
+	end
+
+	if self.current_objbank == GPUBank.SYSTEM then
+		self.model_data = (@*[0]IntFloat)(&self.objmem)
+		self.objmap_data = (@*[0]uint8)(&self.sysmem_ptr[84])
+	else
+		local index: uint64 = self.current_objbank - GPUBank.OBJBANK0
+		self.model_data = (@*[0]IntFloat)(&self.objbank_ptr[MEMORY_OBJMEM_SIZE_ELEMENTS * index])
+		self.objmap_data = (@*[0]uint8)(&self.ompbank_ptr[MEMORY_OBJMAP_SIZE * index])
+	end
+end
+
+function GPU:updateTexture(): void
+	rl.updateTexture(self.gfx_texture, self.texture_data)
+	self.update_tex = false
 end
 
 function GPU:resetGPU(): void
@@ -1091,7 +1198,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	end
 	]]
 
-	rl.setTargetFPS(30)
+	rl.setTargetFPS(60)
 	rl.setExitKey(rl.keyboardKey.NULL)
 
 	self.gfx_master_rendertexture = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
@@ -1109,7 +1216,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.gfx_texture = rl.loadTextureFromImage(img)
 	rl.unloadImage(img)
 
-	self.gfx_font_texture = rl.loadTexture("assets/font.png")
+	self.gfx_ui_texture = rl.loadTexture("assets/ui.png")
 	
 	self.gfx_shader = rl.loadShaderFromMemory(GPU_VERT_SRC, GPU_FRAG_SRC)
 	
@@ -1153,12 +1260,17 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 		projection=rl.cameraProjection.PERSPECTIVE
 	}
 
+	self:setBankPointers(
+		GPUBank.TEXBANK0,
+		GPUBank.OBJBANK0
+	)
+
 	self:resetGPU()
 end
 
 function GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
-	rl.unloadTexture(self.gfx_font_texture)
+	rl.unloadTexture(self.gfx_ui_texture)
 	rl.unloadTexture(self.gfx_texture)
 
 	for i = 0, < RenderTexture.COUNT do

@@ -23,7 +23,6 @@ local token_names: []string = {
 	"vec3",
 	"struct identifier",
 	"string",
-	"function pointer",
 	"struct",
 	"enum",
 	"identifier",

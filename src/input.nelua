@@ -47,6 +47,20 @@ global input.button_map: [input.Button.COUNT * input.PLAYER_COUNT]cint
 global input.is_shift_down: boolean
 global input.is_ctrl_down: boolean
 global input.is_alt_down: boolean
+global input.left_clicked: boolean
+global input.left_click_held: boolean
+global input.left_click_released: boolean
+global input.right_clicked: boolean
+global input.right_click_held: boolean
+global input.right_click_released: boolean
+global input.middle_clicked: boolean
+global input.middle_click_held: boolean
+global input.middle_click_released: boolean
+global input.mouse_x: cint
+global input.mouse_delta_x: cint
+global input.mouse_y: cint
+global input.mouse_delta_y: cint
+global input.mouse_wheel_y: int32
 
 function input.setDefaultButtonMap(): void
 	input.button_map[input.Button.UP]       = rl.keyboardKey.UP
@@ -65,10 +79,28 @@ function input.setDefaultButtonMap(): void
 	input.button_map[input.Button.START]    = rl.keyboardKey.ENTER
 end
 
-function input.refresh(): void
+function input.refresh(screen_x: int32, screen_y: int32, screen_w: int32, screen_h: int32): void
     input.is_shift_down = rl.isKeyDown(rl.keyboardKey.LEFT_SHIFT) or rl.isKeyDown(rl.keyboardKey.RIGHT_SHIFT)
     input.is_ctrl_down = rl.isKeyDown(rl.keyboardKey.LEFT_CONTROL) or rl.isKeyDown(rl.keyboardKey.RIGHT_CONTROL)
     input.is_alt_down = rl.isKeyDown(rl.keyboardKey.LEFT_ALT) or rl.isKeyDown(rl.keyboardKey.RIGHT_ALT)
+    input.left_clicked = rl.isMouseButtonPressed(0)
+    input.left_click_held = rl.isMouseButtonDown(0)
+    input.left_click_released = rl.isMouseButtonReleased(0)
+    input.right_clicked = rl.isMouseButtonPressed(1)
+    input.right_click_held = rl.isMouseButtonDown(1)
+    input.right_click_released = rl.isMouseButtonReleased(1)
+    input.middle_clicked = rl.isMouseButtonPressed(2)
+    input.middle_click_held = rl.isMouseButtonDown(2)
+    input.middle_click_released = rl.isMouseButtonReleased(2)
+
+    local scale: int32 = screen_w /// 480
+    local prev_mouse_x: int32 = input.mouse_x
+    local prev_mouse_y: int32 = input.mouse_y
+    input.mouse_x = (rl.getMouseX() - screen_x) /// scale
+    input.mouse_y = (rl.getMouseY() - screen_y) /// scale
+    input.mouse_delta_x = input.mouse_x - prev_mouse_x
+    input.mouse_delta_y = input.mouse_y - prev_mouse_y
+    input.mouse_wheel_y = (@int32)(rl.getMouseWheelMoveV().y)
 end
 
 function input.getButtonKeycode(btn: integer): cint
@@ -81,6 +113,30 @@ end
 
 function input.pressedRepeat(key: cint): boolean
     return rl.isKeyPressed(key) or rl.isKeyPressedRepeat(key)
+end
+
+function input.isMouseInRect(x: int32, y: int32, w: int32, h: int32): boolean
+    local max_x: int32 = (x + w) - 1
+    local max_y: int32 = (y + h) - 1
+    if (input.mouse_x < x) or (input.mouse_x > max_x) then return false end
+    if (input.mouse_y < y) or (input.mouse_y > max_y) then return false end
+    return true
+end
+
+function input.clickedRect(button: cint, allow_hold: boolean, x: int32, y: int32, w: int32, h: int32): boolean
+    if allow_hold then
+        if not rl.isMouseButtonDown(button) then return false end
+    else
+        if not rl.isMouseButtonPressed(button) then return false end
+    end
+
+    -- bounds check
+    local max_x: int32 = (x + w) - 1
+    local max_y: int32 = (y + h) - 1
+    if (input.mouse_x < x) or (input.mouse_x > max_x) then return false end
+    if (input.mouse_y < y) or (input.mouse_y > max_y) then return false end
+
+    return true
 end
 
 function input.hexEdit(byte_ptr: *[0]uint8, out_byte: *uint8, nibble_index: uinteger, handle_empty: boolean): boolean

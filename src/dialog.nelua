@@ -478,7 +478,8 @@ global function dialogImportTextureUpdate(sm: *StateMachine, vm: *EVM): void
                         return
                     end
 
-                    vm.gpu:loadTextureData(0, 0, 0, 0, 0, 1024, 1024)
+                    vm.gpu:loadTextureData(vm.gpu.current_texbank - GPUBank.TEXBANK0, 0, 0, 0, 0, 1024, 1024)
+                    vm.gpu.update_tex = true
 
                     rl.unloadImage(core.image_to_import)
 	                core.has_loaded_image = false
@@ -627,6 +628,7 @@ global function dialogLoadCartUpdate(sm: *StateMachine, vm: *EVM): void
                         core.current_cart_name = (@string)(rl.getFileName(file_path)):copy()
                         sm.queued_dialog = DialogID.NONE
                         core:log(LogEntryType.INFO, "cart loaded", true)
+                        vm.gpu.update_tex = true
                     else
                         core:log(LogEntryType.HOST_ERROR, vm.error, true)
                     end

@@ -2,6 +2,7 @@ GENERAL:
 - cleanup+refactor nasty code (looking at you, operatorTypeCheck())
 - implement safeguards on everything
 - code structure refactor
+- implement controller support (probably not for editors)
 
 COMPILER:
 - improve end-of-function return generation (return zero value if no explicit return is used)
@@ -16,20 +17,20 @@ COMPILER:
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
 VM:
+- fix incorrect vargv values when calling from function with args
 - complete audio system
-  - implement groove
+  - implement groove and bpm
   - implement command fx
 - implement missing api functions
-  - audio bpm+pan+volume getters and setters
   - math functions
   - collision functions
+  - mouse and keyboard input functions?
 - complete collision system
 - complete wrapi() and wrapf() negative ranges
 - implement debug opcodes
 - implement memory allocator and api for vm heap
 - implement cartridge data loading/saving api
-- implement triangle rendering limit
-- implement cycle limit (how to deal with incomplete calls?)
+- implement virtual CPU and GPU limits (degrade FPS at certain VM instruction/triangles rendered thresholds, error out at max)
 
 HOST:
 - complete all import dialogs

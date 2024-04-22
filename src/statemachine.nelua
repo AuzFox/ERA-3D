@@ -113,7 +113,16 @@ function StateMachine:update(): void
                 core.anim_beginning = core.facing_angle
                 core.anim_target = core.facing_angle + 90.0
                 self.state_id = util.wrapI(self.state_id + 1, StateID.CODE, StateID.TEXTURE + 1)
+            case StateID.RUN then
+                self.state_id = self.queued_state
             else
+                if self.state_id ~= StateID.BOOT then
+                    core.animation_type = MenuAnimation.STATE_SWITCH
+                    core.anim_time = 0.0
+                    core.anim_beginning = core.facing_angle
+                    local angle_difference: float32 = (@float32)(self.queued_state - self.state_id) * 90.0
+                    core.anim_target = core.facing_angle + angle_difference
+                end
                 self.state_id = self.queued_state
         end
         

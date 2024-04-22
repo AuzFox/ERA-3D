@@ -22,6 +22,13 @@ TODO
 
 TODO
 
+## Libraries Used
+- Raylib 5.0
+- Raylib.nelua
+- BlipKit
+- zip
+- fs.nelua
+
 ## License
 
 ERA-3D is licensed under the zlib license.
