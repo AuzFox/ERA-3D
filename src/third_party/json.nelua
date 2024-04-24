@@ -1,0 +1,332 @@
+--[[
+The json module.
+
+This module contains utilities to parse chunks JSON texts into
+Nelua types and vice-versa.
+
+TODO:
+* Handle allocation errors on `json.emit`.
+* Escape strings in `json.emit`.
+]]
+
+local string = require 'string'
+local strconv = require 'detail.strconv'
+local strchar = require 'detail.strchar'
+
+-- The JSON module.
+global json = @record{}
+
+-- Helper to check if `c` is a number digit (matches [A-Fa-f.+-]).
+local function isnumdigit(c: byte): boolean <inline>
+  return strchar.isxdigit(c) or -- hex digit
+         c == '+'_b or c == '-'_b or -- sign
+         c == '.'_b -- fractional
+end
+
+-- Helper to convert an integer to its corresponding UTF-8 byte sequence.
+local function utf8esc(x: uint32): ([8]byte, int32)
+  local buf: [8]byte <noinit>
+  local n: int32 = 1
+  check(x <= 0x7FFFFFFF_u)
+  if x < 0x80 then -- ASCII?
+    buf[7] = (@byte)(x)
+  else -- need continuation bytes
+    local mfb: usize = 0x3f -- maximum that fits in first byte
+    repeat -- add continuation bytes
+      buf[8 - n] = (@byte)(0x80 | (x & 0x3f))
+      n = n + 1
+      x = x >> 6 -- removed added bits
+      mfb = mfb >> 1 -- now there is one less bit available in first byte
+    until x <= mfb -- still needs continuation byte?
+    buf[8 - n] = (@byte)((~mfb << 1) | x) -- add first byte
+  end
+  memory.move(&buf[0], &buf[8-n], n)
+  memory.zero(&buf[n], 8-n)
+  return buf, n
+end
+
+-- Helper to remove escape sequences from a JSON string.
+local function unescape(s: string): (string, string)
+  if s.size == 0 then return (@string){}, (@string){} end
+  if not memory.scan(s.data, '\\'_b, s.size) then return string.copy(s), (@string){} end
+  local ns: string = string.create(s.size)
+  local i: usize, j: usize = 0, 0
+  while i < s.size do
+    local c: byte = s.data[i]
+    i = i + 1
+    if likely(c ~= '\\'_b) then
+      ns.data[j] = c
+    else
+      c = s.data[i]
+      i = i + 1
+      switch c do
+        case '"'_b, '\\'_b, '/'_b then ns.data[j] = c
+        case 'b'_b then ns.data[j] = '\b'_b
+        case 't'_b then ns.data[j] = '\t'_b
+        case 'n'_b then ns.data[j] = '\n'_b
+        case 'f'_b then ns.data[j] = '\f'_b
+        case 'r'_b then ns.data[j] = '\r'_b
+        case 'u'_b then
+          for k: usize=i,<i+4 do
+            if k >= s.size or not strchar.isxdigit(s.data[k]) then
+              ns:destroy()
+              return ns, 'expected 4 hexadecimal digits in utf8 sequence'
+            end
+          end
+          local ok: boolean, hex: integer = strconv.str2int((@string){data=&s.data[i],size=4}, 16)
+          if not ok then return ns, 'malformed hexadecimal integer in utf8 sequence' end
+          local utf8buf: [8]byte, len: int32 = utf8esc(hex)
+          memory.copy(&ns.data[j], &utf8buf[0], len)
+          i = i + 4
+          j = j + (@usize)(len) - 1
+      else
+        ns:destroy()
+        return ns, 'unexpected string escape sequence'
+      end
+    end
+    j = j + 1
+  end
+  ns.data[j] = 0
+  ns.size = j
+  return ns, (@string){}
+end
+
+--[[
+Parses JSON text from `chunk` into type `T`.
+Returns value of type `T`, plus an error message in case of errors and number of characters parsed.
+
+This parser creates a specialized JSON parser at compile-time,
+it's like a JSON parser compiler.
+
+This parser follow these rules:
+* `T` is used as a schema and must always be a `record`, `hashmap`, `vector,` or `sequence` type.
+* The schema `T` cannot be incomplete or have missing fields, otherwise a parse error will occur.
+* The schema `T` types cannot mismatch the JSON chunk, otherwise parse error will occur.
+* The schema `T` must always be a `record`, `hashmap`, `vector,` or `sequence` type.
+* Missing fields in the JSON chunk will be initialized to zeros.
+* Fields with `null` value in the JSON chunk will be initialized to zeros.
+* Parsed strings and containers allocates new memory.
+* Follows JSON 4 spec (JSON 5 is not supported).
+
+The following types are handled:
+* `vector` and `sequence`, parsed from JSON arrays.
+* `hashmap` where `K` is a `string`, parsed from JSON objects.
+* `record` types, parsed from JSON objects.
+* `string`, parsed from JSON strings.
+* `boolean`, parsed from JSON `true` or `false`.
+* All primitive integer and float types are parsed from JSON numbers.
+* Records may be nested.
+]]
+function json.parse(chunk: string, T: type): (auto, string, usize)
+  local res: T
+  local i: usize = 0
+  local s: *[0]byte, slen: usize = chunk.data, chunk.size
+  local tmpinit: usize
+  local c: byte
+  local err: string
+  local tmpstr: string, tmpbool: boolean
+  -- macros utils
+  ## local function skip_whitespaces()
+    while i < slen and strchar.isspace(s[i]) do i = i + 1 end
+  ## end
+  ## local function peek_char()
+    c = i < slen and s[i] or 0
+  ## end
+  ## local function skip_comma_peek_char(ec)
+    ## peek_char()
+    if c ~= ','_b then break end
+    i = i + 1
+    ## skip_whitespaces() peek_char()
+  ## end
+  ## local function expect_token(ec, noskip)
+    if i >= slen or s[i] ~= #[string.byte(ec)]# then
+      return res, #['expected token `'..ec..'`, perhaps JSON schema has incompatible fields']#, i
+    end
+    i = i + 1
+    ## if not noskip then skip_whitespaces() end
+  ## end
+  ## local function expect_string()
+    ## expect_token('"', true)
+    tmpinit = i
+    while i < slen and (s[i] ~= '"'_b or s[i-1] == '\\'_b) do i = i + 1 end
+    tmpstr = string{data=&s[tmpinit], size=i-tmpinit}
+    ## expect_token'"'
+  ## end
+  ## local function expect_number()
+    ## peek_char()
+    if c == '"'_b then
+      ## expect_string()
+    else
+      tmpinit = i
+      while i < slen and isnumdigit(s[i]) do i = i + 1 end
+      tmpstr = string{data=&s[tmpinit], size=i-tmpinit}
+    end
+    ## skip_whitespaces()
+  ## end
+  ## local function expect_boolean()
+    tmpinit = i
+    while i < slen and strchar.islower(s[i]) do i = i + 1 end
+    tmpstr = string{data=&s[tmpinit], size=i-tmpinit}
+    ## skip_whitespaces()
+  ## end
+  ## local function expect_value(vtype)
+    local v: #[vtype]#;
+    if i+3 < slen and s[i] == 'n'_b and s[i+1] == 'u'_b and s[i+2] == 'l'_b and s[i+3] == 'l'_b then -- null?
+      i = i + 4
+    else
+      ## if vtype.is_pointer then
+        local pv: #[vtype]#
+        do
+          ## expect_value(vtype.subtype)
+          pv = new(v)
+        end
+        v = pv
+      ## elseif vtype.is_float then
+        ## expect_number()
+        local ok: boolean
+        ok, v = strconv.str2num(tmpstr)
+        if not ok then
+          err = 'malformed JSON number'
+        end
+      ## elseif vtype.is_integral then
+        ## expect_number()
+        local ok: boolean
+        ok, v = strconv.str2int(tmpstr, 10)
+        if not ok then
+          err = 'malformed JSON integer'
+        end
+      ## elseif vtype.is_boolean then
+        ## expect_boolean()
+        v = tmpstr == 'true'
+        if not v and tmpstr ~= 'false' then
+          err = 'malformed JSON boolean'
+        end
+      ## elseif vtype.is_string then
+        ## expect_string()
+        local err: string
+        v, err = unescape(tmpstr)
+      ## elseif vtype.is_record then
+        local err: string, advlen: usize
+        v, err, advlen = json.parse(string{data=&s[i],size=slen-i}, #[vtype]#)
+        i = i + advlen
+      ## else static_error("cannot parse element of type '%s'", vtype) end
+    end
+  ## end
+  -- begin parsing
+  ## skip_whitespaces() -- skip leading whitespaces
+  ## if res.type.is_vector or res.type.is_sequence then -- parse array into vector/sequence
+    ## expect_token'[' peek_char()
+    while c ~= ']'_byte do
+      ## expect_value(res.type.subtype)
+      res:push(v)
+      if err.size > 0 then return res, err, i end
+      ## skip_comma_peek_char()
+    end
+    ## expect_token']'
+  ## elseif res.type.is_hashmap then -- parse object into hashmap
+    local fieldname: string <noinit>
+    ## expect_token'{' peek_char()
+    while c ~= '}'_byte do
+      ## expect_string()
+      fieldname = tmpstr
+      ## expect_token':' expect_value(res.type.V)
+      res[string.copy(fieldname)] = v
+      if err.size > 0 then return res, err, i end
+      ## skip_comma_peek_char()
+    end
+    ## expect_token'}'
+  ## elseif res.type.is_record then -- parse object into a record
+    local fieldname: string <noinit>
+    ## expect_token'{' peek_char()
+    while c ~= '}'_byte do
+      ## expect_string()
+      fieldname = tmpstr
+      ## expect_token':'
+      ## for _,field in ipairs(res.type.fields) do
+        if fieldname == #[field.name]# then
+          ## expect_value(field.type)
+          res.#|field.name|# = v
+          if err.size > 0 then return res, err, i end
+          goto nextfield
+        end
+      ## end
+      return res, "JSON has invalid or incompatible fields with its schema", i
+::nextfield::
+      ## skip_comma_peek_char()
+    end
+    ## expect_token'}'
+  ## else static_error("cannot parse JSON into type '%s'", res.type) end
+  return res, (@string){}, i
+end
+
+--[[
+Emit JSON text from `obj` returning a string.
+If argument `sb` is present,
+then the JSON is is actually emitted into to the string builder and returns nothing.
+
+The `obj` type should follow same rules as `json.parse`.
+]]
+function json.emit(obj: auto, sb: facultative(*stringbuilder))
+  ## local returnstr = sb.type.is_niltype
+  ## if returnstr then
+  local sbo: stringbuilder
+  local sb: *stringbuilder = &sbo
+  ## end
+  -- consider pointers
+  ## local derefobjtype = obj.type:implicit_deref_type()
+  ## if obj.type.is_pointer then
+  if obj == nilptr then
+    sb:write('null')
+    goto finish
+  end
+  ## end
+  -- emit
+  ## if obj.type.is_scalar or obj.type.is_boolean then
+    sb:write(obj)
+  ## elseif obj.type.is_pointer and (obj.type.subtype.is_scalar or obj.type.subtype.is_boolean) then
+    sb:write($obj)
+  ## elseif obj.type.is_stringy then
+    sb:write('"', obj, '"')
+  ## elseif obj.type.is_pointer and obj.type.subtype.is_string then
+    sb:write('"', $obj, '"')
+  ## elseif obj.type.is_niltype then
+    sb:write('null')
+  ## elseif derefobjtype.is_vector or derefobjtype.is_sequence or derefobjtype.is_array or derefobjtype.is_span then
+    -- emit contiguous container as an array
+    local T: type = #[derefobjtype.subtype]#
+    sb:write'['
+    for i: isize, v: T in ipairs(obj) do
+      json.emit(v, sb)
+      sb:write','
+    end
+    if #obj > 0 then sb:rollback(1) end -- remove extra comma
+    sb:write']'
+  ## elseif derefobjtype.is_hashmap then -- emit hashmap as an object
+    local K: type, V: type = #[derefobjtype.K]#, #[derefobjtype.V]#
+    sb:write'{'
+    for k: K, v: V in pairs(obj) do
+      json.emit(k, sb)
+      sb:write':'
+      json.emit(v, sb)
+      sb:write','
+    end
+    if #obj > 0 then sb:rollback(1) end -- remove extra comma
+    sb:write'}'
+  ## elseif derefobjtype.is_record then -- emit record as an object
+    sb:write'{'
+    ## for i,field in ipairs(derefobjtype.fields) do
+      sb:write('"', #[field.name]#, '":')
+      json.emit(obj.#|field.name|#, sb)
+      ## if i<#derefobjtype.fields then
+        sb:write','
+      ## end
+    ## end
+    sb:write'}'
+  ## else static_error("cannot emit JSON from type '%s'", objtype) end
+::finish::
+  ## if returnstr then
+  return sb:promote()
+  ## end
+end
+
+return json

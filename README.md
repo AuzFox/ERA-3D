@@ -23,11 +23,12 @@ TODO
 TODO
 
 ## Libraries Used
-- Raylib 5.0
+- raylib 5.0
 - Raylib.nelua
 - BlipKit
 - zip
-- fs.nelua
+- fs
+- json
 
 ## License
 

@@ -174,13 +174,6 @@ local collision_functions: [4][4]CollisionFunction = {
 	swapCart()?
 ]]
 
--- DEBUG API FUNCTIONS (TODO: remove)
-
-local function apiHalt(vm: *EVM): boolean
-	vm.error = "PROGRAM HALTED -"
-	return false
-end
-
 -- API FUNCTIONS:
 
 -- getMem8() helper function for apiPrint2D()
@@ -216,7 +209,7 @@ local function vargv(vm: *EVM, offset: uint32): uint32
 	vm.cf.vargc = vm.cf.vargc - offset
 	
 	-- get adress vargp currently points to
-	local addr: uint32 = MEMORY_ARGS_START_ADDR + ((vm.ap + vm.cf.vargp) * 4)
+	local addr: uint32 = MEMORY_ARGS_START_ADDR + (vm.cf.vargp * 4)
 
 	-- offset vararg pointer
 	vm.cf.vargp = vm.cf.vargp + offset
@@ -518,11 +511,8 @@ local function apiVargv(vm: *EVM): boolean
 
 	frame.vargc = frame.vargc - offset
 	
-	-- get ap of the function we called from
-	local ap: uinteger = (vm.asp - vm.cf.argc) - frame.argc
-	
 	-- return adress vargp currently points to
-	vm:pushU(MEMORY_ARGS_START_ADDR + ((ap + frame.vargp) * 4))
+	vm:pushU(MEMORY_ARGS_START_ADDR + (frame.vargp * 4))
 
 	-- offset vararg pointer
 	frame.vargp = frame.vargp + offset
@@ -3519,11 +3509,6 @@ function EVM:registerAPI(): void
 	local matrix_struct: *Struct = self.builtin_struct_ids["matrix"].type_info.structref
 
 	local api_ids: []Identifier = {
-		{
-			name="halt",
-			type_info={EVMType.VOID},
-			func=apiHalt
-		},
 		{
 			name="vargc",
 			type_info={EVMType.INT},

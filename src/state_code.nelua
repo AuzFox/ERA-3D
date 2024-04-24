@@ -1,7 +1,5 @@
 require("statemachine")
 
--- TODO: consider reimplementing editor using piece table/tree
-
 -- syntax highlighting variables
 local sh_line: sequence(uint8)
 local sh_line_index: uint32
@@ -658,35 +656,6 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
             c = rl.getCharPressed()
         end
     end
-
-    --[[
-    if rl.isKeyPressed(rl.keyboardKey.P) then
-        io.printf('HEAP:    0x%08X - 0x%08X\n', MEMORY_HEAP_START_ADDR, MEMORY_HEAP_MAX_ADDR)
-        io.printf('TEXMEM:  0x%08X - 0x%08X\n', MEMORY_TEXMEM_START_ADDR, MEMORY_TEXMEM_MAX_ADDR)
-        io.printf('OBJMEM:  0x%08X - 0x%08X\n', MEMORY_OBJMEM_START_ADDR, MEMORY_OBJMEM_MAX_ADDR)
-        io.printf('AOBMEM:  0x%08X - 0x%08X\n', MEMORY_AOBMEM_START_ADDR, MEMORY_AOBMEM_MAX_ADDR)
-        io.printf('SYSMEM:  0x%08X - 0x%08X\n', MEMORY_SYSMEM_START_ADDR, MEMORY_SYSMEM_MAX_ADDR)
-        io.printf('WAVMEM:  0x%08X - 0x%08X\n', MEMORY_WAVMEM_START_ADDR, MEMORY_WAVMEM_MAX_ADDR)
-        io.printf('SEQMEM:  0x%08X - 0x%08X\n', MEMORY_SEQMEM_START_ADDR, MEMORY_SEQMEM_MAX_ADDR)
-        io.printf('GLOBALS: 0x%08X - 0x%08X\n', MEMORY_GLOBALS_START_ADDR, MEMORY_GLOBALS_MAX_ADDR)
-        io.printf('LOCALS:  0x%08X - 0x%08X\n', MEMORY_LOCALS_START_ADDR, MEMORY_LOCALS_MAX_ADDR)
-        io.printf('ARGS:    0x%08X - 0x%08X\n', MEMORY_ARGS_START_ADDR, MEMORY_ARGS_MAX_ADDR)
-        io.printf('TEXBANK: 0x%08X - 0x%08X\n', MEMORY_TEXBANK_START_ADDR, MEMORY_TEXBANK_MAX_ADDR)
-        io.printf('OBJBANK: 0x%08X - 0x%08X\n', MEMORY_OBJBANK_START_ADDR, MEMORY_OBJBANK_MAX_ADDR)
-        io.printf('OMPBANK: 0x%08X - 0x%08X\n', MEMORY_OMPBANK_START_ADDR, MEMORY_OMPBANK_MAX_ADDR)
-        io.printf('WMPBANK: 0x%08X - 0x%08X\n', MEMORY_WMPBANK_START_ADDR, MEMORY_WMPBANK_MAX_ADDR)
-        io.printf('WAVBANK: 0x%08X - 0x%08X\n', MEMORY_WAVBANK_START_ADDR, MEMORY_WAVBANK_MAX_ADDR)
-        io.printf('SEQBANK: 0x%08X - 0x%08X\n', MEMORY_SEQBANK_START_ADDR, MEMORY_SEQBANK_MAX_ADDR)
-        io.printf('ROM:     0x%08X - 0x%08X\n', MEMORY_ROM_START_ADDR, MEMORY_ROM_MAX_ADDR)
-        io.printf('MEMCARD: 0x%08X - 0x%08X\n', MEMORY_MEMCARD_START_ADDR, MEMORY_MEMCARD_MAX_ADDR)
-    elseif rl.isKeyPressed(rl.keyboardKey.B) then
-        if vm.bytecode_len > 0 then
-            vm:dumpBytecode()
-        else
-            print("ERROR: no bytecode to dump")
-        end
-    end
-    ]]
 end
 
 global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
@@ -694,34 +663,6 @@ global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:camera2D(-1)
 
     drawCode(vm)
-
-	--[[
-    -- status bar
-    if core.popup_state == PopupState.HIDDEN then
-        local char_count: int32
-        local int_x: int32 = 36
-
-        vm.gpu:drawRect2D(0, GPU_VSCREEN_H - 9, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
-        vm.gpu:print2D(6, GPU_VSCREEN_H - 9, GPU_WHITE, "LINE")
-        vm.gpu:printInt2D(36, GPU_VSCREEN_H - 9, GPU_WHITE, core.line_index, &char_count)
-        int_x = int_x + char_count * 6
-        vm.gpu:print2D(int_x, GPU_VSCREEN_H - 9, GPU_WHITE, "/")
-        vm.gpu:printInt2D(int_x + 6, GPU_VSCREEN_H - 9, GPU_WHITE, #core.src_lines, nilptr)
-    end
-	]]--
-
-    --[[
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (25 * 6) /// 2, GPU_VSCREEN_HALF_H - 9, GPU_WHITE, "WELCOME TO ERA-3D v0.0.0!")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H +  9, GPU_GRAY, "[CTRL+LEFT/RIGHT]: NAVIGATE MENUS")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 18, GPU_GRAY, "[CTRL+R]         : RUN CART")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 27, GPU_GRAY, "[CTRL+O]         : OPEN CART")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 36, GPU_GRAY, "[CTRL+S]         : SAVE CART")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 45, GPU_GRAY, "[CTRL+SHIFT+S]   : SAVE CART AS...")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 54, GPU_GRAY, "[`]              : OPEN LOG")
-
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 72, GPU_WHITE, "// TODO: CODE EDITOR STUFF HERE...")
-    vm.gpu:print2D(GPU_VSCREEN_HALF_W - (33 * 6) /// 2, GPU_VSCREEN_HALF_H + 81, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SCRIPT")
-    ]]
 end
 
 global function stateCodeCleanup(sm: *StateMachine, vm: *EVM): void

@@ -2,11 +2,13 @@ require("sequence")
 require("hashmap")
 require("span")
 require("stringbuilder")
+require("filestream")
 
 require("rayeasings")
 require("blipkit")
 require("raylib")
 require("rlgl")
+require("json")
 
 -- --------------------------------
 -- CONSTANTS
@@ -609,7 +611,7 @@ global CallFrame = @record {
     lbp: uinteger,
     argc: uint16,
     vargc: uint16, -- remaining vararg word count for function
-    vargp: uint16, -- vararg pointer
+    vargp: uint16, -- vararg pointer (argstack index to current vararg)
     vargf: boolean, -- vararg flag, true if the function for this frame is a varargs function
 }
 
@@ -928,6 +930,14 @@ StateMachine = @record {
 	prev_state: integer
 }
 
+-- config file data record
+global ConfigInfo = @record {
+	log_level: cint,
+	enable_vsync: boolean,
+	enable_highdpi: boolean,
+	draw_fps: boolean
+}
+
 -- global data record
 global CoreData = @record {
 	--gpu: GPU,
@@ -958,6 +968,8 @@ global CoreData = @record {
 	start_line: int32, -- line index to start drawing from
 	start_char: int32, -- char index to start drawing from
 
+	config: ConfigInfo,
+
 	user_directory: string,
 	data_directory: string,
 	carts_directory: string,
@@ -965,6 +977,7 @@ global CoreData = @record {
 	current_cart_path: string,
 	current_cart_name: string,
 	current_browser_path: string,
+	config_file_path: string,
 	popup_text: string,
 	popup_state: integer,
 	popup_timer: float32,
@@ -1004,6 +1017,47 @@ global CoreData = @record {
 --function CoreData:__close(): void
 --	-- do cleanup here...
 --end
+
+function CoreData:setDefaultConfig(): void
+	self.config.log_level = rl.traceLogLevel.NONE
+	self.config.enable_vsync = true
+	self.config.enable_highdpi = true
+	self.config.draw_fps = false
+end
+
+function CoreData:loadConfigFile(): void
+	local fs, err, errcode = filestream.open(self.config_file_path, "r")
+	if not fs:isopen() then
+		self:setDefaultConfig()
+		return
+	end
+	
+	local text: string
+	local errmsg: string
+	local errcode: integer
+	text, errmsg, errcode = fs:read("a")
+
+	self.config = json.parse(text, @ConfigInfo)
+
+	fs:close()
+	
+	-- validate
+	if self.config.log_level < 0 or self.config.log_level > rl.traceLogLevel.NONE then
+		self.config.log_level = rl.traceLogLevel.NONE
+	end
+end
+
+function CoreData:saveConfigFile(): void
+	local fs, err, errcode = filestream.open(self.config_file_path, "w")
+	if not fs:isopen() then
+		return
+	end
+	
+	local text: string = json.emit(self.config)
+	fs:write(text)
+
+	fs:close()
+end
 
 -- display popup message
 function CoreData:popup(message_type: uint8, text: string): void

@@ -17,7 +17,6 @@ COMPILER:
 - implement string reuse (return a pointer to an existing string if a duplicate string literal is detected)
 
 VM:
-- fix incorrect vargv values when calling from function with args
 - complete audio system
   - implement groove and bpm
   - implement command fx
@@ -34,7 +33,6 @@ VM:
 
 HOST:
 - complete all import dialogs
-- implement config file
 - implement debugger
 - implement boot animation
 - implement editors

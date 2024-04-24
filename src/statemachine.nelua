@@ -116,7 +116,7 @@ function StateMachine:update(): void
             case StateID.RUN then
                 self.state_id = self.queued_state
             else
-                if self.state_id ~= StateID.BOOT then
+                if self.state_id ~= StateID.BOOT and self.state_id ~= StateID.RUN then
                     core.animation_type = MenuAnimation.STATE_SWITCH
                     core.anim_time = 0.0
                     core.anim_beginning = core.facing_angle

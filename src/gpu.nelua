@@ -1180,8 +1180,16 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.objbank_ptr = objbank_ptr
 	self.ompbank_ptr = ompbank_ptr
 
-	rl.setConfigFlags(rl.configFlags.VSYNC_HINT | rl.configFlags.WINDOW_RESIZABLE | rl.configFlags.WINDOW_HIGHDPI)
-	rl.setTraceLogLevel(rl.traceLogLevel.ERROR) -- only log errors
+	local flags: cint = 0
+	if core.config.enable_vsync then
+		flags = flags | rl.configFlags.VSYNC_HINT
+	end
+	if core.config.enable_highdpi then
+		flags = flags | rl.configFlags.WINDOW_HIGHDPI
+	end
+
+	rl.setConfigFlags(flags | rl.configFlags.WINDOW_RESIZABLE)
+	rl.setTraceLogLevel(core.config.log_level)
 
 	rl.initWindow(GPU_VSCREEN_W * 2, GPU_VSCREEN_H * 2, "ERA-3D")
 	rl.setWindowMinSize(GPU_VSCREEN_W, GPU_VSCREEN_H)

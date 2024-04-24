@@ -110,8 +110,24 @@ local function setupDirectories(): void
 	end
 end
 
+local function handleConfigFile(): void
+	## if ccinfo.is_windows then
+		core.config_file_path = core.data_directory .. "\\config.json"
+	## elseif ccinfo.is_linux then
+		core.config_file_path = core.data_directory .. "/config.json"
+	## end
+
+	if fs.isfile(core.config_file_path) then
+		core:loadConfigFile()
+	else
+		core:setDefaultConfig()
+		core:saveConfigFile()
+	end
+end
+
 local function init(): void
 	setupDirectories()
+	handleConfigFile()
 
 	vm = newVM()
 	input.setDefaultButtonMap()
@@ -589,6 +605,20 @@ local function run(): void
 			if core.popup_state ~= PopupState.HIDDEN then
 				vm.gpu:drawRect2D(0, GPU_VSCREEN_H - core.popup_offset, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
 				vm.gpu:print2D(6, GPU_VSCREEN_H - core.popup_offset, core.popup_color, core.popup_text)
+			end
+
+			if core.config.draw_fps then
+				local color: uint32 = GPU_GREEN
+				local fps: cint = rl.getFPS()
+
+				if fps <= 10 then
+					color = GPU_RED
+				elseif fps < 20 then
+					color = GPU_YELLOW
+				end
+				
+				vm.gpu:drawRect2D(0, 0, 12, 9, GPU_BLACK)
+				vm.gpu:printInt2D(0, 0, color, (@int32)(fps), nilptr)
 			end
 		vm.gpu:endRenderTexture()
 
