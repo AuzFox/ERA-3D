@@ -413,6 +413,80 @@ local function nextToken(vm: *EVM): void
 	end
 end
 
+local function isInsideBracketPair(): boolean
+	if core.char_index <= 1 or core.char_index >= #core.current_line then
+		return false
+	end
+
+	local c0: uint8 = core.current_line[core.char_index - 1]
+	local c1: uint8 = core.current_line[core.char_index]
+	return (c0 == '{'_u8 and c1 == '}'_u8) or
+		(c0 == '('_u8 and c1 == ')'_u8) or
+		(c0 == '['_u8 and c1 == ']'_u8)
+end
+
+local function wouldDoubleCloseBrackets(char_to_type: uint8): boolean
+	if core.char_index <= 1 or core.char_index >= #core.current_line then
+		return false
+	end
+
+	local closing_char: uint8 = core.current_line[core.char_index]
+	if closing_char ~= char_to_type then
+		return false
+	end
+
+	-- scan line up until char index for unclosed brackets of matching type
+	local opening_char: uint8
+	switch char_to_type do
+		case '}'_u8 then
+			opening_char = '{'_u8
+		case ')'_u8 then
+			opening_char = '('_u8
+		case ']'_u8 then
+			opening_char = '['_u8
+	end
+
+	local brace_level: uint32 = 0
+	for i = 1, < core.char_index do
+		local c: uint8 = core.current_line[i]
+
+		if c == opening_char then
+			brace_level = brace_level + 1
+		elseif c == closing_char and brace_level > 0 then
+			brace_level = brace_level - 1
+		end
+	end
+
+	return brace_level > 0
+end
+
+local function getIndentLevel(): (uint32, uint32)
+	local indent_level: uint32 = 0
+	local brace_level: uint32 = 0
+	local reached_first_char: boolean = false
+
+	for i = 1, <= #core.current_line do
+		local c: uint8 = core.current_line[i]
+
+		if c == ' '_u8 then
+			if not reached_first_char then
+				indent_level = indent_level + 1
+			end
+		else
+			reached_first_char = true
+		end
+	end
+
+	if core.char_index > 1 then
+		local c: uint8 = core.current_line[core.char_index - 1]
+		if c == '{'_u8 or c == '('_u8 or c == '['_u8 then
+			brace_level = 2
+		end
+	end
+
+	return indent_level, brace_level
+end
+
 local function drawCode(vm: *EVM): void
     -- scan src_lines for yet-unclosed multiline comments
     sh_mlcomment_level = 0
@@ -455,7 +529,8 @@ local function drawCode(vm: *EVM): void
 	local cursor_y: int32 = 9 + ((core.line_index - core.start_line) * 9)
 	vm.gpu:drawRect2D(line_number_spacing - 1, cursor_y, GPU_VSCREEN_W, 9, GPU_GRAY & 0xFFFFFFC0)
     vm.gpu:drawRect2D(line_number_spacing + horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
-    
+
+	local encountered_char: boolean = false
 	while true do
         -- get next token
         nextToken(vm)
@@ -512,10 +587,24 @@ local function drawCode(vm: *EVM): void
 				draw_char_index = 1
 				char_x = line_number_spacing + horizontal_offset
 				line_y = line_y + 9
+				encountered_char = false
 			else
 				local c: uint8 = draw_line[draw_char_index]
+				if c ~= ' '_u8 then
+					encountered_char = true
+				end
+
 				if char_x >= line_number_spacing then
-					vm.gpu:drawChar2D(c, &char_x, line_y, ray_col)
+					if not encountered_char and ((draw_char_index - 1) % 2 == 0) and c == ' '_u8 then
+						-- TODO: find a way to highlight the rightmost indent guide,
+						-- only line index matters
+						-- getting the indent level of the line will probably work?
+
+						vm.gpu:drawRect2D(char_x, line_y, 1, 9, 0xC3C3C3C0)
+						char_x = char_x + 6
+					else
+						vm.gpu:drawChar2D(c, &char_x, line_y, ray_col)
+					end
 				else
 					char_x = char_x + 6
 				end
@@ -621,26 +710,80 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
             end
         end
     elseif input.pressedRepeat(rl.keyboardKey.ENTER) then
-        -- split current line at cursor
-        core:insertLine(core.line_index + 1)
-        local new_line: sequence(uint8) = core.src_lines[core.line_index + 1]
-        new_line:pop() -- remove terminator
+		local indent_level: uint32
+		local brace_level: uint32
+		indent_level, brace_level = getIndentLevel()
 
-        while core.char_index < #core.current_line do
-            local c: uint8 = core.current_line:remove(core.char_index)
-            new_line:push(c)
-        end
-        new_line:push('\0'_u8)
+		if isInsideBracketPair() then
+			-- split current line at cursor
+			core:insertLine(core.line_index + 1)
+			core:insertLine(core.line_index + 1)
+			local new_line_0: sequence(uint8) = core.src_lines[core.line_index + 1]
+			local new_line_1: sequence(uint8) = core.src_lines[core.line_index + 2]
+			new_line_0:pop() -- remove terminator
+			new_line_1:pop() -- remove terminator
 
-        core:changeCodeLine(core.line_index + 1)
-        core:changeCharacterIndex(1)
+			for i = 0, < indent_level + brace_level do
+				new_line_0:push(' '_u8)
+			end
+			new_line_0:push('\0'_u8)
+
+			for i = 0, < indent_level do
+				new_line_1:push(' '_u8)
+			end
+	
+			while core.char_index < #core.current_line do
+				local c: uint8 = core.current_line:remove(core.char_index)
+				new_line_1:push(c)
+			end
+			new_line_1:push('\0'_u8)
+	
+			core:changeCodeLine(core.line_index + 1)
+			core:changeCharacterIndex(#core.current_line)
+		else
+			-- split current line at cursor
+			core:insertLine(core.line_index + 1)
+			local new_line: sequence(uint8) = core.src_lines[core.line_index + 1]
+			new_line:pop() -- remove terminator
+
+			for i = 0, < indent_level + brace_level do
+				new_line:push(' '_u8)
+			end
+	
+			while core.char_index < #core.current_line do
+				local c: uint8 = core.current_line:remove(core.char_index)
+				new_line:push(c)
+			end
+			new_line:push('\0'_u8)
+	
+			core:changeCodeLine(core.line_index + 1)
+			core:changeCharacterIndex(1 + indent_level + brace_level)
+		end
     elseif input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
-        core:deleteChar(false)
+		if isInsideBracketPair() then
+        	core:deleteChar(true)
+        	core:deleteChar(false)
+		else
+        	core:deleteChar(false)
+		end
     elseif input.pressedRepeat(rl.keyboardKey.DELETE) then
         core:deleteChar(true)
     elseif input.pressedRepeat(rl.keyboardKey.TAB) then
-        core:insertChar(' '_u8)
-        core:insertChar(' '_u8)
+		if input.is_shift_down then
+			-- deindent
+			local indent_level: uint32
+			local dummy: uint32
+			indent_level, dummy = getIndentLevel()
+
+			if indent_level >= 2 then
+				core.current_line:remove(1)
+				core.current_line:remove(1)
+				core:changeCharacterIndex(math.max(core.char_index - 2, 1))
+			end
+		else
+			core:insertChar(' '_u8)
+			core:insertChar(' '_u8)
+		end
     elseif input.pressedRepeat(rl.keyboardKey.PAGE_UP) then
         core:changeCodeLine(core.line_index - 37)
     elseif input.pressedRepeat(rl.keyboardKey.PAGE_DOWN) then
@@ -652,7 +795,29 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
     else
         local c: cint = rl.getCharPressed()
         while c ~= 0 do
-            core:insertChar(c)
+			switch c do
+				case '('_u8 then
+					core:insertChar('('_u8)
+					core:insertChar(')'_u8)
+					core:changeCharacterIndex(core.char_index - 1)
+				case '{'_u8 then
+					core:insertChar('{'_u8)
+					core:insertChar('}'_u8)
+					core:changeCharacterIndex(core.char_index - 1)
+				case '['_u8 then
+					core:insertChar('['_u8)
+					core:insertChar(']'_u8)
+					core:changeCharacterIndex(core.char_index - 1)
+				case '}'_u8, ')'_u8, ']'_u8 then
+					if wouldDoubleCloseBrackets(c) then
+						core:changeCharacterIndex(core.char_index + 1)
+					else
+						core:insertChar(c)
+					end
+				else
+					core:insertChar(c)
+			end
+
             c = rl.getCharPressed()
         end
     end

@@ -1,0 +1,374 @@
+require("string")
+require("hashmap")
+
+global docs = @record {}
+
+global docs.doc_strings: hashmap(string, string)
+
+docs.doc_strings["vec2Zero"] =
+[[
+  vec2 vec2Zero()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {0.0, 0.0}
+]]
+docs.doc_strings["vec3Zero"] =
+[[
+  vec3 vec3Zero()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {0.0, 0.0, 0.0}
+]]
+docs.doc_strings["vargc"] =
+[[
+  int vargc()
+  
+  DESCRIPTION:
+    returns the remaining number of vararg bytes for a vararg function.
+ 
+    must only be called from a vararg function.
+]]
+docs.doc_strings["vargv"] =
+[[
+  void* vargv(int offset)
+  
+  ARGUMENTS:
+    int offset: the number of bytes to advance the vararg pointer
+  DESCRIPTION:
+    returns a pointer to the current vararg argument and advances the
+    vararg pointer by $offset bytes.
+ 
+    must only be called from a vararg function.
+]]
+docs.doc_strings["pressed"] =
+[[
+  int pressed(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player has pressed the given button this frame.
+    otherwise, returns 0.
+]]
+docs.doc_strings["released"] =
+[[
+  int released(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player has released the given button this frame.
+    otherwise, returns 0.
+]]
+docs.doc_strings["held"] =
+[[
+  int held(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player is holding the given button.
+    otherwise, returns 0.
+]]
+docs.doc_strings["mini"] =
+[[
+  int mini(int a, int b)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+  DESCRIPTION:
+    returns the lower of the two given integers.
+]]
+docs.doc_strings["maxi"] =
+[[
+  int maxi(int a, int b)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+  DESCRIPTION:
+    returns the higher of the two given integers.
+]]
+docs.doc_strings["midi"] =
+[[
+  int midi(int a, int b, int c)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+    int c: the third value to check
+  DESCRIPTION:
+    returns the middle of the three given integers.
+]]
+docs.doc_strings["wrapi"] =
+[[
+  int wrapi(int n, int min, int max)
+  
+  ARGUMENTS:
+    int n  : the value to wrap
+    int min: the minimum range value
+    int max: the maximum range value (exclusive)
+  DESCRIPTION:
+    returns an integer value within the range [min, max).
+    if n is < min or >= max, it wraps around to the other end of the range.
+]]
+docs.doc_strings["minf"] =
+[[
+  float minf(float a, float b)
+  
+  ARGUMENTS:
+    float a: the first value to check
+    float b: the second value to check
+  DESCRIPTION:
+    returns the lower of the two given floats.
+]]
+docs.doc_strings["maxf"] =
+[[
+  float maxf(float a, float b)
+  
+  ARGUMENTS:
+    float a: the first value to check
+    float b: the second value to check
+  DESCRIPTION:
+    returns the higher of the two given floats.
+]]
+docs.doc_strings["midf"] =
+[[
+  float midf(float a, float b, float c)
+  
+  ARGUMENTS:
+    float a: the first value to check
+    float b: the second value to check
+    float c: the third value to check
+  DESCRIPTION:
+    returns the middle of the three given floats.
+]]
+docs.doc_strings["wrapf"] =
+[[
+  float wrapf(float n, float min, float max)
+  
+  ARGUMENTS:
+    float n  : the value to wrap
+    float min: the minimum range value
+    float max: the maximum range value (exclusive)
+  DESCRIPTION:
+    returns a float value within the range [min, max).
+    if n is < min or >= max, it wraps around to the other end of the range.
+]]
+docs.doc_strings["signi"] =
+[[
+  int signi(int n)
+  
+  ARGUMENTS:
+    int n: the value to get the sign of
+  DESCRIPTION:
+    returns the sign of the integer n.
+    
+    if n < 0, returns -1.
+    if n > 0, returns 1.
+    if n == 0, returns 0.
+]]
+docs.doc_strings["signf"] =
+[[
+  float signf(float n)
+  
+  ARGUMENTS:
+    float n: the value to get the sign of
+  DESCRIPTION:
+    returns the sign of the float n.
+    
+    if n < 0, returns -1.
+    if n > 0, returns 1.
+    if n == 0, returns 0.
+]]
+docs.doc_strings["fract"] = [[]]
+docs.doc_strings["deg"] = [[]]
+docs.doc_strings["rad"] = [[]]
+docs.doc_strings["sin"] = [[]]
+docs.doc_strings["cos"] = [[]]
+docs.doc_strings["powf"] = [[]]
+docs.doc_strings["floor"] = [[]]
+docs.doc_strings["ceil"] = [[]]
+docs.doc_strings["round"] = [[]]
+docs.doc_strings["randomize"] = [[]]
+docs.doc_strings["randomizeEx"] = [[]]
+docs.doc_strings["randi"] = [[]]
+docs.doc_strings["randiEx"] = [[]]
+docs.doc_strings["randf"] = [[]]
+docs.doc_strings["randfEx"] = [[]]
+docs.doc_strings["time"] = [[]]
+docs.doc_strings["vec2Length"] = [[]]
+docs.doc_strings["vec2LengthSq"] = [[]]
+docs.doc_strings["vec2Normalize"] = [[]]
+docs.doc_strings["vec2Dot"] = [[]]
+docs.doc_strings["vec2Cross"] = [[]]
+docs.doc_strings["vec2Distance"] = [[]]
+docs.doc_strings["vec2DistanceSq"] = [[]]
+docs.doc_strings["vec2Direction"] = [[]]
+docs.doc_strings["vec2Angle"] = [[]]
+docs.doc_strings["vec2LineAngle"] = [[]]
+docs.doc_strings["vec2Lerp"] = [[]]
+docs.doc_strings["vec2Reflect"] = [[]]
+docs.doc_strings["vec2Rotate"] = [[]]
+docs.doc_strings["vec2MoveToward"] = [[]]
+docs.doc_strings["vec2Invert"] = [[]]
+docs.doc_strings["vec3Length"] = [[]]
+docs.doc_strings["vec3LengthSq"] = [[]]
+docs.doc_strings["vec3Normalize"] = [[]]
+docs.doc_strings["vec3Dot"] = [[]]
+docs.doc_strings["vec3Cross"] = [[]]
+docs.doc_strings["vec3Distance"] = [[]]
+docs.doc_strings["vec3DistanceSq"] = [[]]
+docs.doc_strings["vec3Direction"] = [[]]
+docs.doc_strings["vec3Angle"] = [[]]
+docs.doc_strings["vec3Lerp"] = [[]]
+docs.doc_strings["vec3Reflect"] = [[]]
+docs.doc_strings["vec3Rotate"] = [[]]
+docs.doc_strings["vec3MoveToward"] = [[]]
+docs.doc_strings["vec3Invert"] = [[]]
+docs.doc_strings["vec3ToScreen"] = [[]]
+docs.doc_strings["matrixIdentity"] = [[]]
+docs.doc_strings["matrixAdd"] = [[]]
+docs.doc_strings["matrixSubtract"] = [[]]
+docs.doc_strings["matrixMultiply"] = [[]]
+docs.doc_strings["matrixTranslate"] = [[]]
+docs.doc_strings["matrixRotate"] = [[]]
+docs.doc_strings["matrixScale"] = [[]]
+docs.doc_strings["matrixTranspose"] = [[]]
+docs.doc_strings["matrixInvert"] = [[]]
+docs.doc_strings["camera2D"] = [[]]
+docs.doc_strings["getCam2DOrigin"] = [[]]
+docs.doc_strings["setCam2DOrigin"] = [[]]
+docs.doc_strings["getCam2DTarget"] = [[]]
+docs.doc_strings["setCam2DTarget"] = [[]]
+docs.doc_strings["getCam2DAngle"] = [[]]
+docs.doc_strings["setCam2DAngle"] = [[]]
+docs.doc_strings["getCam2DZoom"] = [[]]
+docs.doc_strings["setCam2DZoom"] = [[]]
+docs.doc_strings["camera3D"] = [[]]
+docs.doc_strings["getCam3DPosition"] = [[]]
+docs.doc_strings["setCam3DPosition"] = [[]]
+docs.doc_strings["getCam3DTarget"] = [[]]
+docs.doc_strings["setCam3DTarget"] = [[]]
+docs.doc_strings["getCam3DUp"] = [[]]
+docs.doc_strings["setCam3DUp"] = [[]]
+docs.doc_strings["getCam3DFOV"] = [[]]
+docs.doc_strings["setCam3DFOV"] = [[]]
+docs.doc_strings["getCam3DProjection"] = [[]]
+docs.doc_strings["setCam3DProjection"] = [[]]
+docs.doc_strings["getCam3DRight"] = [[]]
+docs.doc_strings["getCam3DForward"] = [[]]
+docs.doc_strings["viewport"] = [[]]
+docs.doc_strings["texture"] = [[]]
+docs.doc_strings["getTextureMode"] = [[]]
+docs.doc_strings["setTextureMode"] = [[]]
+docs.doc_strings["getCullMode"] = [[]]
+docs.doc_strings["setCullMode"] = [[]]
+docs.doc_strings["getWireMode"] = [[]]
+docs.doc_strings["setWireMode"] = [[]]
+docs.doc_strings["getFogMode"] = [[]]
+docs.doc_strings["setFogMode"] = [[]]
+docs.doc_strings["getFogStart"] = [[]]
+docs.doc_strings["setFogStart"] = [[]]
+docs.doc_strings["getFogEnd"] = [[]]
+docs.doc_strings["setFogEnd"] = [[]]
+docs.doc_strings["getFogColor"] = [[]]
+docs.doc_strings["setFogColor"] = [[]]
+docs.doc_strings["getBlendMode"] = [[]]
+docs.doc_strings["setBlendMode"] = [[]]
+docs.doc_strings["getLightingMode"] = [[]]
+docs.doc_strings["setLightingMode"] = [[]]
+docs.doc_strings["getAmbientFactor"] = [[]]
+docs.doc_strings["setAmbientFactor"] = [[]]
+docs.doc_strings["getAmbientColor"] = [[]]
+docs.doc_strings["setAmbientColor"] = [[]]
+docs.doc_strings["getLightEnabled"] = [[]]
+docs.doc_strings["setLightEnabled"] = [[]]
+docs.doc_strings["getLightType"] = [[]]
+docs.doc_strings["setLightType"] = [[]]
+docs.doc_strings["getLightRadius"] = [[]]
+docs.doc_strings["setLightRadius"] = [[]]
+docs.doc_strings["getLightPosition"] = [[]]
+docs.doc_strings["setLightPosition"] = [[]]
+docs.doc_strings["getLightDirection"] = [[]]
+docs.doc_strings["setLightDirection"] = [[]]
+docs.doc_strings["getLightColor"] = [[]]
+docs.doc_strings["setLightColor"] = [[]]
+docs.doc_strings["clear"] = [[]]
+docs.doc_strings["matrixMode"] = [[]]
+docs.doc_strings["pushMatrix"] = [[]]
+docs.doc_strings["popMatrix"] = [[]]
+docs.doc_strings["getProjectionMatrix"] = [[]]
+docs.doc_strings["setProjectionMatrix"] = [[]]
+docs.doc_strings["getModelViewMatrix"] = [[]]
+docs.doc_strings["setModelViewMatrix"] = [[]]
+docs.doc_strings["getTopMatrix"] = [[]]
+docs.doc_strings["multiplyTopMatrix"] = [[]]
+docs.doc_strings["identity"] = [[]]
+docs.doc_strings["translate"] = [[]]
+docs.doc_strings["rotate"] = [[]]
+docs.doc_strings["scale"] = [[]]
+docs.doc_strings["frustum"] = [[]]
+docs.doc_strings["ortho"] = [[]]
+docs.doc_strings["meshVertex"] = [[]]
+docs.doc_strings["meshVertex2D"] = [[]]
+docs.doc_strings["meshUV"] = [[]]
+docs.doc_strings["meshNormal"] = [[]]
+docs.doc_strings["meshColor"] = [[]]
+docs.doc_strings["beginMesh"] = [[]]
+docs.doc_strings["endMesh"] = [[]]
+docs.doc_strings["print2D"] = [[]]
+docs.doc_strings["sprite2D"] = [[]]
+docs.doc_strings["sprite2DEx"] = [[]]
+docs.doc_strings["drawObj"] = [[]]
+docs.doc_strings["drawObjEx"] = [[]]
+docs.doc_strings["playSong"] = [[]]
+docs.doc_strings["playTrack"] = [[]]
+docs.doc_strings["playPattern"] = [[]]
+docs.doc_strings["playWav"] = [[]]
+docs.doc_strings["playWavEx"] = [[]]
+docs.doc_strings["pauseTrack"] = [[]]
+docs.doc_strings["pauseTracks"] = [[]]
+docs.doc_strings["resumeTrack"] = [[]]
+docs.doc_strings["resumeTracks"] = [[]]
+docs.doc_strings["stopTrack"] = [[]]
+docs.doc_strings["stopTracks"] = [[]]
+docs.doc_strings["muteTrack"] = [[]]
+docs.doc_strings["muteTracks"] = [[]]
+docs.doc_strings["unmuteTrack"] = [[]]
+docs.doc_strings["unmuteTracks"] = [[]]
+docs.doc_strings["getTrackVolume"] = [[]]
+docs.doc_strings["setTrackVolume"] = [[]]
+docs.doc_strings["getTrackPan"] = [[]]
+docs.doc_strings["setTrackPan"] = [[]]
+docs.doc_strings["getTrackBPM"] = [[]]
+docs.doc_strings["setTrackBPM"] = [[]]
+docs.doc_strings["checkCollision"] = [[]]
+docs.doc_strings["getCollisionPoint"] = [[]]
+docs.doc_strings["loadTexBank"] = [[]]
+docs.doc_strings["loadObjBank"] = [[]]
+docs.doc_strings["loadWavBank"] = [[]]
+docs.doc_strings["loadSeqBank"] = [[]]
+docs.doc_strings["peek8"] = [[]]
+docs.doc_strings["poke8"] = [[]]
+docs.doc_strings["peek32"] = [[]]
+docs.doc_strings["poke32"] = [[]]
+docs.doc_strings["memcpy"] = [[]]
+docs.doc_strings["memset"] = [[]]
+docs.doc_strings["initMemCard"] = [[]]
+
+function docs.getDocString(func: string): string
+    local has: boolean
+    local s: string
+
+    has, s = docs.doc_strings:has_and_get(func)
+    if not has then
+        return (@string){nilptr, 0}
+    end
+
+    return s
+end

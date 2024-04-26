@@ -1116,6 +1116,18 @@ function GPU:updateTexture(): void
 	self.update_tex = false
 end
 
+function GPU:updateConfigFlags(): void
+	local flags: cint = 0
+	if core.config.vsync then
+		flags = flags | rl.configFlags.VSYNC_HINT
+	end
+	if core.config.highdpi then
+		flags = flags | rl.configFlags.WINDOW_HIGHDPI
+	end
+
+	rl.setWindowState(flags)--| rl.configFlags.WINDOW_RESIZABLE)
+end
+
 function GPU:resetGPU(): void
 	for i = 0, < GPU_CAMERAS_COUNT do
 		self.cameras2D[i] = {
@@ -1181,10 +1193,10 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.ompbank_ptr = ompbank_ptr
 
 	local flags: cint = 0
-	if core.config.enable_vsync then
+	if core.config.vsync then
 		flags = flags | rl.configFlags.VSYNC_HINT
 	end
-	if core.config.enable_highdpi then
+	if core.config.highdpi then
 		flags = flags | rl.configFlags.WINDOW_HIGHDPI
 	end
 

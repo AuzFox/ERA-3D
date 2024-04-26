@@ -186,6 +186,9 @@ global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START 
 
 global VM_MAX_CYCLES <comptime> = 65536
 
+global LOG_MAX_LINES <comptime> = 20
+global LOG_H <comptime> = ((LOG_MAX_LINES + 1) * 9)
+
 -- --------------------------------
 -- ENUMS
 -- --------------------------------
@@ -565,7 +568,8 @@ global LogState = @enum {
 }
 
 global LogEntryType = @enum {
-	INFO = 0,
+	INPUT = 0, -- used when logging user command input
+	INFO,
 	HOST_ERROR,
 	COMPILE_ERROR,
 	RUNTIME_ERROR
@@ -933,8 +937,8 @@ StateMachine = @record {
 -- config file data record
 global ConfigInfo = @record {
 	log_level: cint,
-	enable_vsync: boolean,
-	enable_highdpi: boolean,
+	vsync: boolean,
+	highdpi: boolean,
 	draw_fps: boolean
 }
 
@@ -956,8 +960,12 @@ global CoreData = @record {
 	-- dialog open/close animation
 	dialog_size: float32,
 
-	log_text: [16 * 81]cchar, -- log text buffer, 64x 80-character strings
-	log_types: [64]uint8, -- log line types, 1 LogEntryType per line
+	log_text: [LOG_MAX_LINES * 81]cchar, -- log text buffer, 80-character strings
+	log_types: [LOG_MAX_LINES]uint8, -- log line types, 1 LogEntryType per line
+	log_command_buffer: [80]uint8, -- log console command text buffer
+	log_command_str: string,
+	log_command_args: sequence(string),
+	log_command_split_index: uinteger,
 
 	text_buffer: *[0]uint8,
 	src_lines: sequence(sequence(uint8)),
@@ -1020,8 +1028,8 @@ global CoreData = @record {
 
 function CoreData:setDefaultConfig(): void
 	self.config.log_level = rl.traceLogLevel.NONE
-	self.config.enable_vsync = true
-	self.config.enable_highdpi = true
+	self.config.vsync = true
+	self.config.highdpi = true
 	self.config.draw_fps = false
 end
 
@@ -1081,6 +1089,96 @@ function CoreData:popup(message_type: uint8, text: string): void
 	end
 end
 
+function CoreData:clearConsoleCommand(): void
+	self.log_command_str.size = 0
+end
+
+function CoreData:getNextCommandArg(): (boolean, string)
+	local succees: boolean = false
+	local arg: string = {nilptr, 0}
+
+	local in_arg: boolean = false
+	local c: uint8
+
+	while true do
+		if self.log_command_split_index > self.log_command_str.size then
+			if in_arg then
+				arg[#arg + 1] = '\0'_u8
+			end
+
+			break
+		end
+
+		c = self.log_command_str[self.log_command_split_index]
+
+		if in_arg then
+			if c == ' '_u8 then
+				arg[#arg + 1] = '\0'_u8
+				in_arg = false
+				break
+			else
+				arg.size = arg.size + 1
+			end
+		else
+			if c ~= ' '_u8 and c ~= '\0'_u8 then
+				-- establish arg string
+				arg = (@string){
+					(@*[0]uint8)(&self.log_command_buffer[self.log_command_split_index - 1]),
+					1
+				}
+				in_arg = true
+				succees = true
+			end
+		end
+
+		self.log_command_split_index = self.log_command_split_index + 1
+	end
+
+	return succees, arg
+end
+
+function CoreData:splitConsoleCommand(): void
+	self.log_command_args:clear()
+	
+	if self.log_command_str.size == 0 then
+		return
+	end
+	
+	self.log_command_split_index = 1
+	
+	while true do
+		local arg: string
+		local succees: boolean
+		succees, arg = self:getNextCommandArg()
+		if not succees then
+			break
+		end
+		
+		self.log_command_args:push(arg)
+	end
+end
+
+function CoreData:insertConsoleChar(c: uint8): void
+	if self.log_command_str.size >= 79 then
+		return
+	end
+
+	if self.log_command_str.size == 0 then
+		self.log_command_str[1] = c
+	else
+		self.log_command_str[#self.log_command_str + 1] = c
+	end
+
+	self.log_command_str.size = self.log_command_str.size + 1
+end
+
+function CoreData:deleteConsoleChar(): void
+	if self.log_command_str.size > 0 then
+		self.log_command_str[#self.log_command_str] = '\0'_u8
+		self.log_command_str.size = self.log_command_str.size - 1
+	end
+end
+
 function CoreData:clearLog(): void
 	self.log_index = 0
 	self.log_count = 0
@@ -1105,12 +1203,12 @@ function CoreData:log(entry_type: uint8, text: string, make_popup: boolean): voi
 			self.log_index = self.log_index + 1
 			
 			-- increment log index and wrap if needed
-			if self.log_index == 16 then
+			if self.log_index == LOG_MAX_LINES then
 				self.log_index = 0
 			end
 
 			-- increment log size if needed
-			if self.log_count < 16 then
+			if self.log_count < LOG_MAX_LINES then
 				self.log_count = self.log_count + 1
 			end
 
