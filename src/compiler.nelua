@@ -744,7 +744,7 @@ local function next(vm: *EVM): void
 			end
 			
 			return
-		elseif (vm.token == ';'_u8 or vm.token == '{'_u8 or vm.token == '}'_u8 or vm.token == '('_u8 or vm.token == ')'_u8 or vm.token == ']'_u8 or vm.token == ','_u8 or vm.token == ':'_u8 or vm.token == '`'_u8) then
+		elseif (vm.token == ';'_u8 or vm.token == '{'_u8 or vm.token == '}'_u8 or vm.token == '('_u8 or vm.token == ')'_u8 or vm.token == ']'_u8 or vm.token == ','_u8 or vm.token == ':'_u8 or vm.token == '`'_u8 or vm.token == '#'_u8 or vm.token == '$'_u8 or vm.token == '@'_u8) then
 			return
 		end
 	end

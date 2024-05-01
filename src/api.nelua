@@ -541,6 +541,27 @@ local function apiPressed(vm: *EVM): boolean
 	return true
 end
 
+local function apiRepeated(vm: *EVM): boolean
+	-- signature:
+	-- int repeated(int player, int btn);
+
+	local p: uint32 = vm:getArgU(0)
+	local b: uint32 = vm:getArgU(1)
+
+	p = math.clamp(p, 0, input.PLAYER_COUNT - 1)
+	b = (p * input.Button.COUNT) + b
+
+	local code: cint = input.button_map[b]
+
+	if code == 0 then
+		vm:pushU(0)
+	else
+		vm:pushU(input.pressedRepeat(code) and 1 or 0)
+	end
+	
+	return true
+end
+
 local function apiReleased(vm: *EVM): boolean
 	-- signature:
 	-- int released(int player, int btn);
@@ -580,6 +601,152 @@ local function apiHeld(vm: *EVM): boolean
 		vm:pushU(rl.isKeyDown(code) and 1 or 0)
 	end
 	
+	return true
+end
+
+local function apiMousePressed(vm: *EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+
+	if b > 2 then
+		b = 2
+	end
+
+	switch b do
+		case 0 then
+			vm:pushU(input.left_clicked and 1 or 0)
+		case 1 then
+			vm:pushU(input.right_clicked and 1 or 0)
+		case 2 then
+			vm:pushU(input.middle_clicked and 1 or 0)
+	end
+
+	return true
+end
+
+local function apiMouseReleased(vm: *EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+
+	if b > 2 then
+		b = 2
+	end
+
+	switch b do
+		case 0 then
+			vm:pushU(input.left_click_released and 1 or 0)
+		case 1 then
+			vm:pushU(input.right_click_released and 1 or 0)
+		case 2 then
+			vm:pushU(input.middle_click_released and 1 or 0)
+	end
+
+	return true
+end
+
+local function apiMouseHeld(vm: *EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+
+	if b > 2 then
+		b = 2
+	end
+
+	switch b do
+		case 0 then
+			vm:pushU(input.left_click_held and 1 or 0)
+		case 1 then
+			vm:pushU(input.right_click_held and 1 or 0)
+		case 2 then
+			vm:pushU(input.middle_click_held and 1 or 0)
+	end
+
+	return true
+end
+
+local function apiMouseDragging(vm: *EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+
+	if b > 2 then
+		b = 2
+	end
+
+	switch b do
+		case 0 then
+			vm:pushU(input.left_dragging and 1 or 0)
+		case 1 then
+			vm:pushU(input.right_dragging and 1 or 0)
+		case 2 then
+			vm:pushU(input.middle_dragging and 1 or 0)
+	end
+
+	return true
+end
+
+local function apiGetMousePosition(vm: *EVM): boolean
+	vm:pushV2({
+		(@float32)(input.mouse_x),
+		(@float32)(input.mouse_y)
+	})
+
+	return true
+end
+
+local function apiGetMouseDelta(vm: *EVM): boolean
+	vm:pushV2({
+		(@float32)(input.mouse_delta_x),
+		(@float32)(input.mouse_delta_y)
+	})
+	
+	return true
+end
+
+local function apiGetMouseDrag(vm: *EVM): boolean
+	local b: uint32 = vm:getArgU(0)
+
+	if b > 2 then
+		b = 2
+	end
+
+	switch b do
+		case 0 then
+			vm:pushV2({
+				(@float32)(input.left_drag_x),
+				(@float32)(input.left_drag_y)
+			})
+		case 1 then
+			vm:pushV2({
+				(@float32)(input.right_drag_x),
+				(@float32)(input.right_drag_y)
+			})
+		case 2 then
+			vm:pushV2({
+				(@float32)(input.middle_drag_x),
+				(@float32)(input.middle_drag_y)
+			})
+	end
+
+	return true
+end
+
+local function apiGetMouseWheel(vm: *EVM): boolean
+	vm:pushI(input.mouse_wheel_y)
+
+	return true
+end
+
+local function apiGetMouseLock(vm: *EVM): boolean
+	vm:pushU(rl.isCursorHidden() and 1 or 0)
+
+	return true
+end
+
+local function apiSetMouseLock(vm: *EVM): boolean
+	local lock: uint32 = vm:getArgU(0)
+
+	if lock == 0 then
+		rl.enableCursor()
+	else
+		rl.disableCursor()
+	end
+
 	return true
 end
 
@@ -1019,19 +1186,7 @@ local function apiVec2Angle(vm: *EVM): boolean
 	local a: rl.vector2 = vm:getArgV2(0)
 	local b: rl.vector2 = vm:getArgV2(2)
 
-	vm:pushF(math.atan2(b.y - a.y, b.x - a.x))
-
-	return true
-end
-
-local function apiVec2LineAngle(vm: *EVM): boolean
-	-- signature:
-	-- float vec2LineAngle(vec2 a, vec2 b);
-
-	local a: rl.vector2 = vm:getArgV2(0)
-	local b: rl.vector2 = vm:getArgV2(2)
-
-	vm:pushF(rl.vector2.lineAngle(a, b))
+	vm:pushF(math.deg(math.atan2(b.y - a.y, b.x - a.x)))
 
 	return true
 end
@@ -1265,7 +1420,7 @@ local function apiVec3Angle(vm: *EVM): boolean
 	local a: rl.vector3 = vm:getArgV3(0)
 	local b: rl.vector3 = vm:getArgV3(3)
 
-	vm:pushF(rl.vector3.angle(a, b))
+	vm:pushF(math.deg(rl.vector3.angle(a, b)))
 
 	return true
 end
@@ -3530,6 +3685,15 @@ function EVM:registerAPI(): void
 			func=apiPressed
 		},
 		{
+			name="repeated",
+			type_info={EVMType.INT},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiRepeated
+		},
+		{
 			name="released",
 			type_info={EVMType.INT},
 			argdata={
@@ -3546,6 +3710,62 @@ function EVM:registerAPI(): void
 				{EVMType.INT}
 			},
 			func=apiHeld
+		},
+		{
+			name="mousePressed",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiMousePressed
+		},
+		{
+			name="mouseReleased",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiMouseReleased
+		},
+		{
+			name="mouseHeld",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiMouseHeld
+		},
+		{
+			name="mouseDragging",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiMouseDragging
+		},
+		{
+			name="getMousePosition",
+			type_info={EVMType.VEC2, self.struct_vec2},
+			func=apiGetMousePosition
+		},
+		{
+			name="getMouseDelta",
+			type_info={EVMType.VEC2, self.struct_vec2},
+			func=apiGetMouseDelta
+		},
+		{
+			name="getMouseDrag",
+			type_info={EVMType.VEC2, self.struct_vec2},
+			argdata={{EVMType.INT}},
+			func=apiGetMouseDrag
+		},
+		{
+			name="getMouseWheel",
+			type_info={EVMType.INT},
+			func=apiGetMouseWheel
+		},
+		{
+			name="getMouseLock",
+			type_info={EVMType.INT},
+			func=apiGetMouseLock
+		},
+		{
+			name="setMouseLock",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiSetMouseLock
 		},
 		{
 			name="mini",
@@ -3807,15 +4027,6 @@ function EVM:registerAPI(): void
 				{EVMType.VEC2, self.struct_vec2}
 			},
 			func=apiVec2Angle
-		},
-		{
-			name="vec2LineAngle",
-			type_info={EVMType.FLOAT},
-			argdata={
-				{EVMType.VEC2, self.struct_vec2},
-				{EVMType.VEC2, self.struct_vec2}
-			},
-			func=apiVec2LineAngle
 		},
 		{
 			name="vec2Lerp",

@@ -194,6 +194,12 @@ local icon_table: [Icon.COUNT]rl.rectangle = {
 	{210, 0, 12, 9}, -- STATE_TRACKER
 	{222, 0, 12, 9}, -- STATE_MODEL
 	{234, 0, 12, 9}, -- STATE_TEXTURE
+	{198, 9, 12, 9}, -- TOOL_PENCIL
+	{210, 9, 12, 9}, -- TOOL_LINE
+	{222, 9, 12, 9}, -- TOOL_RECT
+	{234, 9, 12, 9}, -- TOOL_ELIPSE
+	{210, 18, 12, 9}, -- TOOL_BUCKET
+	{198, 18, 12, 9}, -- TOOL_SELECT
 }
 
 function GPU:clear(col: uint32): void

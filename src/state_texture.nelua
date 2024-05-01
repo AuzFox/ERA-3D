@@ -13,6 +13,15 @@ local PanType = @enum {
     MINIMAP
 }
 
+local ToolType = @enum {
+    PENCIL = 0,
+    LINE,
+    RECT,
+    ELIPSE,
+    BUCKET,
+    SELECT,
+}
+
 local primary_color: uint32 = GPU_LBLUE
 local secondary_color: uint32 = 0
 local edit_window_x: uint32 = 0
@@ -24,13 +33,12 @@ local edit_pixel_x: int32
 local edit_pixel_y: int32
 local pan_window_start_x: int32
 local pan_window_start_y: int32
-local pan_delta_x: int32
-local pan_delta_y: int32
 local pan_type: uint8 = PanType.NONE
 local mouse_in_canvas: boolean = false
 local mouse_in_minimap: boolean = false
 local mouse_in_tool_list: boolean = false
 local mouse_in_color_palette: boolean = false
+local current_tool: integer = ToolType.PENCIL
 
 global function stateTextureInit(sm: *StateMachine, vm: *EVM): void
 end
@@ -54,7 +62,7 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
     mouse_in_tool_list = input.isMouseInRect(6, TOOL_LIST_Y, 48, 36)
     mouse_in_color_palette = input.isMouseInRect(6, PALETTE_Y, 96, 18)
     
-    if input.mouse_wheel_y > 0 and edit_window_size > 8 then
+    if pan_type == PanType.NONE and input.mouse_wheel_y > 0 and edit_window_size > 8 then
         -- when zooming in/out, the 4 pixels in the middle of the edit window should remain in the middle of the new edit window
         local middle_pixel_x: int32 = edit_window_x + (edit_window_size /// 2)
         local middle_pixel_y: int32 = edit_window_y + (edit_window_size /// 2)
@@ -62,7 +70,7 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
         edit_window_size = edit_window_size /// 2
         edit_window_x = util.midI(0, middle_pixel_x - (edit_window_size /// 2), 1024 - edit_window_size)
         edit_window_y = util.midI(0, middle_pixel_y - (edit_window_size /// 2), 1024 - edit_window_size)
-    elseif input.mouse_wheel_y < 0 and edit_window_size < 64 then
+    elseif pan_type == PanType.NONE and input.mouse_wheel_y < 0 and edit_window_size < 64 then
         local middle_pixel_x: int32 = edit_window_x + (edit_window_size /// 2)
         local middle_pixel_y: int32 = edit_window_y + (edit_window_size /// 2)
 
@@ -81,12 +89,10 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
     end
 
     -- click in canvas
-    if mouse_in_canvas then
+    if mouse_in_canvas and pan_type == PanType.NONE then
         if input.middle_clicked then
             pan_window_start_x = edit_window_x
             pan_window_start_y = edit_window_y
-            pan_delta_x = 0
-            pan_delta_y = 0
             pan_type = PanType.CANVAS
         end
 
@@ -103,12 +109,10 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
                 vm.gpu:setPixel(edit_pixel_x, edit_pixel_y, secondary_color)
             end
         end
-    elseif mouse_in_minimap then
-        if input.middle_clicked then
+    elseif mouse_in_minimap and pan_type == PanType.NONE then
+        if input.left_clicked or input.middle_clicked then
             pan_window_start_x = edit_window_x
             pan_window_start_y = edit_window_y
-            pan_delta_x = 0
-            pan_delta_y = 0
             pan_type = PanType.MINIMAP
         end
     elseif mouse_in_color_palette then
@@ -126,21 +130,24 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
         end
     end
 
-    if not input.middle_click_held then
-        pan_type = PanType.NONE
-    end
-
     switch pan_type do
         case PanType.CANVAS then
-            pan_delta_x = pan_delta_x + input.mouse_delta_x
-            pan_delta_y = pan_delta_y + input.mouse_delta_y
-            edit_window_x = util.midI(0, pan_window_start_x - (pan_delta_x /// pixel_size_x), 1024 - edit_window_size)
-            edit_window_y = util.midI(0, pan_window_start_y - (pan_delta_y /// pixel_size_y), 1024 - edit_window_size)
+            if input.middle_click_released then
+                pan_type = PanType.NONE
+            elseif input.middle_dragging then
+                edit_window_x = util.midI(0, pan_window_start_x - (input.middle_drag_x /// pixel_size_x), 1024 - edit_window_size)
+                edit_window_y = util.midI(0, pan_window_start_y - (input.middle_drag_y /// pixel_size_y), 1024 - edit_window_size)
+            end
         case PanType.MINIMAP then
-            pan_delta_x = pan_delta_x + input.mouse_delta_x
-            pan_delta_y = pan_delta_y + input.mouse_delta_y
-            edit_window_x = util.midI(0, pan_window_start_x - pan_delta_x, 1024 - edit_window_size)
-            edit_window_y = util.midI(0, pan_window_start_y - pan_delta_y, 1024 - edit_window_size)
+            if input.left_click_released or input.middle_click_released then
+                pan_type = PanType.NONE
+            elseif input.left_dragging then
+                edit_window_x = util.midI(0, pan_window_start_x - input.left_drag_x, 1024 - edit_window_size)
+                edit_window_y = util.midI(0, pan_window_start_y - input.left_drag_y, 1024 - edit_window_size)
+            elseif input.middle_dragging then
+                edit_window_x = util.midI(0, pan_window_start_x - input.middle_drag_x, 1024 - edit_window_size)
+                edit_window_y = util.midI(0, pan_window_start_y - input.middle_drag_y, 1024 - edit_window_size)
+            end
     end
 end
 
@@ -210,16 +217,8 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     end
 
     -- tool list
-    local tool_list_y: int32 = TOOL_LIST_Y
-    for i = 0, < 16 do
-        local clamped_i: int32 = i % 4
-        local x: int32 = 6 + (clamped_i * 12)
-        
-        vm.gpu:drawIcon2D(x, tool_list_y, GPU_WHITE, Icon.STATE_TRACKER)
-
-        if i ~= 0 and clamped_i == 3 then
-            tool_list_y = tool_list_y + 9
-        end
+    for i = 0, < 6 do
+        vm.gpu:drawIcon2D(6 + (i * 12), TOOL_LIST_Y, i == current_tool and core.cursor_color or GPU_WHITE, Icon.TOOL_PENCIL + i)
     end
     
     -- color palette

@@ -407,7 +407,7 @@ local function nextToken(vm: *EVM): void
 			end
 			
 			return
-		elseif (sh_token == ';'_u8 or sh_token == '{'_u8 or sh_token == '}'_u8 or sh_token == '('_u8 or sh_token == ')'_u8 or sh_token == ']'_u8 or sh_token == ','_u8 or sh_token == ':'_u8 or sh_token == '`'_u8) then
+		elseif (sh_token == ';'_u8 or sh_token == '{'_u8 or sh_token == '}'_u8 or sh_token == '('_u8 or sh_token == ')'_u8 or sh_token == ']'_u8 or sh_token == ','_u8 or sh_token == ':'_u8 or sh_token == '`'_u8 or sh_token == '$'_u8 or sh_token == '#'_u8 or sh_token == '@'_u8) then
 			return
 		end
 	end
@@ -489,6 +489,7 @@ end
 
 local function drawCode(vm: *EVM): void
     -- scan src_lines for yet-unclosed multiline comments
+	local brace_level: uint64 = 0
     sh_mlcomment_level = 0
     if core.start_line > 1 then
         for li = 1, < core.start_line do
@@ -500,13 +501,25 @@ local function drawCode(vm: *EVM): void
                     if (ci < #l) and (l[ci + 1] == '*'_u8) then
                         sh_mlcomment_level = sh_mlcomment_level + 1
                         ci = ci + 1
+					elseif (ci < #l) and (l[ci + 1] == '/'_u8) then
+                        break
                     end
                 elseif c == '*'_u8 then
                     if (ci < #l) and (l[ci + 1] == '/'_u8) and (sh_mlcomment_level > 0) then
                         sh_mlcomment_level = sh_mlcomment_level - 1
                         ci = ci + 1
                     end
-                end
+				end
+				
+				if sh_mlcomment_level == 0 then
+					if c == '{'_u8 or c == '('_u8 or c == '['_u8 then
+						brace_level = brace_level + 1
+					elseif c == '}'_u8 or c == ')'_u8 or c == ']'_u8 then
+						if brace_level > 0 then
+							brace_level = brace_level - 1
+						end
+					end
+				end
             end
         end
     end
@@ -531,6 +544,11 @@ local function drawCode(vm: *EVM): void
     vm.gpu:drawRect2D(line_number_spacing + horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
 
 	local encountered_char: boolean = false
+	local brace_colors: [3]uint32 = {
+		GPU_YELLOW,
+		GPU_PINK,
+		GPU_LBLUE
+	}
 	while true do
         -- get next token
         nextToken(vm)
@@ -543,6 +561,20 @@ local function drawCode(vm: *EVM): void
 		switch sh_token do
 			case Token.COMMENT then
 				color = GPU_GRAY
+			case ','_u8, ':'_u8, ';'_u8 then
+				color = GPU_LGRAY
+			case '$'_u8, '#'_u8, '`'_u8, '@'_u8 then
+				color = GPU_RED
+			case '{'_u8, '('_u8, Token.BRAK then
+				color = brace_colors[brace_level % 3]
+				brace_level = brace_level + 1
+			case '}'_u8, ')'_u8, ']'_u8 then
+				if brace_level > 0 then
+					brace_level = brace_level - 1
+					color = brace_colors[brace_level % 3]
+				else
+					color = GPU_RED
+				end
 			case Token.STRUCT, Token.ENUM, Token.IF, Token.ELSE, Token.WHILE, Token.FOR, Token.BREAK, Token.CONTINUE, Token.RETURN, Token.SIZEOF then
 				color = GPU_PINK
 			case Token.VOID, Token.INT, Token.FLOAT, Token.VEC2, Token.VEC3, Token.STRING, Token.STRUCT_ID, Token.VARARGS then
@@ -562,7 +594,11 @@ local function drawCode(vm: *EVM): void
 			case Token.UNKNOWN then
 				color = GPU_RED
 			else
-				color = GPU_WHITE
+				if sh_token >= Token.LNOT and sh_token < Token.BRAK then
+					color = GPU_LGRAY
+				else
+					color = GPU_WHITE
+				end
 		end
 
 		local ray_col: rl.color = {
@@ -660,6 +696,22 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
         core:changeCodeLine(core.line_index + 1)
         return
     end
+
+	if input.mouse_wheel_y > 0 then
+		core.start_line = math.max(core.start_line - (input.mouse_wheel_y * 3), 1)
+	elseif input.mouse_wheel_y < 0 then
+		core.start_line = math.clamp(core.start_line - (input.mouse_wheel_y * 3), 1, math.max(1, #core.src_lines - 37))
+	end
+	if input.left_clicked or (input.left_click_held and (math.abs(input.left_drag_x) > 6 or math.abs(input.left_drag_y) > 9)) then
+		local line_number_spacing: int32 = (vm.gpu:measureInt(#core.src_lines) + 1) * 6
+
+		if input.isMouseInRect(line_number_spacing, 9, GPU_VSCREEN_W - line_number_spacing, GPU_VSCREEN_H - 9) then
+			local line_index: int32 = (input.mouse_y - 9) /// 9
+			local char_index: int32 = (input.mouse_x - line_number_spacing) /// 6
+			core:changeCodeLine(core.start_line + line_index)
+			core:changeCharacterIndex(core.start_char + char_index)
+		end
+	end
 
     if input.pressedRepeat(rl.keyboardKey.LEFT) then
         if core.char_index == 1 then

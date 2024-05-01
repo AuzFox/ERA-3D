@@ -50,15 +50,24 @@ global input.is_alt_down: boolean
 global input.left_clicked: boolean
 global input.left_click_held: boolean
 global input.left_click_released: boolean
+global input.left_dragging: boolean
+global input.left_drag_x: cint
+global input.left_drag_y: cint
 global input.right_clicked: boolean
 global input.right_click_held: boolean
 global input.right_click_released: boolean
+global input.right_dragging: boolean
+global input.right_drag_x: cint
+global input.right_drag_y: cint
 global input.middle_clicked: boolean
 global input.middle_click_held: boolean
 global input.middle_click_released: boolean
+global input.middle_dragging: boolean
+global input.middle_drag_x: cint
+global input.middle_drag_y: cint
 global input.mouse_x: cint
-global input.mouse_delta_x: cint
 global input.mouse_y: cint
+global input.mouse_delta_x: cint
 global input.mouse_delta_y: cint
 global input.mouse_wheel_y: int32
 
@@ -101,6 +110,42 @@ function input.refresh(screen_x: int32, screen_y: int32, screen_w: int32, screen
     input.mouse_delta_x = input.mouse_x - prev_mouse_x
     input.mouse_delta_y = input.mouse_y - prev_mouse_y
     input.mouse_wheel_y = (@int32)(rl.getMouseWheelMoveV().y)
+
+    if input.left_click_held and not input.left_clicked then
+        input.left_drag_x = input.left_drag_x + input.mouse_delta_x
+        input.left_drag_y = input.left_drag_y + input.mouse_delta_y
+        if not input.left_dragging and (input.mouse_delta_x ~= 0 or input.mouse_delta_y ~= 0) then
+            input.left_dragging = true
+        end
+    elseif input.left_click_released then
+        input.left_drag_x = 0
+        input.left_drag_y = 0
+        input.left_dragging = false
+    end
+
+    if input.right_click_held and not input.right_clicked then
+        input.right_drag_x = input.right_drag_x + input.mouse_delta_x
+        input.right_drag_y = input.right_drag_y + input.mouse_delta_y
+        if not input.right_dragging and (input.mouse_delta_x ~= 0 or input.mouse_delta_y ~= 0) then
+            input.right_dragging = true
+        end
+    elseif input.right_click_released then
+        input.right_drag_x = 0
+        input.right_drag_y = 0
+        input.right_dragging = false
+    end
+
+    if input.middle_click_held and not input.middle_clicked then
+        input.middle_drag_x = input.middle_drag_x + input.mouse_delta_x
+        input.middle_drag_y = input.middle_drag_y + input.mouse_delta_y
+        if not input.middle_dragging and (input.mouse_delta_x ~= 0 or input.mouse_delta_y ~= 0) then
+            input.middle_dragging = true
+        end
+    elseif input.middle_click_released then
+        input.middle_drag_x = 0
+        input.middle_drag_y = 0
+        input.middle_dragging = false
+    end
 end
 
 function input.getButtonKeycode(btn: integer): cint

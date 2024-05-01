@@ -41,6 +41,8 @@ global function stateRunExit(sm: *StateMachine, vm: *EVM): void
         current_wavbank,
         current_seqbank
     )
+
+    rl.enableCursor()
 end
 
 global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void

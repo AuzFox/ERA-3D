@@ -184,7 +184,7 @@ global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
 global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
 
-global VM_MAX_CYCLES <comptime> = 65536
+global VM_MAX_CYCLES <comptime> = 133333 -- ~8 million cycles per second
 
 global LOG_MAX_LINES <comptime> = 20
 global LOG_H <comptime> = ((LOG_MAX_LINES + 1) * 9)
@@ -442,6 +442,12 @@ global Icon = @enum {
 	STATE_TRACKER,
 	STATE_MODEL,
 	STATE_TEXTURE,
+	TOOL_PENCIL,
+	TOOL_LINE,
+	TOOL_RECT,
+	TOOL_ELIPSE,
+	TOOL_BUCKET,
+	TOOL_SELECT,
 	COUNT -- not an actual icon, used to count the number of icons
 }
 
@@ -966,6 +972,14 @@ global CoreData = @record {
 	log_command_str: string,
 	log_command_args: sequence(string),
 	log_command_split_index: uinteger,
+	log_update_fn: function(): void,
+	log_draw_fn: function(int32): void,
+	log_prev_update_fn: function(): void,
+	log_prev_draw_fn: function(int32): void,
+	api_current_list: sequence(string),
+	api_list_catagory: integer,
+	api_list_index: integer,
+	current_doc_str: string,
 
 	text_buffer: *[0]uint8,
 	src_lines: sequence(sequence(uint8)),
@@ -1232,18 +1246,18 @@ function CoreData:changeCharacterIndex(new_index: int32): void
 	elseif self.char_index > self.start_char + 68 then
 		self.start_char = math.clamp(self.char_index - 68, 1, math.max(1, #self.current_line - 69))
 	end
-end
-
-function CoreData:changeCodeLine(index: int32): void
-    self.line_index = math.clamp(index, 1, #self.src_lines)
-    self.current_line = self.src_lines[self.line_index]
-    self:changeCharacterIndex(self.char_index)
 
 	if self.line_index < self.start_line + 1 then
 		self.start_line = math.max(self.line_index - 1, 1)
 	elseif self.line_index > self.start_line + 36 then
 		self.start_line = math.clamp(self.line_index - 36, 1, math.max(1, #self.src_lines - 37))
 	end
+end
+
+function CoreData:changeCodeLine(index: int32): void
+    self.line_index = math.clamp(index, 1, #self.src_lines)
+    self.current_line = self.src_lines[self.line_index]
+    self:changeCharacterIndex(self.char_index)
 end
 
 function CoreData:getNewLine(): sequence(uint8)

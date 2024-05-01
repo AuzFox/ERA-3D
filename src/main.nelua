@@ -16,6 +16,13 @@ require("dialog")
 require("input")
 require("docs")
 
+local function consoleUpdate(): void <forwarddecl> end
+local function apiListUpdate(): void <forwarddecl> end
+local function docStringUpdate(): void <forwarddecl> end
+local function consoleDraw(log_y: int32): void <forwarddecl> end
+local function apiListDraw(log_y: int32): void <forwarddecl> end
+local function docStringDraw(log_y: int32): void <forwarddecl> end
+
 local MAX_PARTICLES <comptime> = 24
 
 local TriParticle = @record {
@@ -225,6 +232,12 @@ local function init(): void
 		}
 	}
 
+	core.api_list_catagory = docs.APICatagory.ALL
+	core.api_list_index = 1
+	core.api_current_list = docs.api_lists[core.api_list_catagory]
+	
+	core.log_update_fn = consoleUpdate
+	core.log_draw_fn = consoleDraw
 	core.log_state = LogState.HIDDEN
 	core.animation_type = MenuAnimation.NONE
 	core.anim_time = 0.0
@@ -297,9 +310,13 @@ local function runConsoleCommand(): void
 
 	if cmd == "cls" then
 		core:clearLog()
+	elseif cmd == "api" then
+		core.log_update_fn = apiListUpdate
+		core.log_draw_fn = apiListDraw
 	elseif cmd == "help" then
 		if argc == 1 then
 			core:log(LogEntryType.INFO, "cls   : clear console", false)
+			core:log(LogEntryType.INFO, "api   : view API function list", false)
 			core:log(LogEntryType.INFO, "help  : lookup command/API function help page or list console commands", false)
 			core:log(LogEntryType.INFO, "config: view/set config options", false)
 			core:log(LogEntryType.INFO, " ", false)
@@ -313,6 +330,14 @@ local function runConsoleCommand(): void
 				core:log(LogEntryType.INFO, "    cls", false)
 				core:log(LogEntryType.INFO, "  DESCRIPTION:", false)
 				core:log(LogEntryType.INFO, "    clear all previous output from the console", false)
+			elseif help_cmd == "api" then
+				core:log(LogEntryType.INFO, "  SYNTAX:", false)
+				core:log(LogEntryType.INFO, "    api", false)
+				core:log(LogEntryType.INFO, "  DESCRIPTION:", false)
+				core:log(LogEntryType.INFO, "    view API function list", false)
+				core:log(LogEntryType.INFO, "    press UP/DOWN to navigate list", false)
+				core:log(LogEntryType.INFO, "    press ENTER to view documentation for the selected function", false)
+				core:log(LogEntryType.INFO, "    press ESCAPE to exit the API list viewer", false)
 			elseif help_cmd == "help" then
 				core:log(LogEntryType.INFO, "  SYNTAX:", false)
 				core:log(LogEntryType.INFO, "    help $cmd_or_func", false)
@@ -337,7 +362,11 @@ local function runConsoleCommand(): void
 			else
 				local doc_str: string = docs.getDocString(help_cmd)
 				if doc_str.data ~= nilptr then
-					core:log(LogEntryType.INFO, doc_str, false)
+					core.current_doc_str = doc_str
+					core.log_prev_update_fn = core.log_update_fn
+					core.log_prev_draw_fn = core.log_draw_fn
+					core.log_update_fn = docStringUpdate
+					core.log_draw_fn = docStringDraw
 				else
 					core:log(LogEntryType.HOST_ERROR, "help: help page not found", false)
 				end
@@ -469,28 +498,146 @@ local function runConsoleCommand(): void
 	end
 end
 
+function consoleUpdate(): void
+	if input.pressedRepeat(rl.keyboardKey.ENTER) then
+		core:log(LogEntryType.INPUT, string.format(">%s", core.log_command_str), false)
+		core:splitConsoleCommand()
+		runConsoleCommand()
+		core:clearConsoleCommand()
+		return
+	elseif input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
+		core:deleteConsoleChar()
+		return
+	end
+
+	local c: cint = rl.getCharPressed()
+	while c ~= 0 do
+		core:insertConsoleChar(c)
+		c = rl.getCharPressed()
+	end
+end
+
+function consoleDraw(log_y: int32): void
+	local line_y: int32 = log_y
+	local line_index: int32 = util.wrapI(core.log_index - core.log_count, 0, LOG_MAX_LINES)
+	local lines_drawn: int32 = 0
+	for i = 0, < core.log_count do
+		local line_ptr: *[0]cchar = (@*[0]cchar)(&core.log_text[line_index * 81])
+
+		local col: uint32
+		switch core.log_types[line_index] do
+			case LogEntryType.INPUT then
+				col = GPU_WHITE
+			case LogEntryType.INFO then
+				col = GPU_GREEN
+			case LogEntryType.HOST_ERROR then
+				col = GPU_YELLOW
+			case LogEntryType.COMPILE_ERROR then
+				col = GPU_ORANGE
+			case LogEntryType.RUNTIME_ERROR then
+				col = GPU_RED
+		end
+
+		vm.gpu:printCString2D(0, line_y, col, line_ptr)
+		
+		line_index = util.wrapI(line_index + 1, 0, LOG_MAX_LINES)
+		line_y = line_y + 9
+		lines_drawn = lines_drawn + 1
+	end
+
+	vm.gpu:print2D(0, line_y, GPU_WHITE, ">")
+	vm.gpu:print2D(6, line_y, GPU_WHITE, core.log_command_str)
+	vm.gpu:drawRect2D(6 + (core.log_command_str.size * 6), line_y, 6, 9, core.cursor_color)
+end
+
+function apiListUpdate(): void
+	if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+		core.log_update_fn = consoleUpdate
+		core.log_draw_fn = consoleDraw
+	elseif rl.isKeyPressed(rl.keyboardKey.ENTER) then
+		core.current_doc_str = docs.getDocString(core.api_current_list[core.api_list_index])
+		core.log_prev_update_fn = core.log_update_fn
+		core.log_prev_draw_fn = core.log_draw_fn
+		core.log_update_fn = docStringUpdate
+		core.log_draw_fn = docStringDraw
+	elseif input.pressedRepeat(rl.keyboardKey.UP) then
+		core.api_list_index = math.clamp(core.api_list_index - 1, 1, #core.api_current_list)
+	elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+		core.api_list_index = math.clamp(core.api_list_index + 1, 1, #core.api_current_list)
+	elseif input.pressedRepeat(rl.keyboardKey.LEFT) then
+		core.api_list_catagory = math.clamp(core.api_list_catagory - 1, 0, docs.APICatagory.COUNT - 1)
+		core.api_list_index = 1
+		core.api_current_list = docs.api_lists[core.api_list_catagory]
+	elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+		core.api_list_catagory = math.clamp(core.api_list_catagory + 1, 0, docs.APICatagory.COUNT - 1)
+		core.api_list_index = 1
+		core.api_current_list = docs.api_lists[core.api_list_catagory]
+	end
+end
+
+function apiListDraw(log_y: int32): void
+	local tab_names: []string = {
+		"ALL",
+		"MATH",
+		"VECTORS",
+		"MATRICES",
+		"INPUT",
+		"GRAPHICS",
+		"AUDIO",
+		"PHYSICS",
+		"MEMORY",
+		"MISC"
+	}
+
+	vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 9, GPU_DGRAY)
+	vm.gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
+
+	local x: int32 = 0
+	for i = 0, < #tab_names do
+		local name: string = tab_names[i]
+		vm.gpu:print2D(x, log_y, i == core.api_list_catagory and core.cursor_color or GPU_LGRAY, name)
+		x = x + (#name * 6) + 12
+	end
+	
+	local start_index: integer = math.max(core.api_list_index - 9, 1)
+	for i = start_index, <= start_index + 18 do
+		if i > #core.api_current_list then break end
+
+		if i == core.api_list_index then
+			vm.gpu:drawRect2D(0, log_y + ((i - start_index) * 9) + 9, GPU_VSCREEN_W, 9, GPU_DGRAY & 0xFFFFFFC0)
+			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_WHITE, core.api_current_list[i])
+		else
+			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_LGRAY, core.api_current_list[i])
+		end
+	end
+
+	vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: EXIT   [UP/DOWN]: NAVIGATE LIST   [ENTER]: VIEW FUNCTION DOCS")
+end
+
+function docStringUpdate(): void
+	if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+		core.log_update_fn = core.log_prev_update_fn
+		core.log_draw_fn = core.log_prev_draw_fn
+	end
+end
+
+function docStringDraw(log_y: int32): void
+	vm.gpu:print2D(0, log_y, GPU_GREEN, core.current_doc_str)
+	vm.gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
+	if core.log_prev_update_fn == consoleUpdate then
+		vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO CONSOLE")
+	else
+		vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO API LIST")
+	end
+end
+
 local function updateLog(): void
 	if input.is_ctrl_down then
 		if rl.isKeyPressed(rl.keyboardKey.ENTER) then
 			core.queued_log_state = LogState.HIDDEN
 		end
 	else
-		if input.pressedRepeat(rl.keyboardKey.ENTER) then
-			core:log(LogEntryType.INPUT, string.format(">%s", core.log_command_str), false)
-			core:splitConsoleCommand()
-			runConsoleCommand()
-			core:clearConsoleCommand()
-			return
-		elseif input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
-			core:deleteConsoleChar()
-			return
-		end
-
-		local c: cint = rl.getCharPressed()
-        while c ~= 0 do
-            core:insertConsoleChar(c)
-            c = rl.getCharPressed()
-        end
+		core.log_update_fn()
 	end
 end
 
@@ -793,36 +940,7 @@ local function run(): void
 				vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, LOG_H + 1, GPU_BLACK & 0xFFFFFFE5)
 				vm.gpu:drawRect2D(0, log_y + LOG_H + 1, GPU_VSCREEN_W, 1, GPU_GRAY)
 
-				local line_y: int32 = log_y
-				local line_index: int32 = util.wrapI(core.log_index - core.log_count, 0, LOG_MAX_LINES)
-				local lines_drawn: int32 = 0
-				for i = 0, < core.log_count do
-					local line_ptr: *[0]cchar = (@*[0]cchar)(&core.log_text[line_index * 81])
-
-					local col: uint32
-					switch core.log_types[line_index] do
-						case LogEntryType.INPUT then
-							col = GPU_WHITE
-						case LogEntryType.INFO then
-							col = GPU_GREEN
-						case LogEntryType.HOST_ERROR then
-							col = GPU_YELLOW
-						case LogEntryType.COMPILE_ERROR then
-							col = GPU_ORANGE
-						case LogEntryType.RUNTIME_ERROR then
-							col = GPU_RED
-					end
-
-					vm.gpu:printCString2D(0, line_y, col, line_ptr)
-					
-					line_index = util.wrapI(line_index + 1, 0, LOG_MAX_LINES)
-					line_y = line_y + 9
-					lines_drawn = lines_drawn + 1
-				end
-
-				vm.gpu:print2D(0, line_y, GPU_WHITE, ">")
-				vm.gpu:print2D(6, line_y, GPU_WHITE, core.log_command_str)
-				vm.gpu:drawRect2D(6 + (core.log_command_str.size * 6), line_y, 6, 9, core.cursor_color)
+				core.log_draw_fn(log_y)
 			end
 
 			if core.popup_state ~= PopupState.HIDDEN then
