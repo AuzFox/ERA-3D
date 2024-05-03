@@ -2,8 +2,8 @@
 
 ERA-3D is a 3D fantasy console inspired by 5th generation video game consoles such as the Nintendo 64 and Sony Playstation.
 
-### WARNING
-ERA-3D is still in early development, expect unfinished UI and missing features!
+> [!WARNING]
+> ERA-3D is still in early development, expect unfinished UI and missing features!
 
 ## Specifications
 ```
@@ -19,7 +19,10 @@ Scripting: Custom langauge similar to C
 
 ## Documentation
 
-TODO
+> [!WARNING]
+> ERA-3D is currently lacking documentation for many features.
+
+The [ERA-3D Wiki](https://github.com/AuzFox/ERA-3D/wiki) contains details on the system's memory map and scripting laguage (ERA-C).
 
 ## Building
 
