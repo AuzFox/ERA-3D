@@ -274,6 +274,7 @@ global Opcode = @enum {
 	ADDROF_A,
 	PUSH_ZERO,
 	PUSH_ZEROF,
+	PUSH_ZERO_N,
 	PUSH_ONE,
 	PUSH_ONEF,
 	PUSH_CHAR,

@@ -885,6 +885,9 @@ function EVM:dumpBytecode(): void
 				io.printf("PUSH_ZERO\n")
 			case Opcode.PUSH_ZEROF then
 				io.printf("PUSH_ZEROF\n")
+			case Opcode.PUSH_ZERO_N then
+				index = self:next16()
+				io.printf("PUSH_ZERO_N %d\n", index)
 			case Opcode.PUSH_ONE then
 				io.printf("PUSH_ONE\n")
 			case Opcode.PUSH_ONEF then
@@ -1284,6 +1287,11 @@ function EVM:run(max_cycles: uint64): boolean
 				self:pushU(0)
 			case Opcode.PUSH_ZEROF then
 				self:pushF(0.0)
+			case Opcode.PUSH_ZERO_N then
+				index = self:next16()
+				for i = 0, < index do
+					self:pushU(0)
+				end
 			case Opcode.PUSH_ONE then
 				self:pushU(1)
 			case Opcode.PUSH_ONEF then

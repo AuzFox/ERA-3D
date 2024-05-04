@@ -1018,7 +1018,7 @@ local function expression(vm: *EVM, level: integer): void
 		coroutine.yield()
 	end
 
-	-- unary operators
+	-- literals, struct initializers, and unary operators
 	if vm.token == Token.INT_LITERAL then
 		match(vm, Token.INT_LITERAL)
 
@@ -1056,6 +1056,130 @@ local function expression(vm: *EVM, level: integer): void
 		vm:emit32(vm.token_val)
 		
 		vm.expr_type = {EVMType.STRING, vm.struct_string}
+	elseif vm.token >= Token.VEC2 and vm.token <= Token.STRING then
+		-- new-style struct initializer
+
+		local target_info: TypeInfo = {EVMType.INT}
+
+		switch vm.token do
+			case Token.VEC2 then
+				target_info.structref = vm.struct_vec2
+				match(vm, Token.VEC2)
+				target_info.type_id = EVMType.VEC2
+			case Token.VEC3 then
+				target_info.structref = vm.struct_vec3
+				match(vm, Token.VEC3)
+				target_info.type_id = EVMType.VEC3
+			case Token.STRUCT_ID then
+				target_info.structref = vm.current_id.type_info.structref
+				match(vm, Token.STRUCT_ID)
+				target_info.type_id = EVMType.STRUCT
+			case Token.STRING then
+				target_info.structref = vm.struct_string
+				match(vm, Token.STRING)
+				target_info.type_id = EVMType.STRING
+		end
+
+		match(vm, '('_u8)
+
+		local target_struct: *Struct = target_info.structref
+
+		if vm.token == ')'_u8 then
+			match(vm, ')'_u8)
+			
+			vm:emitOp(Opcode.PUSH_ZERO_N)
+			vm:emit16(target_struct.size)
+		else
+			local target_memberc: isize = #target_struct.members
+			local target_member_info: TypeInfo
+			local memberc: isize = 0
+			
+			while vm.token ~= ')'_u8 do
+				if memberc + 1 > target_memberc then
+					vm.error = string.format("line %d:\ntoo many member values in initializer for struct type `%s`. expected %d", vm.line, target_struct.name, target_memberc)
+					vm.compile_err = true
+					coroutine.yield()
+				else
+					target_member_info = target_struct.members[memberc + 1].type_info
+				end
+				
+				expression(vm, Token.ASSIGN)
+
+				if vm.expr_type.type_id == EVMType.VOID then
+					vm.error = string.format("line %d:\ncannot pass expression of type `void` to struct initializer", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				elseif target_member_info.type_id ~= vm.expr_type.type_id then
+					-- can we convert types?
+					local can_convert: boolean = false
+					
+					if target_member_info.type_id == EVMType.INT and vm.expr_type.type_id == EVMType.FLOAT then
+						can_convert = true
+						vm:emitOp(Opcode.FTOI)
+					elseif target_member_info.type_id == EVMType.INT and vm.expr_type.type_id >= EVMType.POINTER then
+						can_convert = true
+					elseif target_member_info.type_id == EVMType.FLOAT and vm.expr_type.type_id == EVMType.INT then
+						can_convert = true
+						vm:emitOp(Opcode.ITOF)
+					elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.INT then
+						can_convert = true
+					elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id >= EVMType.POINTER then
+						can_convert = true
+					elseif target_member_info.type_id == EVMType.FUNC_POINTER and vm.expr_type.type_id >= EVMType.POINTER then
+						can_convert = (vm.expr_type.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
+					elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.FUNC_POINTER then
+						can_convert = (target_member_info.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
+					end
+					
+					if not can_convert then
+						vm.error = string.format(
+							"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
+							vm.line,
+							memberc + 1,
+							target_struct.name,
+							getTypeName(target_member_info),
+							getTypeName(vm.expr_type)
+						)
+						vm.compile_err = true
+						coroutine.yield()
+					end
+				elseif target_member_info.type_id == EVMType.STRUCT then
+					if target_member_info.structref ~= vm.expr_type.structref then
+						vm.error = string.format("line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`", vm.line, memberc + 1, target_struct.name, target_member_info.structref.name, vm.expr_type.structref.name)
+						vm.compile_err = true
+						coroutine.yield()
+					end
+				elseif target_member_info.type_id == EVMType.FUNC_POINTER then
+					if not matchFuncPointerTypes(target_member_info.fptr_info, vm.expr_type.fptr_info) then
+						vm.error = string.format(
+							"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
+							vm.line,
+							memberc + 1,
+							target_struct.name,
+							getTypeName(target_member_info),
+							getTypeName(vm.expr_type)
+						)
+						vm.compile_err = true
+						coroutine.yield()
+					end
+				end
+
+				memberc = memberc + 1
+				if vm.token == ','_u8 then
+					match(vm, ','_u8)
+				end
+			end
+
+			if memberc < target_memberc then
+				vm.error = string.format("line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d", vm.line, target_struct.name, target_memberc, memberc)
+				vm.compile_err = true
+				coroutine.yield()
+			end
+			
+			match(vm, ')'_u8)
+		end
+
+		vm.expr_type = target_info
 	elseif vm.token == Token.SIZEOF then
 		match(vm, Token.SIZEOF)
 
@@ -1640,99 +1764,107 @@ local function expression(vm: *EVM, level: integer): void
 			match(vm, ')'_u8)
 
 			if vm.token == '{'_u8 then
-				-- struct initializer
+				-- C-style struct initializer
 
 				if target_info.type_id >= EVMType.VEC2 and target_info.type_id <= EVMType.STRING then
 					match(vm, '{'_u8)
 
 					local target_struct: *Struct = target_info.structref
-					local target_memberc: isize = #target_struct.members
-					local target_member_info: TypeInfo
-					local memberc: isize = 0
-					
-					while vm.token ~= '}'_u8 do
-						if memberc + 1 > target_memberc then
-							vm.error = string.format("line %d:\ntoo many member values in initializer for struct type `%s`. expected %d", vm.line, target_struct.name, target_memberc)
+
+					if vm.token == '}'_u8 then
+						match(vm, '}'_u8)
+						
+						vm:emitOp(Opcode.PUSH_ZERO_N)
+						vm:emit16(target_struct.size)
+					else
+						local target_memberc: isize = #target_struct.members
+						local target_member_info: TypeInfo
+						local memberc: isize = 0
+						
+						while vm.token ~= '}'_u8 do
+							if memberc + 1 > target_memberc then
+								vm.error = string.format("line %d:\ntoo many member values in initializer for struct type `%s`. expected %d", vm.line, target_struct.name, target_memberc)
+								vm.compile_err = true
+								coroutine.yield()
+							else
+								target_member_info = target_struct.members[memberc + 1].type_info
+							end
+							
+							expression(vm, Token.ASSIGN)
+		
+							if vm.expr_type.type_id == EVMType.VOID then
+								vm.error = string.format("line %d:\ncannot pass expression of type `void` to struct initializer", vm.line)
+								vm.compile_err = true
+								coroutine.yield()
+							elseif target_member_info.type_id ~= vm.expr_type.type_id then
+								-- can we convert types?
+								local can_convert: boolean = false
+								
+								if target_member_info.type_id == EVMType.INT and vm.expr_type.type_id == EVMType.FLOAT then
+									can_convert = true
+									vm:emitOp(Opcode.FTOI)
+								elseif target_member_info.type_id == EVMType.INT and vm.expr_type.type_id >= EVMType.POINTER then
+									can_convert = true
+								elseif target_member_info.type_id == EVMType.FLOAT and vm.expr_type.type_id == EVMType.INT then
+									can_convert = true
+									vm:emitOp(Opcode.ITOF)
+								elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.INT then
+									can_convert = true
+								elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id >= EVMType.POINTER then
+									can_convert = true
+								elseif target_member_info.type_id == EVMType.FUNC_POINTER and vm.expr_type.type_id >= EVMType.POINTER then
+									can_convert = (vm.expr_type.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
+								elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.FUNC_POINTER then
+									can_convert = (target_member_info.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
+								end
+								
+								if not can_convert then
+									vm.error = string.format(
+										"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
+										vm.line,
+										memberc + 1,
+										target_struct.name,
+										getTypeName(target_member_info),
+										getTypeName(vm.expr_type)
+									)
+									vm.compile_err = true
+									coroutine.yield()
+								end
+							elseif target_member_info.type_id == EVMType.STRUCT then
+								if target_member_info.structref ~= vm.expr_type.structref then
+									vm.error = string.format("line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`", vm.line, memberc + 1, target_struct.name, target_member_info.structref.name, vm.expr_type.structref.name)
+									vm.compile_err = true
+									coroutine.yield()
+								end
+							elseif target_member_info.type_id == EVMType.FUNC_POINTER then
+								if not matchFuncPointerTypes(target_member_info.fptr_info, vm.expr_type.fptr_info) then
+									vm.error = string.format(
+										"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
+										vm.line,
+										memberc + 1,
+										target_struct.name,
+										getTypeName(target_member_info),
+										getTypeName(vm.expr_type)
+									)
+									vm.compile_err = true
+									coroutine.yield()
+								end
+							end
+		
+							memberc = memberc + 1
+							if vm.token == ','_u8 then
+								match(vm, ','_u8)
+							end
+						end
+		
+						if memberc < target_memberc then
+							vm.error = string.format("line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d", vm.line, target_struct.name, target_memberc, memberc)
 							vm.compile_err = true
 							coroutine.yield()
-						else
-							target_member_info = target_struct.members[memberc + 1].type_info
 						end
 						
-						expression(vm, Token.ASSIGN)
-	
-						if vm.expr_type.type_id == EVMType.VOID then
-							vm.error = string.format("line %d:\ncannot pass expression of type `void` to struct initializer", vm.line)
-							vm.compile_err = true
-							coroutine.yield()
-						elseif target_member_info.type_id ~= vm.expr_type.type_id then
-							-- can we convert types?
-							local can_convert: boolean = false
-							
-							if target_member_info.type_id == EVMType.INT and vm.expr_type.type_id == EVMType.FLOAT then
-								can_convert = true
-								vm:emitOp(Opcode.FTOI)
-							elseif target_member_info.type_id == EVMType.INT and vm.expr_type.type_id >= EVMType.POINTER then
-								can_convert = true
-							elseif target_member_info.type_id == EVMType.FLOAT and vm.expr_type.type_id == EVMType.INT then
-								can_convert = true
-								vm:emitOp(Opcode.ITOF)
-							elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.INT then
-								can_convert = true
-							elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id >= EVMType.POINTER then
-								can_convert = true
-							elseif target_member_info.type_id == EVMType.FUNC_POINTER and vm.expr_type.type_id >= EVMType.POINTER then
-								can_convert = (vm.expr_type.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
-							elseif target_member_info.type_id >= EVMType.POINTER and vm.expr_type.type_id == EVMType.FUNC_POINTER then
-								can_convert = (target_member_info.type_id & (EVMType.POINTER - 1) == EVMType.VOID)
-							end
-							
-							if not can_convert then
-								vm.error = string.format(
-									"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
-									vm.line,
-									memberc + 1,
-									target_struct.name,
-									getTypeName(target_member_info),
-									getTypeName(vm.expr_type)
-								)
-								vm.compile_err = true
-								coroutine.yield()
-							end
-						elseif target_member_info.type_id == EVMType.STRUCT then
-							if target_member_info.structref ~= vm.expr_type.structref then
-								vm.error = string.format("line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`", vm.line, memberc + 1, target_struct.name, target_member_info.structref.name, vm.expr_type.structref.name)
-								vm.compile_err = true
-								coroutine.yield()
-							end
-						elseif target_member_info.type_id == EVMType.FUNC_POINTER then
-							if not matchFuncPointerTypes(target_member_info.fptr_info, vm.expr_type.fptr_info) then
-								vm.error = string.format(
-									"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
-									vm.line,
-									memberc + 1,
-									target_struct.name,
-									getTypeName(target_member_info),
-									getTypeName(vm.expr_type)
-								)
-								vm.compile_err = true
-								coroutine.yield()
-							end
-						end
-	
-						memberc = memberc + 1
-						if vm.token == ','_u8 then
-							match(vm, ','_u8)
-						end
+						match(vm, '}'_u8)
 					end
-	
-					if memberc < target_memberc then
-						vm.error = string.format("line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d", vm.line, target_struct.name, target_memberc, memberc)
-						vm.compile_err = true
-						coroutine.yield()
-					end
-					
-					match(vm, '}'_u8)
 				else
 					vm.error = string.format(
 						"line %d:\ninvalid type `%s` for struct initializer",
