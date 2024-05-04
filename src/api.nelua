@@ -25,7 +25,11 @@ function EVM:getMem32(addr: uint32): uint32 <forwarddecl> end
 function EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 function EVM:loadMemCard(new_id: string): boolean <forwarddecl> end
 
-function EVM:getMemColAABB(addr: uint32, box: *ColAABB): boolean <forwarddecl> end
+--function EVM:getMemColPoint(addr: uint32, point: *ColPoint): boolean <forwarddecl> end
+function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean <forwarddecl> end
+--function EVM:getMemColSphere(addr: uint32, sphere: *ColSphere): boolean <forwarddecl> end
+--function EVM:getMemColCylinder(addr: uint32, cylinder: *ColCylinder): boolean <forwarddecl> end
+--function EVM:getMemColTriangle(addr: uint32, triangle: *ColTriangle): boolean <forwarddecl> end
 
 local CollisionFunction: type = @function(*EVM, uint32, uint32): (boolean, uint32)
 
@@ -42,6 +46,10 @@ local function checkPointSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (bool
 end
 
 local function checkPointCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkPointTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	return true, 0
 end
 
@@ -98,6 +106,10 @@ local function checkAABBCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boo
 	return true, 0
 end
 
+local function checkAABBTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
 local function checkSpherePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	return true, 0
 end
@@ -111,6 +123,10 @@ local function checkSphereSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boo
 end
 
 local function checkSphereCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkSphereTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	return true, 0
 end
 
@@ -130,26 +146,54 @@ local function checkCylinderCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): 
 	return true, 0
 end
 
+local function checkCylinderTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkTrianglePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkTriangleAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkTriangleSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkTriangleCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
+local function checkTriangleTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return true, 0
+end
+
 local ColType = @enum {
 	POINT = 0,
 	AABB,
 	SPHERE,
-	CYLINDER
+	CYLINDER,
+	TRIANGLE,
+	COUNT
 }
 
 local collision_type_names: []string = {
 	"colpoint",
 	"colaabb",
 	"colsphere",
-	"colcylinder"
+	"colcylinder",
+	"coltriangle"
 }
 
-local collision_functions: [4][4]CollisionFunction = {
-	-- point             AABB               sphere               cylinder
-	{checkPointPoint   , checkPointAABB   , checkPointSphere   , checkPointCylinder   }, -- point
-	{checkAABBPoint    , checkAABBAABB    , checkAABBSphere    , checkAABBCylinder    }, -- AABB
-	{checkSpherePoint  , checkSphereAABB  , checkSphereSphere  , checkSphereCylinder  }, -- sphere
-	{checkCylinderPoint, checkCylinderAABB, checkCylinderSphere, checkCylinderCylinder}  -- cylinder
+local collision_functions: [ColType.COUNT][ColType.COUNT]CollisionFunction = {
+	-- point             AABB               sphere               cylinder               triangle
+	{checkPointPoint   , checkPointAABB   , checkPointSphere   , checkPointCylinder   , checkPointTriangle},    -- point
+	{checkAABBPoint    , checkAABBAABB    , checkAABBSphere    , checkAABBCylinder    , checkAABBTriangle},     -- AABB
+	{checkSpherePoint  , checkSphereAABB  , checkSphereSphere  , checkSphereCylinder  , checkSphereTriangle},   -- sphere
+	{checkCylinderPoint, checkCylinderAABB, checkCylinderSphere, checkCylinderCylinder, checkCylinderTriangle}, -- cylinder
+	{checkTrianglePoint, checkTriangleAABB, checkTriangleSphere, checkTriangleCylinder, checkTriangleTriangle}, -- triangle
 }
 
 --[[
@@ -3064,7 +3108,7 @@ local function apiCheckCollision(vm: *EVM): boolean
 		return false
 	end
 
-	if a_type > ColType.CYLINDER or b_type > ColType.CYLINDER then
+	if a_type >= ColType.COUNT or b_type >= ColType.COUNT then
 		vm.error = "attempt to call checkCollision() on invalid collision shape type(s)"
 		return false
 	end
@@ -3091,6 +3135,15 @@ local function apiCheckCollision(vm: *EVM): boolean
 	end
 end
 
+local function apiRaycast(vm: *EVM): boolean
+	-- signature:
+	-- int raycast(vec3 position, vec3 direction, float distance, void* colobj);
+
+	vm:pushU(0)
+
+	return true
+end
+
 local function apiCheckAABBPoint(vm: *EVM): boolean
 	-- signature:
 	-- int checkAABBPoint(box b, vec3 p);
@@ -3111,11 +3164,9 @@ local function apiCheckAABBPoint(vm: *EVM): boolean
 	local min_z: float32 = b_position.z - half_depth
 	local max_z: float32 = b_position.z + half_depth
 
-	if p.x < min_x or p.x > max_x then
-		vm:pushI(0)
-	elseif p.y < min_y or p.y > max_y then
-		vm:pushI(0)
-	elseif p.z < min_z or p.z > max_z then
+	if p.x < min_x or p.x > max_x or
+		p.y < min_y or p.y > max_y or
+		p.z < min_z or p.z > max_z then
 		vm:pushI(0)
 	else
 		vm:pushI(1)
@@ -3124,16 +3175,20 @@ local function apiCheckAABBPoint(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetCollisionPoint(vm: *EVM): boolean
+local function apiGetRaycastPoint(vm: *EVM): boolean
 	-- signature:
-	-- vec3 getCollisionPoint();
+	-- vec3 getRaycastPoint();
+
+	vm:pushV3({0.0, 0.0, 0.0})
 
 	return true
 end
 
-local function apiGetCollisionNormal(vm: *EVM): boolean
+local function apiGetRaycastNormal(vm: *EVM): boolean
 	-- signature:
-	-- vec3 getCollisionNormal();
+	-- vec3 getRaycastNormal();
+
+	vm:pushV3({0.0, 0.0, 0.0})
 
 	return true
 end
@@ -3525,16 +3580,16 @@ function EVM:registerBuiltins(): void
 	vertex_struct:addMember(vertex_color)
 	vertex_struct.is_complete = true
 
-	-- define colsphere struct
-	local colsphere_struct: *Struct = new(@Struct)
-	local colsphere_position: *Identifier = new(@Identifier)
-	local colsphere_radius: *Identifier = new(@Identifier)
-	colsphere_struct.name = "colsphere"
-	$colsphere_position = {name="position", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
-	$colsphere_radius = {name="radius", index=3, type_info={EVMType.FLOAT}}
-	colsphere_struct:addMember(colsphere_position)
-	colsphere_struct:addMember(colsphere_radius)
-	colsphere_struct.is_complete = true
+	-- define colpoint struct
+	local colpoint_struct: *Struct = new(@Struct)
+	local colpoint_type: *Identifier = new(@Identifier)
+	local colpoint_position: *Identifier = new(@Identifier)
+	colpoint_struct.name = "colpoint"
+	$colpoint_type = {name="type", index=0, type_info={EVMType.INT}}
+	$colpoint_position = {name="position", index=1, type_info={EVMType.VEC3, self.struct_vec3}}
+	colpoint_struct:addMember(colpoint_type)
+	colpoint_struct:addMember(colpoint_position)
+	colpoint_struct.is_complete = true
 
 	-- define colaabb struct
 	local colaabb_struct: *Struct = new(@Struct)
@@ -3556,15 +3611,32 @@ function EVM:registerBuiltins(): void
 	colaabb_struct:addMember(colaabb_depth)
 	colaabb_struct.is_complete = true
 
+	-- define colsphere struct
+	local colsphere_struct: *Struct = new(@Struct)
+	local colsphere_type: *Identifier = new(@Identifier)
+	local colsphere_position: *Identifier = new(@Identifier)
+	local colsphere_radius: *Identifier = new(@Identifier)
+	colsphere_struct.name = "colsphere"
+	$colsphere_type = {name="type", index=0, type_info={EVMType.INT}}
+	$colsphere_position = {name="position", index=1, type_info={EVMType.VEC3, self.struct_vec3}}
+	$colsphere_radius = {name="radius", index=4, type_info={EVMType.FLOAT}}
+	colsphere_struct:addMember(colsphere_type)
+	colsphere_struct:addMember(colsphere_position)
+	colsphere_struct:addMember(colsphere_radius)
+	colsphere_struct.is_complete = true
+
 	-- define colcylinder struct
 	local colcylinder_struct: *Struct = new(@Struct)
+	local colcylinder_type: *Identifier = new(@Identifier)
 	local colcylinder_position: *Identifier = new(@Identifier)
 	local colcylinder_height: *Identifier = new(@Identifier)
 	local colcylinder_radius: *Identifier = new(@Identifier)
 	colcylinder_struct.name = "colcylinder"
-	$colcylinder_position = {name="position", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
-	$colcylinder_height = {name="height", index=3, type_info={EVMType.FLOAT}}
-	$colcylinder_radius = {name="radius", index=4, type_info={EVMType.FLOAT}}
+	$colcylinder_type = {name="type", index=0, type_info={EVMType.INT}}
+	$colcylinder_position = {name="position", index=1, type_info={EVMType.VEC3, self.struct_vec3}}
+	$colcylinder_height = {name="height", index=4, type_info={EVMType.FLOAT}}
+	$colcylinder_radius = {name="radius", index=5, type_info={EVMType.FLOAT}}
+	colcylinder_struct:addMember(colcylinder_type)
 	colcylinder_struct:addMember(colcylinder_position)
 	colcylinder_struct:addMember(colcylinder_height)
 	colcylinder_struct:addMember(colcylinder_radius)
@@ -3572,13 +3644,16 @@ function EVM:registerBuiltins(): void
 
 	-- define coltriangle struct
 	local coltriangle_struct: *Struct = new(@Struct)
+	local coltriangle_type: *Identifier = new(@Identifier)
 	local coltriangle_point1: *Identifier = new(@Identifier)
 	local coltriangle_point2: *Identifier = new(@Identifier)
 	local coltriangle_point3: *Identifier = new(@Identifier)
 	coltriangle_struct.name = "coltriangle"
-	$coltriangle_point1 = {name="point1", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
-	$coltriangle_point2 = {name="point2", index=3, type_info={EVMType.VEC3, self.struct_vec3}}
-	$coltriangle_point3 = {name="point3", index=6, type_info={EVMType.VEC3, self.struct_vec3}}
+	$coltriangle_type = {name="type", index=0, type_info={EVMType.INT}}
+	$coltriangle_point1 = {name="point1", index=1, type_info={EVMType.VEC3, self.struct_vec3}}
+	$coltriangle_point2 = {name="point2", index=4, type_info={EVMType.VEC3, self.struct_vec3}}
+	$coltriangle_point3 = {name="point3", index=7, type_info={EVMType.VEC3, self.struct_vec3}}
+	coltriangle_struct:addMember(coltriangle_type)
 	coltriangle_struct:addMember(coltriangle_point1)
 	coltriangle_struct:addMember(coltriangle_point2)
 	coltriangle_struct:addMember(coltriangle_point3)
@@ -3587,8 +3662,9 @@ function EVM:registerBuiltins(): void
 	local builtin_structs: []Identifier = {
 		{name="matrix",      type_info={EVMType.STRUCT, matrix_struct}},
 		{name="vertex",      type_info={EVMType.STRUCT, vertex_struct}},
-		{name="colsphere",   type_info={EVMType.STRUCT, colsphere_struct}},
+		{name="colpoint",    type_info={EVMType.STRUCT, colpoint_struct}},
 		{name="colaabb",     type_info={EVMType.STRUCT, colaabb_struct}},
+		{name="colsphere",   type_info={EVMType.STRUCT, colsphere_struct}},
 		{name="colcylinder", type_info={EVMType.STRUCT, colcylinder_struct}},
 		{name="coltriangle", type_info={EVMType.STRUCT, coltriangle_struct}}
 	}
@@ -3619,8 +3695,20 @@ function EVM:registerBuiltins(): void
 	}
 
 	local constructor_ids: []Identifier = {
-		{name="vec2Zero", type_info={EVMType.VEC2, self.struct_vec2}},
-		{name="vec3Zero", type_info={EVMType.VEC3, self.struct_vec3}}
+		{name="vec2Zero", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_ZERO},
+		{name="vec2One", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_ONE},
+		{name="vec2Up", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_UP},
+		{name="vec2Down", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_DOWN},
+		{name="vec2Left", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_LEFT},
+		{name="vec2Right", type_info={EVMType.VEC2, self.struct_vec2}, const_val=Opcode.PUSH_VEC2_RIGHT},
+		{name="vec3Zero", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_ZERO},
+		{name="vec3One", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_ONE},
+		{name="vec3Up", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_UP},
+		{name="vec3Down", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_DOWN},
+		{name="vec3Left", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_LEFT},
+		{name="vec3Right", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_RIGHT},
+		{name="vec3Forward", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_FORWARD},
+		{name="vec3Back", type_info={EVMType.VEC3, self.struct_vec3}, const_val=Opcode.PUSH_VEC3_BACK}
 	}
 
 	self.keywords:reserve(#keyword_ids)
@@ -5032,14 +5120,25 @@ function EVM:registerAPI(): void
 			func=apiCheckCollision
 		},
 		{
-			name="getCollisionPoint",
-			type_info={EVMType.VEC3, self.struct_vec3},
-			func=apiGetCollisionPoint
+			name="raycast",
+			type_info={EVMType.INT},
+			argdata={
+				{EVMType.VEC3, self.struct_vec3},
+				{EVMType.VEC3, self.struct_vec3},
+				{EVMType.FLOAT},
+				{EVMType.VOID + EVMType.POINTER}
+			},
+			func=apiRaycast
 		},
 		{
-			name="getCollisionNormal",
+			name="getRaycastPoint",
 			type_info={EVMType.VEC3, self.struct_vec3},
-			func=apiGetCollisionNormal
+			func=apiGetRaycastPoint
+		},
+		{
+			name="getRaycastNormal",
+			type_info={EVMType.VEC3, self.struct_vec3},
+			func=apiGetRaycastNormal
 		},
 		{
 			name="loadTexBank",

@@ -49,7 +49,6 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "getCam3DRight",
     "getCam3DTarget",
     "getCam3DUp",
-    "getCollisionPoint",
     "getCullMode",
     "getFogColor",
     "getFogEnd",
@@ -69,6 +68,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "getMousePosition",
     "getMouseWheel",
     "getProjectionMatrix",
+    "getRaycastNormal",
+    "getRaycastPoint",
     "getTextureMode",
     "getTopMatrix",
     "getTrackBPM",
@@ -195,30 +196,42 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "vec2DistanceSq",
     "vec2Distance",
     "vec2Dot",
+    "vec2Down",
     "vec2Invert",
+    "vec2Left",
     "vec2LengthSq",
     "vec2Length",
     "vec2Lerp",
     "vec2MoveToward",
     "vec2Normalize",
+    "vec2One",
     "vec2Reflect",
+    "vec2Right",
     "vec2Rotate",
+    "vec2Up",
     "vec2Zero",
     "vec3Angle",
+    "vec3Back",
     "vec3Cross",
     "vec3Direction",
     "vec3DistanceSq",
     "vec3Distance",
     "vec3Dot",
+    "vec3Down",
+    "vec3Forward",
     "vec3Invert",
+    "vec3Left",
     "vec3LengthSq",
     "vec3Length",
     "vec3Lerp",
     "vec3MoveToward",
     "vec3Normalize",
+    "vec3One",
     "vec3Reflect",
+    "vec3Right",
     "vec3Rotate",
     "vec3ToScreen",
+    "vec3Up",
     "vec3Zero",
     "viewport",
     "wrapf",
@@ -258,30 +271,42 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "vec2DistanceSq",
     "vec2Distance",
     "vec2Dot",
+    "vec2Down",
     "vec2Invert",
+    "vec2Left",
     "vec2LengthSq",
     "vec2Length",
     "vec2Lerp",
     "vec2MoveToward",
     "vec2Normalize",
+    "vec2One",
     "vec2Reflect",
+    "vec2Right",
     "vec2Rotate",
+    "vec2Up",
     "vec2Zero",
     "vec3Angle",
+    "vec3Back",
     "vec3Cross",
     "vec3Direction",
     "vec3DistanceSq",
     "vec3Distance",
     "vec3Dot",
+    "vec3Down",
+    "vec3Forward",
     "vec3Invert",
+    "vec3Left",
     "vec3LengthSq",
     "vec3Length",
     "vec3Lerp",
     "vec3MoveToward",
     "vec3Normalize",
+    "vec3One",
     "vec3Reflect",
+    "vec3Right",
     "vec3Rotate",
     "vec3ToScreen",
+    "vec3Up",
     "vec3Zero"
   },
   { -- MATRICES
@@ -423,7 +448,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
   },
   { -- PHYSICS
     "checkCollision",
-    "getCollisionPoint"
+    "getRaycastNormal",
+    "getRaycastPoint"
   },
   { -- MEMORY
     "initMemCard",
@@ -452,12 +478,96 @@ docs.doc_strings["vec2Zero"] =
   DESCRIPTION:
     returns a vec2 with the value {0.0, 0.0}
 ]]
+docs.doc_strings["vec2One"] =
+[[
+  vec2 vec2One()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {1.0, 1.0}
+]]
+docs.doc_strings["vec2Up"] =
+[[
+  vec2 vec2Up()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {0.0, 1.0}
+]]
+docs.doc_strings["vec2Down"] =
+[[
+  vec2 vec2Down()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {0.0, -1.0}
+]]
+docs.doc_strings["vec2Left"] =
+[[
+  vec2 vec2Left()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {-1.0, 0.0}
+]]
+docs.doc_strings["vec2Right"] =
+[[
+  vec2 vec2Right()
+  
+  DESCRIPTION:
+    returns a vec2 with the value {1.0, 0.0}
+]]
 docs.doc_strings["vec3Zero"] =
 [[
   vec3 vec3Zero()
   
   DESCRIPTION:
     returns a vec3 with the value {0.0, 0.0, 0.0}
+]]
+docs.doc_strings["vec3One"] =
+[[
+  vec3 vec3One()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {1.0, 1.0, 1.0}
+]]
+docs.doc_strings["vec3Up"] =
+[[
+  vec3 vec3Up()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {0.0, -1.0, 0.0}
+]]
+docs.doc_strings["vec3Down"] =
+[[
+  vec3 vec3Down()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {0.0, 1.0, 0.0}
+]]
+docs.doc_strings["vec3Left"] =
+[[
+  vec3 vec3Left()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {-1.0, 0.0, 0.0}
+]]
+docs.doc_strings["vec3Right"] =
+[[
+  vec3 vec3Right()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {1.0, 0.0, 0.0}
+]]
+docs.doc_strings["vec3Forward"] =
+[[
+  vec3 vec3Forward()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {0.0, 0.0, -1.0}
+]]
+docs.doc_strings["vec3Back"] =
+[[
+  vec3 vec3Back()
+  
+  DESCRIPTION:
+    returns a vec3 with the value {0.0, 0.0, 1.0}
 ]]
 docs.doc_strings["vargc"] =
 [[
@@ -1550,7 +1660,9 @@ docs.doc_strings["setTrackPan"] = [[]]
 docs.doc_strings["getTrackBPM"] = [[]]
 docs.doc_strings["setTrackBPM"] = [[]]
 docs.doc_strings["checkCollision"] = [[]]
-docs.doc_strings["getCollisionPoint"] = [[]]
+docs.doc_strings["raycast"] = [[]]
+docs.doc_strings["getRaycastPoint"] = [[]]
+docs.doc_strings["getRaycastNormal"] = [[]]
 docs.doc_strings["loadTexBank"] = [[]]
 docs.doc_strings["loadObjBank"] = [[]]
 docs.doc_strings["loadWavBank"] = [[]]

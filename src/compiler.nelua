@@ -1183,18 +1183,7 @@ local function expression(vm: *EVM, level: integer): void
 				result_type = id.type_info
 			end
 
-			local constructor_index: integer = -1
-			local constructor_opcodes: []uint8 = {
-				Opcode.PUSH_VEC2_ZERO,
-				Opcode.PUSH_VEC3_ZERO
-			}
-
-			if id.name == "vec2Zero" then
-				constructor_index = 0
-			elseif id.name == "vec3Zero" then
-				constructor_index = 1
-			end
-
+			local is_constructor: boolean = vm.api_ids:has(id.name) and id.func == nilptr
 			local target_argc: isize = #argdata
 			local target_info: TypeInfo
 			local argc: isize = 0
@@ -1295,7 +1284,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 
-					if constructor_index == -1 then
+					if not is_constructor then
 						size = size + sizeOfType(vm.expr_type)
 					end
 
@@ -1337,8 +1326,8 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emit16(size)
 			else
 				if id.class == Class.API then
-					if constructor_index ~= -1 then
-						vm:emitOp(constructor_opcodes[constructor_index])
+					if is_constructor then
+						vm:emitOp((@uint8)(id.const_val))
 					else
 						vm:emitOp(Opcode.API)
 						vm:emit16(id.index)

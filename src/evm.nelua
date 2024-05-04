@@ -593,28 +593,28 @@ function EVM:setMem32(addr: uint32, val: uint32): boolean
 	return true
 end
 
-function EVM:getMemColAABB(addr: uint32, box: *ColAABB): boolean
+function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean
 	-- address is already confirmed to be aligned
 
 	local intf: IntFloat
 
 	if addr + 24 > MEMORY_MAX_ADDR then
-		self.error = string.format("invalid word write address 0x%08X", addr)
+		self.error = string.format("invalid word read address 0x%08X", addr)
 		return false
 	end
 
 	intf.u = self:getMem32(addr + 4)
-	box.position.x = intf.f
+	aabb.position.x = intf.f
 	intf.u = self:getMem32(addr + 8)
-	box.position.y = intf.f
+	aabb.position.y = intf.f
 	intf.u = self:getMem32(addr + 12)
-	box.position.z = intf.f
+	aabb.position.z = intf.f
 	intf.u = self:getMem32(addr + 16)
-	box.width = intf.f
+	aabb.width = intf.f
 	intf.u = self:getMem32(addr + 20)
-	box.height = intf.f
+	aabb.height = intf.f
 	intf.u = self:getMem32(addr + 24)
-	box.depth = intf.f
+	aabb.depth = intf.f
 
 	return true
 end
@@ -897,8 +897,28 @@ function EVM:dumpBytecode(): void
 				io.printf("PUSH_FLOAT %f\n", self:nextF())
 			case Opcode.PUSH_VEC2_ZERO then
 				io.printf("PUSH_VEC2_ZERO\n")
+			case Opcode.PUSH_VEC2_UP then
+				io.printf("PUSH_VEC2_UP\n")
+			case Opcode.PUSH_VEC2_DOWN then
+				io.printf("PUSH_VEC2_DOWN\n")
+			case Opcode.PUSH_VEC2_LEFT then
+				io.printf("PUSH_VEC2_LEFT\n")
+			case Opcode.PUSH_VEC2_RIGHT then
+				io.printf("PUSH_VEC2_RIGHT\n")
 			case Opcode.PUSH_VEC3_ZERO then
 				io.printf("PUSH_VEC3_ZERO\n")
+			case Opcode.PUSH_VEC3_UP then
+				io.printf("PUSH_VEC3_UP\n")
+			case Opcode.PUSH_VEC3_DOWN then
+				io.printf("PUSH_VEC3_DOWN\n")
+			case Opcode.PUSH_VEC3_LEFT then
+				io.printf("PUSH_VEC3_LEFT\n")
+			case Opcode.PUSH_VEC3_RIGHT then
+				io.printf("PUSH_VEC3_RIGHT\n")
+			case Opcode.PUSH_VEC3_FORWARD then
+				io.printf("PUSH_VEC3_FORWARD\n")
+			case Opcode.PUSH_VEC3_BACK then
+				io.printf("PUSH_VEC3_BACK\n")
 			case Opcode.PUSH_STRING then
 				index = self:next16()
 				local addr: uint32 = self:next32()
@@ -1275,9 +1295,33 @@ function EVM:run(max_cycles: uint64): boolean
 			case Opcode.PUSH_FLOAT then
 				self:pushF(self:nextF())
 			case Opcode.PUSH_VEC2_ZERO then
-				self:pushV2({0,0})
+				self:pushV2({0.0, 0.0})
+			case Opcode.PUSH_VEC2_ONE then
+				self:pushV2({1.0, 1.0})
+			case Opcode.PUSH_VEC2_UP then
+				self:pushV2({0.0, -1.0})
+			case Opcode.PUSH_VEC2_DOWN then
+				self:pushV2({0.0, 1.0})
+			case Opcode.PUSH_VEC2_LEFT then
+				self:pushV2({-1.0, 0.0})
+			case Opcode.PUSH_VEC2_RIGHT then
+				self:pushV2({1.0, 0.0})
 			case Opcode.PUSH_VEC3_ZERO then
-				self:pushV3({0,0,0})
+				self:pushV3({0.0, 0.0, 0.0})
+			case Opcode.PUSH_VEC3_ONE then
+				self:pushV3({1.0, 1.0, 1.0})
+			case Opcode.PUSH_VEC3_UP then
+				self:pushV3({0.0, 1.0, 0.0})
+			case Opcode.PUSH_VEC3_DOWN then
+				self:pushV3({0.0, -1.0, 0.0})
+			case Opcode.PUSH_VEC3_LEFT then
+				self:pushV3({-1.0, 0.0, 0.0})
+			case Opcode.PUSH_VEC3_RIGHT then
+				self:pushV3({1.0, 0.0, 0.0})
+			case Opcode.PUSH_VEC3_FORWARD then
+				self:pushV3({0.0, -1.0, 0.0})
+			case Opcode.PUSH_VEC3_BACK then
+				self:pushV3({0.0, 1.0, 0.0})
 			case Opcode.PUSH_STRING then
 				index = self:next16()
 				local addr: uint32 = self:next32()
