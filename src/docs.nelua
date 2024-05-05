@@ -137,6 +137,7 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "randi",
     "randomizeEx",
     "randomize",
+    "raycast",
     "released",
     "repeated",
     "resumeTracks",
@@ -449,7 +450,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
   { -- PHYSICS
     "checkCollision",
     "getRaycastNormal",
-    "getRaycastPoint"
+    "getRaycastPoint",
+    "raycast"
   },
   { -- MEMORY
     "initMemCard",
@@ -476,98 +478,98 @@ docs.doc_strings["vec2Zero"] =
   vec2 vec2Zero()
   
   DESCRIPTION:
-    returns a vec2 with the value {0.0, 0.0}
+    returns a vec2 with the value vec2(0.0, 0.0)
 ]]
 docs.doc_strings["vec2One"] =
 [[
   vec2 vec2One()
   
   DESCRIPTION:
-    returns a vec2 with the value {1.0, 1.0}
+    returns a vec2 with the value vec2(1.0, 1.0)
 ]]
 docs.doc_strings["vec2Up"] =
 [[
   vec2 vec2Up()
   
   DESCRIPTION:
-    returns a vec2 with the value {0.0, 1.0}
+    returns a vec2 with the value vec2(0.0, 1.0)
 ]]
 docs.doc_strings["vec2Down"] =
 [[
   vec2 vec2Down()
   
   DESCRIPTION:
-    returns a vec2 with the value {0.0, -1.0}
+    returns a vec2 with the value vec2(0.0, -1.0)
 ]]
 docs.doc_strings["vec2Left"] =
 [[
   vec2 vec2Left()
   
   DESCRIPTION:
-    returns a vec2 with the value {-1.0, 0.0}
+    returns a vec2 with the value vec2(-1.0, 0.0)
 ]]
 docs.doc_strings["vec2Right"] =
 [[
   vec2 vec2Right()
   
   DESCRIPTION:
-    returns a vec2 with the value {1.0, 0.0}
+    returns a vec2 with the value vec2(1.0, 0.0)
 ]]
 docs.doc_strings["vec3Zero"] =
 [[
   vec3 vec3Zero()
   
   DESCRIPTION:
-    returns a vec3 with the value {0.0, 0.0, 0.0}
+    returns a vec3 with the value vec3(0.0, 0.0, 0.0)
 ]]
 docs.doc_strings["vec3One"] =
 [[
   vec3 vec3One()
   
   DESCRIPTION:
-    returns a vec3 with the value {1.0, 1.0, 1.0}
+    returns a vec3 with the value vec3(1.0, 1.0, 1.0)
 ]]
 docs.doc_strings["vec3Up"] =
 [[
   vec3 vec3Up()
   
   DESCRIPTION:
-    returns a vec3 with the value {0.0, -1.0, 0.0}
+    returns a vec3 with the value vec3(0.0, -1.0, 0.0)
 ]]
 docs.doc_strings["vec3Down"] =
 [[
   vec3 vec3Down()
   
   DESCRIPTION:
-    returns a vec3 with the value {0.0, 1.0, 0.0}
+    returns a vec3 with the value vec3(0.0, 1.0, 0.0)
 ]]
 docs.doc_strings["vec3Left"] =
 [[
   vec3 vec3Left()
   
   DESCRIPTION:
-    returns a vec3 with the value {-1.0, 0.0, 0.0}
+    returns a vec3 with the value vec3(-1.0, 0.0, 0.0)
 ]]
 docs.doc_strings["vec3Right"] =
 [[
   vec3 vec3Right()
   
   DESCRIPTION:
-    returns a vec3 with the value {1.0, 0.0, 0.0}
+    returns a vec3 with the value vec3(1.0, 0.0, 0.0)
 ]]
 docs.doc_strings["vec3Forward"] =
 [[
   vec3 vec3Forward()
   
   DESCRIPTION:
-    returns a vec3 with the value {0.0, 0.0, -1.0}
+    returns a vec3 with the value vec3(0.0, 0.0, -1.0)
 ]]
 docs.doc_strings["vec3Back"] =
 [[
   vec3 vec3Back()
   
   DESCRIPTION:
-    returns a vec3 with the value {0.0, 0.0, 1.0}
+    returns a vec3 with the value vec3(0.0, 0.0, 1.0)
 ]]
 docs.doc_strings["vargc"] =
 [[
@@ -1372,30 +1374,287 @@ docs.doc_strings["getCam3DProjection"] = [[]]
 docs.doc_strings["setCam3DProjection"] = [[]]
 docs.doc_strings["getCam3DRight"] = [[]]
 docs.doc_strings["getCam3DForward"] = [[]]
-docs.doc_strings["viewport"] = [[]]
-docs.doc_strings["texture"] = [[]]
-docs.doc_strings["getTextureMode"] = [[]]
-docs.doc_strings["setTextureMode"] = [[]]
-docs.doc_strings["getCullMode"] = [[]]
-docs.doc_strings["setCullMode"] = [[]]
-docs.doc_strings["getWireMode"] = [[]]
-docs.doc_strings["setWireMode"] = [[]]
-docs.doc_strings["getFogMode"] = [[]]
-docs.doc_strings["setFogMode"] = [[]]
-docs.doc_strings["getFogStart"] = [[]]
-docs.doc_strings["setFogStart"] = [[]]
-docs.doc_strings["getFogEnd"] = [[]]
-docs.doc_strings["setFogEnd"] = [[]]
-docs.doc_strings["getFogColor"] = [[]]
-docs.doc_strings["setFogColor"] = [[]]
-docs.doc_strings["getBlendMode"] = [[]]
-docs.doc_strings["setBlendMode"] = [[]]
-docs.doc_strings["getLightingMode"] = [[]]
-docs.doc_strings["setLightingMode"] = [[]]
-docs.doc_strings["getAmbientFactor"] = [[]]
-docs.doc_strings["setAmbientFactor"] = [[]]
-docs.doc_strings["getAmbientColor"] = [[]]
-docs.doc_strings["setAmbientColor"] = [[]]
+docs.doc_strings["viewport"] =
+[[
+  void viewport(int x, int y, int width, int height)
+
+  ARGUMENTS:
+    int x     : viewport screen x position
+    int y     : viewport screen y position
+    int width : viewport width
+    int height: viewport height
+  DESCRIPTION:
+    restricts rendering to the given screen rectangle.
+]]
+docs.doc_strings["texture"] =
+[[
+  void texture(int x, int y, int width, int height)
+
+  ARGUMENTS:
+    int x     : texture window x position [0-1023]
+    int y     : texture window y position [0-1023]
+    int width : texture window width [1-256]
+    int height: texture window height [1-256]
+  DESCRIPTION:
+    changes the window of texture memory to use as the current texture.
+
+    a maximum texture size of 256x256 can be specified.
+
+    texture UV coordinates will be mapped to the specified texture window.
+]]
+docs.doc_strings["getTextureMode"] =
+[[
+  int getTextureMode()
+
+  DESCRIPTION:
+    returns the current texture mode.
+
+    see setTextureMode() for a list of modes.
+]]
+docs.doc_strings["setTextureMode"] =
+[[
+  void setTextureMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new texture mode to use [0-2]
+  DESCRIPTION:
+    changes the current texture mode setting.
+
+    mode must be one of the following values:
+      0: repeat texture (default)
+      1: clamp texture to edges
+      2: disable texturing
+    
+    modes 0 and 1 determine whether UVs outside of the 0.0-1.0 range
+    will be cause the texture to be repeated accross a surface, or
+    if UVs should be clamped to the 0.0-1.0 range.
+
+    mode 2 will ignore texture pixel colors and output
+    pure white instead.
+]]
+docs.doc_strings["getCullMode"] =
+[[
+  int getCullMode()
+
+  DESCRIPTION:
+    returns the current face culling mode.
+
+    see setCullMode() for a list of modes.
+]]
+docs.doc_strings["setCullMode"] =
+[[
+  void setCullMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new face culling mode to use [0-2]
+  DESCRIPTION:
+    changes the current face culling mode setting.
+
+    mode must be one of the following values:
+      0: cull backfaces (default)
+      1: cull frontfaces
+      2: disable face culling
+]]
+docs.doc_strings["getWireMode"] =
+[[
+  int getWireMode()
+
+  DESCRIPTION:
+    returns true if wireframe mode is currently enabled.
+    otherwise, returns false.
+]]
+docs.doc_strings["setWireMode"] =
+[[
+  void setWireMode(int mode)
+
+  ARGUMENTS:
+    int mode: the wireframe mode to use [true/false]
+  DESCRIPTION:
+    enables/disables wireframe mode.
+
+    if mode is true, wireframe mode will be enabled.
+    otherwise, wireframe mode will be disabled.
+]]
+docs.doc_strings["getFogMode"] =
+[[
+  int getFogMode()
+
+  DESCRIPTION:
+    returns true if fog is currently enabled.
+    otherwise, returns false.
+]]
+docs.doc_strings["setFogMode"] =
+[[
+  void setFogMode(int mode)
+
+  ARGUMENTS:
+    int mode: the fog mode to use [true/false]
+  DESCRIPTION:
+    enables/disables fog.
+
+    if mode is true, fog rendering will be enabled.
+    otherwise, fog rendering will be disabled.
+
+    fog is rendered by fading the color of geometry to the set fog color.
+    the fog start setting determines how far from the camera the fade begins.
+    the fog end setting is the distance from the camera where objects
+    will be fully tinted to the fog color.
+]]
+docs.doc_strings["getFogStart"] =
+[[
+  float getFogStart();
+
+  DESCRIPTION:
+    returns the fog starting distance setting.
+
+    see setFogMode().
+]]
+docs.doc_strings["setFogStart"] =
+[[
+  void setFogStart(float start);
+  
+  ARGUMENTS:
+    float start: the distance from the camera to start
+                 rendering fog. [0.0-1000.0]
+  DESCRIPTION:
+    sets the fog starting distance setting.
+
+    see setFogMode().
+]]
+docs.doc_strings["getFogEnd"] =
+[[
+  float getFogEnd();
+
+  DESCRIPTION:
+    returns the fog end distance setting.
+
+    see setFogMode().
+]]
+docs.doc_strings["setFogEnd"] =
+[[
+  void setFogEnd(float end);
+  
+  ARGUMENTS:
+    float end: the distance from the camera where the
+               fog ends. [0.0-1000.0]
+  DESCRIPTION:
+    sets the fog end distance setting.
+
+    see setFogMode().
+]]
+docs.doc_strings["getFogColor"] =
+[[
+  int getFogColor()
+
+  DESCRIPTION:
+    returns the current fog tint color.
+
+    see setFogMode().
+]]
+docs.doc_strings["setFogColor"] =
+[[
+  void setFogColor(int color)
+
+  ARGUMENTS:
+    int color: the fog color to use (RGBA32 format)
+  DESCRIPTION:
+    sets the current fog tint color.
+
+    see setFogMode().
+]]
+docs.doc_strings["getBlendMode"] =
+[[
+  int getBlendMode()
+
+  DESCRIPTION:
+    returns the current blending mode.
+
+    see setBlendMode().
+]]
+docs.doc_strings["setBlendMode"] =
+[[
+  void setBlendMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new blending mode to use [0-4]
+  DESCRIPTION:
+    changes the current color blending mode setting.
+
+    mode must be one of the following values:
+      0: blend considering alpha (default)
+      1: additive blending
+      2: multiplicative blending
+      3: additive blending (alternative)
+      4: subtractive blending
+]]
+docs.doc_strings["getLightingMode"] =
+[[
+  int getLightingMode()
+
+  DESCRIPTION:
+    returns true if lighting is currently enabled.
+    otherwise, returns false.
+
+    see setLightingMode().
+]]
+docs.doc_strings["setLightingMode"] =
+[[
+  void setLightingMode(int mode)
+
+  ARGUMENTS:
+    int mode: the lighting mode to use [true/false]
+  DESCRIPTION:
+    enables/disables vertex lighting.
+
+    if mode is true, lighting will be enabled.
+    otherwise, lighting will be disabled.
+
+    vertex lighting changes vertex colors to simulate lighting.
+    when lighting is enabled, meshColor() calls will be ignored.
+
+    ambient lighting is also calculated when lighting is enabled.
+    ambient lighting is a form of light that every object
+    recieves equally.
+]]
+docs.doc_strings["getAmbientFactor"] =
+[[
+  float getAmbientFactor()
+
+  DESCRIPTIONS:
+    returns the current ambient light factor.
+
+    see setAmbientFactor().
+]]
+docs.doc_strings["setAmbientFactor"] =
+[[
+  void setAmbientFactor(float factor)
+  
+  ARGUMENTS:
+    float factor: percentage of ambient light tinting [0.0-100.0]
+  DESCRIPTIONS:
+    sets the current ambient light factor.
+
+    the ambient factor is the percentage of tinting that objects will
+    recieve from ambient lighting. (0.0 to 100.0)
+]]
+docs.doc_strings["getAmbientColor"] =
+[[
+  int getAmbientColor()
+
+  DESCRIPTION:
+    returns the current ambient lighting color.
+
+    see setAmbientColor().
+]]
+docs.doc_strings["setAmbientColor"] =
+[[
+  void setAmbientColor(int color)
+
+  ARGUMENTS:
+    int color: the ambient light color to use (RGBA32 format)
+  DESCRIPTION:
+    sets the current ambient lighting color.
+]]
 docs.doc_strings["getLightEnabled"] = [[]]
 docs.doc_strings["setLightEnabled"] = [[]]
 docs.doc_strings["getLightType"] = [[]]
@@ -1663,17 +1922,135 @@ docs.doc_strings["checkCollision"] = [[]]
 docs.doc_strings["raycast"] = [[]]
 docs.doc_strings["getRaycastPoint"] = [[]]
 docs.doc_strings["getRaycastNormal"] = [[]]
-docs.doc_strings["loadTexBank"] = [[]]
-docs.doc_strings["loadObjBank"] = [[]]
-docs.doc_strings["loadWavBank"] = [[]]
-docs.doc_strings["loadSeqBank"] = [[]]
-docs.doc_strings["initMemCard"] = [[]]
-docs.doc_strings["peek8"] = [[]]
-docs.doc_strings["poke8"] = [[]]
-docs.doc_strings["peek32"] = [[]]
-docs.doc_strings["poke32"] = [[]]
-docs.doc_strings["memcpy"] = [[]]
-docs.doc_strings["memset"] = [[]]
+docs.doc_strings["loadTexBank"] =
+[[
+  void loadTexBank(int bank)
+
+  ARGUMENTS:
+    int bank: index of the texture bank to load [0-3]
+  DESCRIPTION:
+    loads a texture bank from the cartridge into system memory.
+
+    system texture data is stored in the address range
+    0x00800000 to 0x00BFFFFF.
+]]
+docs.doc_strings["loadObjBank"] =
+[[
+  void loadObjBank(int bank)
+
+  ARGUMENTS:
+    int bank: index of the object bank to load [0-3]
+  DESCRIPTION:
+    loads an object bank from the cartridge into system memory.
+
+    system object data is stored in the address range
+    0x00C00000 to 0x00F5FFFF.
+]]
+docs.doc_strings["loadWavBank"] =
+[[
+  void loadWavBank(int bank)
+
+  ARGUMENTS:
+    int bank: index of the wave bank to load [0-1]
+  DESCRIPTION:
+    loads a wave bank from the cartridge into system memory.
+
+    system wave data is stored in the address range
+    0x01000000 to 0x016FFFFF.
+]]
+docs.doc_strings["loadSeqBank"] =
+[[
+  void loadSeqBank(int bank)
+
+  ARGUMENTS:
+    int bank: index of the sequencer bank to load [0-7]
+  DESCRIPTION:
+    loads a sequencer bank from the cartridge into system memory.
+
+    system sequencer data is stored in the address range
+    0x01700000 to 0x0173FFFF.
+]]
+docs.doc_strings["initMemCard"] =
+[[
+  void initMemCard(string id)
+
+  ARGUMENTS:
+    string id: unique identifier for memory card data
+  DESCRIPTION:
+    initializes the system's memory card memory range.
+    memory card data is stored in the address range 0x05800000 to 0x05800FFF.
+
+    id is a string used to identify saved memory card data.
+    id must be between 1 and 16 characters long and may only contain
+    the characters A-Z, a-z, 0-9, and _
+
+    if save data matching the given id exists, it will be loaded.
+    write bytes to the address range 0x05800000 to 0x05800FFF to save
+    data to the memory card.
+]]
+docs.doc_strings["peek8"] =
+[[
+  int peek8(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the value of the byte at the given memory address.
+]]
+docs.doc_strings["poke8"] =
+[[
+  void poke8(void* address, int value)
+
+  ARGUMENTS:
+    void* address: memory pointer to write to
+    int value    : byte value to write
+  DESCRIPTION:
+    writes the given byte to the given memory address.
+]]
+docs.doc_strings["peek32"] =
+[[
+  int peek32(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the 32-bit integer value starting at the given memory address.
+]]
+docs.doc_strings["poke32"] =
+[[
+  void poke32(void* address, int value)
+
+  ARGUMENTS:
+    void* address: memory pointer to write to
+    int value    : 32-bit integer value to write
+  DESCRIPTION:
+    writes the 32-bit integer to the given memory address.
+]]
+docs.doc_strings["memcpy"] =
+[[
+  void memcpy(void* destination, void* source, int n)
+
+  ARGUMENTS:
+    void* destination: the memory address to write to
+    void* source     : the memory address to read from
+    int n            : the amount of bytes to read
+  DESCRIPTION:
+    copies n bytes from source to destination.
+
+    source and destination buffers may safely overlap.
+]]
+docs.doc_strings["memset"] =
+[[
+  void memset(void* destination, int n, int value)
+
+  ARGUMENTS:
+    void* destination: the memory address to write to
+    int n            : the amount of bytes to write
+    int value        : byte value to write
+  DESCRIPTION:
+    copies the given byte value to the first n bytes
+    starting at the destination address.
+]]
 
 function docs.getDocString(func: string): string
     local has: boolean
