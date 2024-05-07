@@ -1655,18 +1655,151 @@ docs.doc_strings["setAmbientColor"] =
   DESCRIPTION:
     sets the current ambient lighting color.
 ]]
-docs.doc_strings["getLightEnabled"] = [[]]
-docs.doc_strings["setLightEnabled"] = [[]]
-docs.doc_strings["getLightType"] = [[]]
-docs.doc_strings["setLightType"] = [[]]
-docs.doc_strings["getLightRadius"] = [[]]
-docs.doc_strings["setLightRadius"] = [[]]
-docs.doc_strings["getLightPosition"] = [[]]
-docs.doc_strings["setLightPosition"] = [[]]
-docs.doc_strings["getLightDirection"] = [[]]
-docs.doc_strings["setLightDirection"] = [[]]
-docs.doc_strings["getLightColor"] = [[]]
-docs.doc_strings["setLightColor"] = [[]]
+docs.doc_strings["getLightEnabled"] =
+[[
+  int getLightEnabled(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns true if the given light is enabled,
+    otherwise, returns false.
+
+    see setLightEnabled().
+]]
+docs.doc_strings["setLightEnabled"] =
+[[
+  void setLightEnabled(int light, int enabled)
+
+  ARGUMENTS:
+    int light  : index of the light [0-7]
+    int enabled: the enabled mode to use [true/false]
+  DESCRIPTION:
+    sets the enabled flag on the given light.
+
+    when a light is enabled, it will be used in lighting calculations.
+]]
+docs.doc_strings["getLightType"] =
+[[
+  int getLightType(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns the type of the given light.
+
+    see setLightType().
+]]
+docs.doc_strings["setLightType"] =
+[[
+  void setLightType(int light, int type)
+
+  ARGUMENTS:
+    int light: index of the light [0-7]
+    int type : the type to use [0-1]
+  DESCRIPTION:
+    sets the type flag on the given light.
+
+    type must be one of the following values:
+      0: point light
+      1: directional light
+    
+    point lights emit light in a radius around them, like a lightbulb.
+    directional lights cast light on all objects regardless of distance,
+    but only in one direction.
+    
+    for example, a directional light could be used to simulate sunlight.
+]]
+docs.doc_strings["getLightRadius"] =
+[[
+  float getLightRadius(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns the radius value of the given light.
+
+    see setLightRadius().
+]]
+docs.doc_strings["setLightRadius"] =
+[[
+  void setLightRadius(int light, float radius)
+
+  ARGUMENTS:
+    int light   : index of the light [0-7]
+    float radius: the radius value to use
+  DESCRIPTION:
+    sets the radius value on the given light.
+
+    directional lights ignore this value.
+]]
+docs.doc_strings["getLightPosition"] =
+[[
+  vec3 getLightPosition(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns the position of the given light.
+
+    see setLightPosition().
+]]
+docs.doc_strings["setLightPosition"] =
+[[
+  void setLightPosition(int light, vec3 position)
+
+  ARGUMENTS:
+    int light    : index of the light [0-7]
+    vec3 position: the position value to use
+  DESCRIPTION:
+    sets the position of the given light.
+
+    directional lights ignore this value.
+]]
+docs.doc_strings["getLightDirection"] =
+[[
+  vec3 getLightDirection(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns the direction of the given light.
+
+    see setLightDirection().
+]]
+docs.doc_strings["setLightDirection"] =
+[[
+  void setLightDirection(int light, vec3 direction)
+
+  ARGUMENTS:
+    int light     : index of the light [0-7]
+    vec3 direction: the direction value to use
+  DESCRIPTION:
+    sets the direction of the given light.
+
+    direction must be normalized.
+
+    points lights ignore this value.
+]]
+docs.doc_strings["getLightColor"] =
+[[
+  int getLightColor(int light)
+
+  ARGUMENTS:
+    int light: index of the light to query [0-7]
+  DESCRIPTION:
+    returns the color of the given light.
+]]
+docs.doc_strings["setLightColor"] =
+[[
+  void setLightColor(int light, int color)
+
+  ARGUMENTS:
+    int light: index of the light [0-7]
+    int color: the color value to use (RGBA32 format)
+  DESCRIPTION:
+    sets the color the given light.
+]]
 docs.doc_strings["clear"] =
 [[
   void clear(int color)
@@ -1892,7 +2025,29 @@ docs.doc_strings["endMesh"] =
 
     must only be called after a matching call to beginMesh().
 ]]
-docs.doc_strings["print2D"] = [[]]
+docs.doc_strings["print2D"] =
+[[
+  void print2D(int x, int y, int color, string fmt, ...)
+
+  ARGUMENTS:
+    int x     : text screen x position
+    int y     : text screen y position
+    int color : the text color to use (RGBA32 format)
+    string fmt: format text string
+    ...       : format values
+  DESCRIPTION:
+    prints a formatted text string to the screen.
+    
+    format specifiers:
+    %%       literal '%' character
+    %d or %i signed integer value
+    %u       unsigned integer value
+    %f       float value
+    %x       lowercase hexidecimal integer value
+    %X       uppercase hexidecimal integer value
+    %v2      vec2 value
+    %v3      vec3 value
+]]
 docs.doc_strings["sprite2D"] = [[]]
 docs.doc_strings["sprite2DEx"] = [[]]
 docs.doc_strings["drawObj"] = [[]]

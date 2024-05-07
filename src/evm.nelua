@@ -593,12 +593,49 @@ function EVM:setMem32(addr: uint32, val: uint32): boolean
 	return true
 end
 
-function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean
+function EVM:getMemColPoint(addr: uint32, point: *ColPoint): boolean
 	-- address is already confirmed to be aligned
+
+	--[[ memory layout
+		 0-3  type
+		 4-7  position.x
+		 8-11 position.x
+		12-15 position.x
+	]]
 
 	local intf: IntFloat
 
-	if addr + 24 > MEMORY_MAX_ADDR then
+	if addr + 15 > MEMORY_MAX_ADDR then
+		self.error = string.format("invalid word read address 0x%08X", addr)
+		return false
+	end
+
+	intf.u = self:getMem32(addr + 4)
+	point.position.x = intf.f
+	intf.u = self:getMem32(addr + 8)
+	point.position.y = intf.f
+	intf.u = self:getMem32(addr + 12)
+	point.position.z = intf.f
+
+	return true
+end
+
+function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean
+	-- address is already confirmed to be aligned
+
+	--[[ memory layout
+		 0-3  type
+		 4-7  position.x
+		 8-11 position.x
+		12-15 position.x
+		16-19 width
+		20-13 height
+		24-27 depth
+	]]
+
+	local intf: IntFloat
+
+	if addr + 27 > MEMORY_MAX_ADDR then
 		self.error = string.format("invalid word read address 0x%08X", addr)
 		return false
 	end
@@ -615,6 +652,114 @@ function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean
 	aabb.height = intf.f
 	intf.u = self:getMem32(addr + 24)
 	aabb.depth = intf.f
+
+	return true
+end
+
+function EVM:getMemColSphere(addr: uint32, sphere: *ColSphere): boolean
+	-- address is already confirmed to be aligned
+
+	--[[ memory layout
+		 0-3  type
+		 4-7  position.x
+		 8-11 position.x
+		12-15 position.x
+		16-19 radius
+	]]
+
+	local intf: IntFloat
+
+	if addr + 19 > MEMORY_MAX_ADDR then
+		self.error = string.format("invalid word read address 0x%08X", addr)
+		return false
+	end
+
+	intf.u = self:getMem32(addr + 4)
+	sphere.position.x = intf.f
+	intf.u = self:getMem32(addr + 8)
+	sphere.position.y = intf.f
+	intf.u = self:getMem32(addr + 12)
+	sphere.position.z = intf.f
+	intf.u = self:getMem32(addr + 16)
+	sphere.radius = intf.f
+
+	return true
+end
+
+function EVM:getMemColCylinder(addr: uint32, cylinder: *ColCylinder): boolean
+	-- address is already confirmed to be aligned
+
+	--[[ memory layout
+		 0-3  type
+		 4-7  position.x
+		 8-11 position.x
+		12-15 position.x
+		16-19 height
+		20-23 radius
+	]]
+
+	local intf: IntFloat
+
+	if addr + 23 > MEMORY_MAX_ADDR then
+		self.error = string.format("invalid word read address 0x%08X", addr)
+		return false
+	end
+
+	intf.u = self:getMem32(addr + 4)
+	cylinder.position.x = intf.f
+	intf.u = self:getMem32(addr + 8)
+	cylinder.position.y = intf.f
+	intf.u = self:getMem32(addr + 12)
+	cylinder.position.z = intf.f
+	intf.u = self:getMem32(addr + 16)
+	cylinder.height = intf.f
+	intf.u = self:getMem32(addr + 20)
+	cylinder.radius = intf.f
+
+	return true
+end
+
+function EVM:getMemColTriangle(addr: uint32, triangle: *ColTriangle): boolean
+	-- address is already confirmed to be aligned
+
+	--[[ memory layout
+		 0-3  type
+		 4-7  point1.x
+		 8-11 point1.y
+		12-15 point1.z
+		16-19 point2.x
+		20-23 point2.y
+		24-27 point2.z
+		28-31 point3.x
+		32-35 point3.y
+		36-39 point3.z
+	]]
+
+	local intf: IntFloat
+
+	if addr + 39 > MEMORY_MAX_ADDR then
+		self.error = string.format("invalid word read address 0x%08X", addr)
+		return false
+	end
+
+	intf.u = self:getMem32(addr + 4)
+	triangle.point1.x = intf.f
+	intf.u = self:getMem32(addr + 8)
+	triangle.point1.y = intf.f
+	intf.u = self:getMem32(addr + 12)
+	triangle.point1.z = intf.f
+	intf.u = self:getMem32(addr + 16)
+	triangle.point2.x = intf.f
+	intf.u = self:getMem32(addr + 20)
+	triangle.point2.y = intf.f
+	intf.u = self:getMem32(addr + 24)
+	triangle.point2.z = intf.f
+	intf.u = self:getMem32(addr + 28)
+	triangle.point3.x = intf.f
+	intf.u = self:getMem32(addr + 32)
+	triangle.point3.y = intf.f
+	intf.u = self:getMem32(addr + 36)
+	triangle.point3.z = intf.f
 
 	return true
 end
@@ -2395,7 +2540,7 @@ function EVM:saveCart(filename: string): boolean
 				err = zip_entry_write(zip, ptr, #line)
 				line[#line] = '\0'_u8 -- restore terminator
 			else
-				err = zip_entry_write(zip, ptr, #line)
+				err = zip_entry_write(zip, ptr, #line - 1) -- don't save the terminator to the file
 			end
 			if err ~= ZIP_OK then
 				self.error = string.format("failed to save src.ec to cart: (error code %d)", err)

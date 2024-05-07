@@ -619,13 +619,38 @@ global EVMString = @record {
     data: uint32 -- string data virtual address
 }
 
--- record used to represet an ERA-C colaabb struct
+-- records used to represet ERA-C collision object structs
+global ColPoint = @record {
+    type: uint32,
+    position: rl.vector3
+}
+
 global ColAABB = @record {
     type: uint32,
     position: rl.vector3,
     width: float32,
     height: float32,
     depth: float32
+}
+
+global ColSphere = @record {
+    type: uint32,
+    position: rl.vector3,
+    radius: float32
+}
+
+global ColCylinder = @record {
+    type: uint32,
+    position: rl.vector3,
+    height: float32,
+    radius: float32
+}
+
+global ColTriangle = @record {
+    type: uint32,
+    point1: rl.vector3,
+    point2: rl.vector3,
+    point3: rl.vector3
 }
 
 -- record that tracks data used by the vm when calling functions

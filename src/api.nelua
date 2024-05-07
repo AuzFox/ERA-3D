@@ -11,6 +11,7 @@ function EVM:getArgV2(i: uint16): rl.vector2 <forwarddecl> end
 function EVM:getArgV3(i: uint16): rl.vector3 <forwarddecl> end
 function EVM:getArgStr(i: uint16): EVMString <forwarddecl> end
 function EVM:getArgMat(i: uint16): rl.matrix <forwarddecl> end
+
 function EVM:pushI(val: int32): void <forwarddecl> end
 function EVM:pushU(val: uint32): void <forwarddecl> end
 function EVM:pushF(val: float32): void <forwarddecl> end
@@ -25,36 +26,51 @@ function EVM:getMem32(addr: uint32): uint32 <forwarddecl> end
 function EVM:setMem32(addr: uint32, val: uint32): boolean <forwarddecl> end
 function EVM:loadMemCard(new_id: string): boolean <forwarddecl> end
 
---function EVM:getMemColPoint(addr: uint32, point: *ColPoint): boolean <forwarddecl> end
+function EVM:getMemColPoint(addr: uint32, point: *ColPoint): boolean <forwarddecl> end
 function EVM:getMemColAABB(addr: uint32, aabb: *ColAABB): boolean <forwarddecl> end
---function EVM:getMemColSphere(addr: uint32, sphere: *ColSphere): boolean <forwarddecl> end
---function EVM:getMemColCylinder(addr: uint32, cylinder: *ColCylinder): boolean <forwarddecl> end
---function EVM:getMemColTriangle(addr: uint32, triangle: *ColTriangle): boolean <forwarddecl> end
+function EVM:getMemColSphere(addr: uint32, sphere: *ColSphere): boolean <forwarddecl> end
+function EVM:getMemColCylinder(addr: uint32, cylinder: *ColCylinder): boolean <forwarddecl> end
+function EVM:getMemColTriangle(addr: uint32, triangle: *ColTriangle): boolean <forwarddecl> end
 
 local CollisionFunction: type = @function(*EVM, uint32, uint32): (boolean, uint32)
 
 local function checkPointPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	local a: ColPoint
+	local b: ColPoint
+	if not vm:getMemColPoint(a_addr, &a) then return false, 0 end
+	if not vm:getMemColPoint(b_addr, &b) then return false, 0 end
+
+	if a.position.x == b.position.x and
+		a.position.y == b.position.y and
+		a.position.z == b.position.z then
+		return true, 1
+	else
+		return true, 0
+	end
 end
 
 local function checkPointAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkPointSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkPointCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkPointTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkAABBPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkPointAABB(vm, b_addr, a_addr)
 end
 
 local function checkAABBAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
@@ -91,7 +107,12 @@ local function checkAABBAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean
 		b.position.z + half_b_depth
 	}
 
-	if (min_a.x <= max_b.x) and (max_a.x >= min_b.x) and (min_a.y <= max_b.y) and (max_a.y >= min_b.y) and (min_a.z <= max_b.z) and (max_a.z >= min_b.z) then
+	if (min_a.x <= max_b.x) and
+		(max_a.x >= min_b.x) and
+		(min_a.y <= max_b.y) and
+		(max_a.y >= min_b.y) and
+		(min_a.z <= max_b.z) and
+		(max_a.z >= min_b.z) then
 		return true, 1
 	else
 		return true, 0
@@ -99,74 +120,83 @@ local function checkAABBAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean
 end
 
 local function checkAABBSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkAABBCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkAABBTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkSpherePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkPointSphere(vm, b_addr, a_addr)
 end
 
 local function checkSphereAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkAABBSphere(vm, b_addr, a_addr)
 end
 
 local function checkSphereSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkSphereCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkSphereTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkCylinderPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkPointCylinder(vm, b_addr, a_addr)
 end
 
 local function checkCylinderAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkAABBCylinder(vm, b_addr, a_addr)
 end
 
 local function checkCylinderSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkSphereCylinder(vm, b_addr, a_addr)
 end
 
 local function checkCylinderCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkCylinderTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
 local function checkTrianglePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkPointTriangle(vm, b_addr, a_addr)
 end
 
 local function checkTriangleAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkAABBTriangle(vm, b_addr, a_addr)
 end
 
 local function checkTriangleSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkSphereTriangle(vm, b_addr, a_addr)
 end
 
 local function checkTriangleCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return true, 0
+	return checkCylinderTriangle(vm, b_addr, a_addr)
 end
 
 local function checkTriangleTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	-- TODO: implement
 	return true, 0
 end
 
@@ -483,6 +513,8 @@ local function apiPrint2D(vm: *EVM): boolean
 							vm.error = string.format("invalid format specifier `%%v%c`", c)
 							return false
 					end
+				case '%'_u8 then
+					vm.gpu:drawChar2D(c, &cur_x, y, ray_col)
 				else
 					vm.error = string.format("invalid format specifier `%%%c`", c)
 					return false
