@@ -4,6 +4,7 @@ local CANVAS_X <comptime> = 6 + 128 + 6
 local CANVAS_Y <comptime> = 18
 local CANVAS_W <comptime> = 320
 local CANVAS_H <comptime> = 320
+local TEXBANK_LIST_Y <comptime> = 146
 local TOOL_LIST_Y <comptime> = 182
 local PALETTE_Y <comptime> = 218
 
@@ -36,6 +37,7 @@ local pan_window_start_y: int32
 local pan_type: uint8 = PanType.NONE
 local mouse_in_canvas: boolean = false
 local mouse_in_minimap: boolean = false
+local mouse_in_texbank_list: boolean = false
 local mouse_in_tool_list: boolean = false
 local mouse_in_color_palette: boolean = false
 local current_tool: integer = ToolType.PENCIL
@@ -59,6 +61,7 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
 
     mouse_in_canvas = input.isMouseInRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H)
     mouse_in_minimap = input.isMouseInRect(6, CANVAS_Y, 128, 128)
+    mouse_in_texbank_list = input.isMouseInRect(60, TEXBANK_LIST_Y, 48, 9)
     mouse_in_tool_list = input.isMouseInRect(6, TOOL_LIST_Y, 48, 36)
     mouse_in_color_palette = input.isMouseInRect(6, PALETTE_Y, 96, 18)
     
@@ -86,6 +89,14 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
 
     if rl.isKeyPressed(rl.keyboardKey.X) then
         primary_color, secondary_color = secondary_color, primary_color
+    end
+
+    if mouse_in_texbank_list and pan_type == PanType.NONE and input.left_clicked then
+        vm.gpu:setBankPointers(
+            GPUBank.TEXBANK0 + ((input.mouse_x - 60) /// 12),
+            vm.gpu.current_objbank
+        )
+        vm.gpu.update_tex = true
     end
 
     -- click in canvas
@@ -163,10 +174,7 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     local minimap_window_x: int32 = (6 + (edit_window_x - minimap_x)) - 1
     local minimap_window_y: int32 = (CANVAS_Y + (edit_window_y - minimap_y)) - 1
     vm.gpu:drawGFXTexture(minimap_x, minimap_y, 128, 128, 6, CANVAS_Y, 128, 128)
-    vm.gpu:drawRect2D(minimap_window_x, minimap_window_y, edit_window_size + 2, 1, core.cursor_color)
-    vm.gpu:drawRect2D(minimap_window_x, minimap_window_y, 1, edit_window_size + 2, core.cursor_color)
-    vm.gpu:drawRect2D(minimap_window_x + edit_window_size + 1, minimap_window_y, 1, edit_window_size + 2, core.cursor_color)
-    vm.gpu:drawRect2D(minimap_window_x, minimap_window_y + edit_window_size + 1, edit_window_size + 2, 1, core.cursor_color)
+    vm.gpu:drawRectLines2D(minimap_window_x, minimap_window_y, edit_window_size + 2, edit_window_size + 2, core.cursor_color)
 
     -- canvas
     local i: uint32 = 0
@@ -187,7 +195,17 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
 
     -- status
     local text_y: int32 = 9 + 128 + 9
-    vm.gpu:print2D(6, text_y, GPU_WHITE, "TEXBANK: 0")
+    vm.gpu:print2D(6, text_y, GPU_WHITE, "TEXBANK:")
+    local bank_x: int32 = 60
+    for i = 0, <= 3 do
+        if i + 1 == vm.gpu.current_texbank then
+            vm.gpu:drawRect2D(bank_x, text_y, 12, 9, GPU_ALPHA_GRAY)
+            vm.gpu:printHexNibble2D(bank_x + 3, text_y, core.cursor_color, i)
+        else
+            vm.gpu:printHexNibble2D(bank_x + 3, text_y, GPU_LGRAY, i)
+        end
+        bank_x = bank_x + 12
+    end
     text_y = text_y + 9
     
     -- primary color
@@ -218,7 +236,7 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
 
     -- tool list
     for i = 0, < 6 do
-        vm.gpu:drawIcon2D(6 + (i * 12), TOOL_LIST_Y, i == current_tool and core.cursor_color or GPU_WHITE, Icon.TOOL_PENCIL + i)
+        vm.gpu:drawIcon2D(6 + (i * 12), TOOL_LIST_Y, i == current_tool and core.cursor_color or GPU_LGRAY, Icon.TOOL_PENCIL + i)
     end
     
     -- color palette

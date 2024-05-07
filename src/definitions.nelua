@@ -27,39 +27,38 @@ global EVM_CALLSTACK_SIZE <comptime> = 256
 global EVM_API_FUNCS_SIZE <comptime> = 65536
 
 --[[ VM logical memory map
-	note: 1 vm word = 4 bytes
+note: 1 vm word = 4 bytes
 
-	SYSTEM MEMORY:
-		HEAP                (8MiB          ) 0x00000000 - 0x007FFFFF (general purpose RAM)
-		TEXMEM              (4MiB          ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
-		OBJMEM              (3MiB + 384KiB ) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		AOBMEM              (8KiB          ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
-		SYSMEM              (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
-			audio state     (1B            )                         (1 byte (track playing flags))
-			track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
-			padding         (3B            )                         (unused)
-			objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
-			wavmem map      (8KiB          )                         (WAVMEM map (512 entries; 4 words each (sample start, sample end, sustain start, sustain end)))
-		WAVMEM              (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
-		SEQMEM              (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
-			song data       (2KiB          )                         (256 * 8 bytes)
-			pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
-			instrument data (6KiB + 256B   )                         (256 * 25 bytes (flags, sample start (24bit), sample end(24bit), sustain start (24bit), sustain end(24bit), attack, decay, sustain, release, name))
-			groove data     (1KiB          )                         (16 * 64 bytes)
-			unused          (???KiB + ???B )                         (unused)
-		GLOBALS             (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
-		LOCALS              (256KiB        ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
-		ARGS                (256KiB        ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
-	CART ROM:
-		TEXBANK[0-3]        (16MiB         ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
-		OBJBANK[0-3]        (13MiB + 512KiB) 0x02800000 - 0x0357FFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
-		OMPBANK[0-3]        (1MiB + 256KiB ) 0x03580000 - 0x036BFFFF (4x maps for OBJBANK[0-3])
-		WMPBANK[0-1]        (1MiB + 256KiB ) 0x036C0000 - 0x037FFFFF (2x maps for WAVBANK[0-1])
-		WAVBANK[0-1]        (14MiB         ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
-		SEQBANK[0-7]        (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
-		ROM                 (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
-	MEMORY CARD:
-		MEMCARD             (4KiB          ) 0x05800000 - 0x05800FFF (persistent save data (4KiB per registered cart ID))
+SYSTEM MEMORY:
+  HEAP              (8MiB          ) 0x00000000 - 0x007FFFFF (general purpose RAM)
+  TEXMEM            (4MiB          ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
+  OBJMEM            (3MiB + 384KiB ) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+  AOBMEM            (8KiB          ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
+  SYSMEM            (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
+    audio state     (1B            )                         (1 byte (track playing flags))
+    track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
+    padding         (3B            )                         (unused)
+    objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
+    wavmem map      (8KiB          )                         (WAVMEM map (512 entries; 4 words each (sample start, sample end, sustain start, sustain end)))
+  WAVMEM            (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
+  SEQMEM            (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
+    song data       (2KiB          )                         (256 * 8 bytes)
+    pattern data    (80KiB         )                         (256 * 64 * 5 bytes (note, vol, instr, fx, arg))
+    instrument data (6KiB + 256B   )                         (256 * 25 bytes (flags, sample start (24bit), sample end(24bit), sustain start (24bit), sustain end(24bit), attack, decay, sustain, release, name))
+    groove data     (1KiB          )                         (16 * 64 bytes)
+  GLOBALS           (256KiB        ) 0x01740000 - 0x0177FFFF (vm global variables (65536 vm words))
+  LOCALS            (256KiB        ) 0x01780000 - 0x017BFFFF (vm local variables (65536 vm words))
+  ARGS              (256KiB        ) 0x017C0000 - 0x017FFFFF (vm function arguments (65536 vm words))
+CART ROM:
+  TEXBANK[0-3]      (16MiB         ) 0x01800000 - 0x027FFFFF (4x texture sheets (1024*1024, 32BPP))
+  OBJBANK[0-3]      (13MiB + 512KiB) 0x02800000 - 0x0357FFFF (4x mesh data buffers (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
+  OMPBANK[0-3]      (1MiB + 256KiB ) 0x03580000 - 0x036BFFFF (4x maps for OBJBANK[0-3])
+  WMPBANK[0-1]      (1MiB + 256KiB ) 0x036C0000 - 0x037FFFFF (2x maps for WAVBANK[0-1])
+  WAVBANK[0-1]      (14MiB         ) 0x03800000 - 0x045FFFFF (2x wav data buffers (22050hz, 16bit, stereo))
+  SEQBANK[0-7]      (2MiB          ) 0x04600000 - 0x047FFFFF (8x audio sequencer data buffers)
+  ROM               (16MiB         ) 0x04800000 - 0x057FFFFF (string data + user ROM)
+MEMORY CARD:
+  MEMCARD           (4KiB          ) 0x05800000 - 0x05800FFF (persistent save data (4KiB per registered cart ID))
 ]]
 
 -- memory size and address constants
@@ -111,6 +110,7 @@ global MEMORY_NULL <comptime> = 0xFFFFFFFF
 
 global GPU_ALPHA_BLACK <comptime> = 0x00000000
 global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
+global GPU_ALPHA_GRAY  <comptime> = 0x808080C0
 global GPU_BLACK       <comptime> = 0x000000FF
 global GPU_LGRAY       <comptime> = 0xC3C3C3FF
 global GPU_GRAY        <comptime> = 0x808080FF

@@ -605,7 +605,7 @@ function apiListDraw(log_y: int32): void
 
 		if i == core.api_list_index then
 			vm.gpu:drawRect2D(0, log_y + ((i - start_index) * 9) + 9, GPU_VSCREEN_W, 9, GPU_DGRAY & 0xFFFFFFC0)
-			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_WHITE, core.api_current_list[i])
+			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, core.cursor_color, core.api_current_list[i])
 		else
 			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_LGRAY, core.api_current_list[i])
 		end

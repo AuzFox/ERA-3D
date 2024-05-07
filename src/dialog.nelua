@@ -104,34 +104,18 @@ end
 local function fileBrowserDraw(sm: *StateMachine, vm: *EVM): void
     local start_y: int32
     local max_filenames: integer
-    local border_x: int32
-    local border_y: int32
-    local border_w: int32
-    local border_h: int32
-    local name_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SET_FILENAME) and core.cursor_color or GPU_GRAY
-    local browser_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SELECT_FILE_OR_DIR) and core.cursor_color or GPU_GRAY
+    local name_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SET_FILENAME) and core.cursor_color or GPU_LGRAY
+    local browser_cursor_color: uint32 = (core.browser_input_mode == FileBrowserInputMode.SELECT_FILE_OR_DIR) and core.cursor_color or GPU_LGRAY
 
     if core.browser_mode == FileBrowserMode.SAVE then
         start_y = 36
         max_filenames = 32
 
         -- name border
-        border_x = 4
-        border_y = 16
-        border_w = GPU_VSCREEN_W - 8
-        border_h = 12
-        vm.gpu:drawRect2D(border_x, border_y, border_w, 1, name_cursor_color)
-        vm.gpu:drawRect2D(border_x, border_y + 1, 1, border_h, name_cursor_color)
-        vm.gpu:drawRect2D(border_x + border_w - 1, border_y + 1, 1, border_h, name_cursor_color)
-        vm.gpu:drawRect2D(border_x, border_y + border_h, border_w, 1, name_cursor_color)
+        vm.gpu:drawRectLines2D(4, 16, GPU_VSCREEN_W - 8, 13, name_cursor_color)
 
         -- browser border
-        border_y = 34
-        border_h = (34 * 9) + 3
-        vm.gpu:drawRect2D(border_x, border_y, border_w, 1, browser_cursor_color)
-        vm.gpu:drawRect2D(border_x, border_y + 1, 1, border_h, browser_cursor_color)
-        vm.gpu:drawRect2D(border_x + border_w - 1, border_y + 1, 1, border_h, browser_cursor_color)
-        vm.gpu:drawRect2D(border_x, border_y + border_h, border_w, 1, browser_cursor_color)
+        vm.gpu:drawRectLines2D(4, 34, GPU_VSCREEN_W - 8, (34 * 9) + 4, browser_cursor_color)
 
         vm.gpu:print2D(6, 18, GPU_GRAY, "NAME")
         vm.gpu:drawRect2D(36, 18, 64 * 6, 9, GPU_DGRAY)
@@ -163,17 +147,18 @@ local function fileBrowserDraw(sm: *StateMachine, vm: *EVM): void
         end
 
         local path: cstring = core.file_paths.paths[index]
-
-        if index == core.browser_index then
-            vm.gpu:drawRect2D(36, y, 438, 9, browser_cursor_color)
-        end
-
         if rl.isPathFile(path) then
             vm.gpu:print2D(6, y, GPU_LGRAY, "FILE")
         else
             vm.gpu:print2D(6, y, GPU_GRAY, "DIR")
         end
-        vm.gpu:printCString2D(36, y, GPU_WHITE, rl.getFileName(path))
+
+        if index == core.browser_index then
+            vm.gpu:drawRect2D(36, y, 438, 9, GPU_ALPHA_GRAY)
+            vm.gpu:printCString2D(36, y, browser_cursor_color, rl.getFileName(path))
+        else
+            vm.gpu:printCString2D(36, y, GPU_LGRAY, rl.getFileName(path))
+        end
     end
 end
 
@@ -657,8 +642,11 @@ global function dialogSaveCartUpdate(sm: *StateMachine, vm: *EVM): void
                         if ext ~= ".e3d" and ext ~= ".zip" then
                             file_name_str = file_name_str .. ".e3d"
                         end
-                    else
+                    elseif #file_name_str > 1 then
                         file_name_str = file_name_str .. ".e3d"
+                    else
+                        core:log(LogEntryType.HOST_ERROR, "filename cannot be empty", true)
+                        return
                     end
 
                     core.current_cart_name = file_name_str:copy()

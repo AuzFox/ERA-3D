@@ -663,6 +663,21 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 	rl.drawRectangle(x, y, w, h, ray_col)
 end
 
+function GPU:drawRectLines2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
+	local fx0: float32 = (@float32)(x)
+	local fy0: float32 = (@float32)(y)
+	local fx1: float32 = (@float32)(x + w)
+	local fy1: float32 = (@float32)(y + h)
+	local ray_col: rl.color = {
+		(@cuchar)(col >> 24),
+		(@cuchar)((col & 0xFF0000) >> 16),
+		(@cuchar)((col & 0x00FF00) >> 8),
+		(@cuchar)(col & 0xFF)
+	}
+
+	rl.drawRectangleLines(x, y, w, h, ray_col)
+end
+
 function GPU:uploadMemVertex(index: uint32): void
 	local word_index: uinteger = index * 9
 

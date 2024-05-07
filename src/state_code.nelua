@@ -540,7 +540,7 @@ local function drawCode(vm: *EVM): void
     local line_y: int32 = 9
 
 	local cursor_y: int32 = 9 + ((core.line_index - core.start_line) * 9)
-	vm.gpu:drawRect2D(line_number_spacing - 1, cursor_y, GPU_VSCREEN_W, 9, GPU_GRAY & 0xFFFFFFC0)
+	vm.gpu:drawRect2D(line_number_spacing - 1, cursor_y, GPU_VSCREEN_W, 9, GPU_ALPHA_GRAY)
     vm.gpu:drawRect2D(line_number_spacing + horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
 
 	local encountered_char: boolean = false

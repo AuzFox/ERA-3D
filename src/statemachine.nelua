@@ -47,27 +47,19 @@ function StateMachine:drawDialog(): void
         local final_size_w: float32 = (@float32)(GPU_VSCREEN_W - 8)
         local final_size_h: float32 = (@float32)(GPU_VSCREEN_H - 34)
 
-        local x: int32 = GPU_VSCREEN_HALF_W - (@int32)((final_size_w * core.dialog_size) / 2)
-        local y: int32 = GPU_VSCREEN_HALF_H - (@int32)((final_size_h * core.dialog_size) / 2)
-        local w: int32 = (@int32)(final_size_w * core.dialog_size)
-        local h: int32 = (@int32)(final_size_h * core.dialog_size)
-        self.vm_ptr.gpu:drawRect2D(x, y, w, 1, GPU_GRAY)
-        self.vm_ptr.gpu:drawRect2D(x, y + 1, 1, h, GPU_GRAY)
-        self.vm_ptr.gpu:drawRect2D(x + w - 1, y + 1, 1, h, GPU_GRAY)
-        self.vm_ptr.gpu:drawRect2D(x, y + h, w, 1, GPU_GRAY)
+        self.vm_ptr.gpu:drawRectLines2D(
+            GPU_VSCREEN_HALF_W - (@int32)((final_size_w * core.dialog_size) / 2),
+            GPU_VSCREEN_HALF_H - (@int32)((final_size_h * core.dialog_size) / 2),
+            (@int32)(final_size_w * core.dialog_size),
+            (@int32)(final_size_h * core.dialog_size),
+            GPU_GRAY
+        )
     else
         rl.clearBackground({0, 0, 0, 0})
         self.vm_ptr.gpu:camera2D(-1)
 
         if self.dialog_id ~= DialogID.SAVE_CART then
-            local x: int32 = 4
-            local y: int32 = 16
-            local w: int32 = GPU_VSCREEN_W - 8
-            local h: int32 = GPU_VSCREEN_H - 34
-            self.vm_ptr.gpu:drawRect2D(x, y, w, 1, core.cursor_color)
-            self.vm_ptr.gpu:drawRect2D(x, y + 1, 1, h, core.cursor_color)
-            self.vm_ptr.gpu:drawRect2D(x + w - 1, y + 1, 1, h, core.cursor_color)
-            self.vm_ptr.gpu:drawRect2D(x, y + h, w, 1, core.cursor_color)
+            self.vm_ptr.gpu:drawRectLines2D(4, 16, GPU_VSCREEN_W - 8, GPU_VSCREEN_H - 32, core.cursor_color)
         end
 
         self.dialog_ptr.draw(self, self.vm_ptr)
