@@ -148,6 +148,8 @@ function StateMachine:resetFileBrowser(start_path: string, mode: integer): void
 	core.file_paths = rl.loadDirectoryFiles(start_path)
 	core.has_loaded_paths = true
     core.browser_index = 0
+    core.browser_last_clicked_index = -1
+    core.browser_double_click_timer = 0.0
 end
 
 function StateMachine:cleanup(): void

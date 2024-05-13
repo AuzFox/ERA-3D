@@ -25,6 +25,145 @@ local function fileBrowserChangeDirectory(dir: cstring, vm: *EVM): void
 end
 
 local function fileBrowserUpdate(sm: *StateMachine, vm: *EVM): integer
+    defer
+        if core.browser_double_click_timer > 0.0 then
+            core.browser_double_click_timer = core.browser_double_click_timer - rl.getFrameTime()
+            if core.browser_double_click_timer < 0.0 then
+                core.browser_last_clicked_index = -1
+                core.browser_double_click_timer = 0.0
+            end
+        end
+    end
+
+    if input.mouse_wheel_y ~= 0 then
+        if core.browser_mode == FileBrowserMode.SAVE and input.isMouseInRect(36, 54, GPU_VSCREEN_W - 36, GPU_VSCREEN_H - 54) then
+            core.browser_index = util.midI(0, core.browser_index - input.mouse_wheel_y * 3, core.file_paths.count - 1)
+            return FileBrowserResult.CONTINUE
+        elseif core.browser_mode == FileBrowserMode.LOAD and input.isMouseInRect(36, 36, GPU_VSCREEN_W - 18, GPU_VSCREEN_H - 36) then
+            core.browser_index = util.midI(0, core.browser_index - input.mouse_wheel_y * 3, core.file_paths.count - 1)
+            return FileBrowserResult.CONTINUE
+        end
+    end
+
+    if core.browser_mode == FileBrowserMode.SAVE then
+        if input.left_clicked then
+            if input.isMouseInRect(4, 16, GPU_VSCREEN_W - 8, 13) then -- name box
+                core.browser_input_mode = FileBrowserInputMode.SET_FILENAME
+                return FileBrowserResult.CONTINUE
+            elseif input.isMouseInRect(6, 36, 16, 13) then -- parent dir button
+                fileBrowserChangeDirectory(rl.getPrevDirectoryPath(core.current_browser_path), vm)
+                return FileBrowserResult.CONTINUE
+            elseif input.isMouseInRect(36, 54, GPU_VSCREEN_W - 36, GPU_VSCREEN_H - 54) then -- file list
+                if core.file_paths.count == 0 then
+                    return FileBrowserResult.CONTINUE
+                end
+
+                local max_filenames: integer = 32
+                local start_index: integer = math.max(0, core.browser_index - (max_filenames /// 2 - 1))
+                if core.file_paths.count <= max_filenames then
+                    start_index = 0
+                else
+                    start_index = math.min(start_index, core.file_paths.count - max_filenames)
+                end
+
+                core.browser_index = util.midI(
+                    0,
+                    start_index + ((input.mouse_y - 54) /// 9),
+                    core.file_paths.count - 1
+                )
+
+                core.browser_input_mode = FileBrowserInputMode.SELECT_FILE_OR_DIR
+
+                if core.browser_index ~= core.browser_last_clicked_index then
+                    core.browser_last_clicked_index = core.browser_index
+                    core.browser_double_click_timer = 0.5
+                else
+                    if core.browser_double_click_timer > 0.0 then
+                        core.browser_last_clicked_index = -1
+                        core.browser_double_click_timer = 0.0
+
+                        if rl.isPathFile(core.file_paths.paths[core.browser_index]) then
+                            -- overwrite file
+
+                            -- clear filename
+                            for i = 0, < 65 do
+                                core.file_name[i] = '\0'_u8
+                            end
+
+                            -- copy filename to overwrite
+                            core.dialog_val0 = 0 -- filename cursor position
+                            local newname: *[0]uint8 = (@*[0]uint8)(rl.getFileName(core.file_paths.paths[core.browser_index]))
+                            for i = 0, < 65 do
+                                local c: uint8 = newname[i]
+                                if c == '\0'_u8 then
+                                    break
+                                end
+
+                                core.file_name[i] = c
+                                core.dialog_val0 = core.dialog_val0 + 1
+                            end
+                            
+                            return FileBrowserResult.SELECTED_DIRECTORY
+                        else
+                            fileBrowserChangeDirectory(core.file_paths.paths[core.browser_index], vm)
+                        end
+                    else
+                        core.browser_last_clicked_index = core.browser_index
+                        core.browser_double_click_timer = 0.5
+                    end
+                end
+
+                return FileBrowserResult.CONTINUE
+            end
+        end
+    else
+        if input.left_clicked then
+            if input.isMouseInRect(36, 36, GPU_VSCREEN_W - 18, GPU_VSCREEN_H - 36) then -- file list
+                if core.file_paths.count == 0 then
+                    return FileBrowserResult.CONTINUE
+                end
+
+                local max_filenames: integer = 34
+                local start_index: integer = math.max(0, core.browser_index - (max_filenames /// 2 - 1))
+                if core.file_paths.count <= max_filenames then
+                    start_index = 0
+                else
+                    start_index = math.min(start_index, core.file_paths.count - max_filenames)
+                end
+
+                core.browser_index = util.midI(
+                    0,
+                    start_index + ((input.mouse_y - 36) /// 9),
+                    core.file_paths.count - 1
+                )
+
+                if core.browser_index ~= core.browser_last_clicked_index then
+                    core.browser_last_clicked_index = core.browser_index
+                    core.browser_double_click_timer = 0.5
+                else
+                    if core.browser_double_click_timer > 0.0 then
+                        core.browser_last_clicked_index = -1
+                        core.browser_double_click_timer = 0.0
+
+                        if rl.isPathFile(core.file_paths.paths[core.browser_index]) then
+                            return FileBrowserResult.SELECTED_FILE
+                        else
+                            fileBrowserChangeDirectory(core.file_paths.paths[core.browser_index], vm)
+                        end
+                    else
+                        core.browser_last_clicked_index = core.browser_index
+                        core.browser_double_click_timer = 0.5
+                    end
+                end
+
+                return FileBrowserResult.CONTINUE
+            elseif input.isMouseInRect(6, 18, 16, 13) then -- parent dir button
+                fileBrowserChangeDirectory(rl.getPrevDirectoryPath(core.current_browser_path), vm)
+                return FileBrowserResult.CONTINUE
+            end
+        end
+    end
+
     switch core.browser_input_mode do
         case FileBrowserInputMode.SET_FILENAME then
             if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
@@ -126,7 +265,9 @@ local function fileBrowserDraw(sm: *StateMachine, vm: *EVM): void
         max_filenames = 34
     end
 
-    vm.gpu:print2D(6, start_y, GPU_LGRAY, core.current_browser_path)
+    vm.gpu:drawRectLines2D(6, start_y, 16, 13, GPU_LGRAY)
+    vm.gpu:print2D(8, start_y + 2, GPU_WHITE, "<-")
+    vm.gpu:print2D(36, start_y, GPU_LGRAY, core.current_browser_path)
 
     if core.file_paths.count == 0 then
         vm.gpu:print2D(GPU_VSCREEN_HALF_W - 54, GPU_VSCREEN_HALF_H - 4, GPU_GRAY, "DIRECTORY IS EMPTY")
