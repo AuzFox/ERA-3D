@@ -763,6 +763,10 @@ local function run(): void
 			vm.gpu:updateTexture()
 		end
 
+		if vm.gpu.update_lights then
+			vm.gpu:updateLights()
+		end
+
 		updateCursorColor(0.3, 0.3, 0.3, 0, 2, 4, 128.0, 127.0, 64.0)
 
 		-- draw to state render texture
@@ -780,7 +784,8 @@ local function run(): void
 
 		-- draw to master render texture
 		vm.gpu:beginMasterRenderTexture()
-			vm.gpu:clear(GPU_BLACK)
+			vm.gpu:clearColor(GPU_BLACK)
+			vm.gpu:clear(GPU_CLEAR_ALL)
 
 			if sm.state_id == StateID.RUN then
 				vm.gpu:camera2D(-1)
@@ -790,7 +795,7 @@ local function run(): void
 				
 				local aspect: float32 = (@float32)(vm.gpu.screen_w) / (@float32)(vm.gpu.screen_h)
 				local distance: float32 = 1.0
-				local frustum_height: float32 = 2.0 * distance * math.tan(math.rad(vm.gpu.system_cam.fovy * 0.5))
+				local frustum_height: float32 = 2.0 * distance * math.tan(math.rad(vm.gpu.system_cam3d.fovy * 0.5))
 				local frustum_width: float32 = frustum_height * aspect
 
 				local width: float32 = (frustum_width / 2)
@@ -970,7 +975,8 @@ local function run(): void
 
 		-- render master render texture to the screen
 		rl.beginDrawing()
-			vm.gpu:clear(GPU_BLACK)
+			vm.gpu:clearColor(GPU_BLACK)
+			vm.gpu:clear(GPU_CLEAR_ALL)
 			vm.gpu:drawMasterRenderTexture()
 		rl.endDrawing()
 		
@@ -1001,24 +1007,24 @@ local function run(): void
 	sm:cleanup()
 end
 
---io.printf('HEAP:    0x%08X - 0x%08X\n', MEMORY_HEAP_START_ADDR, MEMORY_HEAP_MAX_ADDR)
---io.printf('TEXMEM:  0x%08X - 0x%08X\n', MEMORY_TEXMEM_START_ADDR, MEMORY_TEXMEM_MAX_ADDR)
---io.printf('OBJMEM:  0x%08X - 0x%08X\n', MEMORY_OBJMEM_START_ADDR, MEMORY_OBJMEM_MAX_ADDR)
---io.printf('AOBMEM:  0x%08X - 0x%08X\n', MEMORY_AOBMEM_START_ADDR, MEMORY_AOBMEM_MAX_ADDR)
---io.printf('SYSMEM:  0x%08X - 0x%08X\n', MEMORY_SYSMEM_START_ADDR, MEMORY_SYSMEM_MAX_ADDR)
---io.printf('WAVMEM:  0x%08X - 0x%08X\n', MEMORY_WAVMEM_START_ADDR, MEMORY_WAVMEM_MAX_ADDR)
---io.printf('SEQMEM:  0x%08X - 0x%08X\n', MEMORY_SEQMEM_START_ADDR, MEMORY_SEQMEM_MAX_ADDR)
---io.printf('GLOBALS: 0x%08X - 0x%08X\n', MEMORY_GLOBALS_START_ADDR, MEMORY_GLOBALS_MAX_ADDR)
---io.printf('LOCALS:  0x%08X - 0x%08X\n', MEMORY_LOCALS_START_ADDR, MEMORY_LOCALS_MAX_ADDR)
---io.printf('ARGS:    0x%08X - 0x%08X\n', MEMORY_ARGS_START_ADDR, MEMORY_ARGS_MAX_ADDR)
---io.printf('TEXBANK: 0x%08X - 0x%08X\n', MEMORY_TEXBANK_START_ADDR, MEMORY_TEXBANK_MAX_ADDR)
---io.printf('OBJBANK: 0x%08X - 0x%08X\n', MEMORY_OBJBANK_START_ADDR, MEMORY_OBJBANK_MAX_ADDR)
---io.printf('OMPBANK: 0x%08X - 0x%08X\n', MEMORY_OMPBANK_START_ADDR, MEMORY_OMPBANK_MAX_ADDR)
---io.printf('WMPBANK: 0x%08X - 0x%08X\n', MEMORY_WMPBANK_START_ADDR, MEMORY_WMPBANK_MAX_ADDR)
---io.printf('WAVBANK: 0x%08X - 0x%08X\n', MEMORY_WAVBANK_START_ADDR, MEMORY_WAVBANK_MAX_ADDR)
---io.printf('SEQBANK: 0x%08X - 0x%08X\n', MEMORY_SEQBANK_START_ADDR, MEMORY_SEQBANK_MAX_ADDR)
---io.printf('ROM:     0x%08X - 0x%08X\n', MEMORY_ROM_START_ADDR, MEMORY_ROM_MAX_ADDR)
---io.printf('MEMCARD: 0x%08X - 0x%08X\n', MEMORY_MEMCARD_START_ADDR, MEMORY_MEMCARD_MAX_ADDR)
+--io.printf('HEAP:    0x%08X-0x%08X\n', MEMORY_HEAP_START_ADDR, MEMORY_HEAP_MAX_ADDR)
+--io.printf('TEXMEM:  0x%08X-0x%08X\n', MEMORY_TEXMEM_START_ADDR, MEMORY_TEXMEM_MAX_ADDR)
+--io.printf('OBJMEM:  0x%08X-0x%08X\n', MEMORY_OBJMEM_START_ADDR, MEMORY_OBJMEM_MAX_ADDR)
+--io.printf('AOBMEM:  0x%08X-0x%08X\n', MEMORY_AOBMEM_START_ADDR, MEMORY_AOBMEM_MAX_ADDR)
+--io.printf('SYSMEM:  0x%08X-0x%08X\n', MEMORY_SYSMEM_START_ADDR, MEMORY_SYSMEM_MAX_ADDR)
+--io.printf('WAVMEM:  0x%08X-0x%08X\n', MEMORY_WAVMEM_START_ADDR, MEMORY_WAVMEM_MAX_ADDR)
+--io.printf('SEQMEM:  0x%08X-0x%08X\n', MEMORY_SEQMEM_START_ADDR, MEMORY_SEQMEM_MAX_ADDR)
+--io.printf('GLOBALS: 0x%08X-0x%08X\n', MEMORY_GLOBALS_START_ADDR, MEMORY_GLOBALS_MAX_ADDR)
+--io.printf('LOCALS:  0x%08X-0x%08X\n', MEMORY_LOCALS_START_ADDR, MEMORY_LOCALS_MAX_ADDR)
+--io.printf('ARGS:    0x%08X-0x%08X\n', MEMORY_ARGS_START_ADDR, MEMORY_ARGS_MAX_ADDR)
+--io.printf('TEXBANK: 0x%08X-0x%08X\n', MEMORY_TEXBANK_START_ADDR, MEMORY_TEXBANK_MAX_ADDR)
+--io.printf('OBJBANK: 0x%08X-0x%08X\n', MEMORY_OBJBANK_START_ADDR, MEMORY_OBJBANK_MAX_ADDR)
+--io.printf('OMPBANK: 0x%08X-0x%08X\n', MEMORY_OMPBANK_START_ADDR, MEMORY_OMPBANK_MAX_ADDR)
+--io.printf('WMPBANK: 0x%08X-0x%08X\n', MEMORY_WMPBANK_START_ADDR, MEMORY_WMPBANK_MAX_ADDR)
+--io.printf('WAVBANK: 0x%08X-0x%08X\n', MEMORY_WAVBANK_START_ADDR, MEMORY_WAVBANK_MAX_ADDR)
+--io.printf('SEQBANK: 0x%08X-0x%08X\n', MEMORY_SEQBANK_START_ADDR, MEMORY_SEQBANK_MAX_ADDR)
+--io.printf('ROM:     0x%08X-0x%08X\n', MEMORY_ROM_START_ADDR, MEMORY_ROM_MAX_ADDR)
+--io.printf('MEMCARD: 0x%08X-0x%08X\n', MEMORY_MEMCARD_START_ADDR, MEMORY_MEMCARD_MAX_ADDR)
 
 init()
 run()

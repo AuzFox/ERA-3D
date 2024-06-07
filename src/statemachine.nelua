@@ -40,10 +40,13 @@ function StateMachine:updateDialog(): void
 end
 
 function StateMachine:drawDialog(): void
-    if core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
-        rl.clearBackground({0, 0, 0, 0})
-        self.vm_ptr.gpu:camera2D(-1)
+    self.vm_ptr.gpu:colorMask(0b0001)
+	self.vm_ptr.gpu:clearColor(0)
+	self.vm_ptr.gpu:clear(GPU_CLEAR_ALL)
+	self.vm_ptr.gpu:colorMask(0b1111)
+	self.vm_ptr.gpu:camera2D(-1)
 
+    if core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
         local final_size_w: float32 = (@float32)(GPU_VSCREEN_W - 8)
         local final_size_h: float32 = (@float32)(GPU_VSCREEN_H - 34)
 
@@ -55,9 +58,6 @@ function StateMachine:drawDialog(): void
             GPU_GRAY
         )
     else
-        rl.clearBackground({0, 0, 0, 0})
-        self.vm_ptr.gpu:camera2D(-1)
-
         if self.dialog_id ~= DialogID.SAVE_CART then
             self.vm_ptr.gpu:drawRectLines2D(4, 16, GPU_VSCREEN_W - 8, GPU_VSCREEN_H - 32, core.cursor_color)
         end
@@ -164,6 +164,10 @@ function StateMachine:cleanup(): void
 
     if core.has_loaded_image then
         rl.unloadImage(core.image_to_import)
+    end
+
+    if core.has_import_texture then
+        rl.unloadTexture(core.import_texture)
     end
 
     if core.has_loaded_sample then

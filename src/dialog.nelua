@@ -303,6 +303,36 @@ local function fileBrowserDraw(sm: *StateMachine, vm: *EVM): void
     end
 end
 
+local function textureConfigUpdate(sm: *StateMachine, vm: *EVM): void
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        rl.unloadTexture(core.import_texture)
+        core.has_import_texture = false
+        rl.unloadImage(core.image_to_import)
+        core.has_loaded_image = false
+
+        core.dialog_step = DialogStep.FILE_BROWSER
+        return
+    end
+end
+
+local function textureConfigDraw(sm: *StateMachine, vm: *EVM): void
+    vm.gpu:print2D(6, 18, GPU_LGRAY, "TEXTURE CONFIG")
+    
+    -- texbank
+    vm.gpu:print2D(6 * 8, 27, GPU_LGRAY, "TEXBANK: 0 1 2 3")
+    vm.gpu:drawRectLines2D(6, 36, 210, 210, GPU_WHITE)
+    vm.gpu:drawGFXTexture(0, 0, 208, 208, 7, 37, 208, 208)
+    
+    -- TODO: use stencil to draw a hole in the texture
+    
+    vm.gpu:print2D(6, 244, GPU_LGRAY, "DESTINATION X: ??? Y: ???")
+    
+    -- import texture
+    vm.gpu:print2D(6 * 40, 27, GPU_LGRAY, "FILENAME")
+    vm.gpu:drawRectLines2D(220, 36, 208, 208, GPU_WHITE)
+    vm.gpu:print2D(220, 244, GPU_LGRAY, "SOURCE X: ??? Y: ???")
+end
+
 local function modelConfigUpdate(sm: *StateMachine, vm: *EVM): void
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
         rl.unloadModel(core.model_to_import)
@@ -595,27 +625,27 @@ global function dialogImportTextureUpdate(sm: *StateMachine, vm: *EVM): void
                     	rl.imageFormat(&core.image_to_import, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8)
                     end
 
-                    if core.image_to_import.width ~= 1024 or core.image_to_import.height ~= 1024 then
-                        -- TODO: open crop or position dialog
-                        --core.dialog_step = DialogStep.TEXTURE_POSITION
-                        core:log(LogEntryType.HOST_ERROR, "failed to load texture: texture must be 1024x1024", true)
-                        rl.unloadImage(core.image_to_import)
-	                    core.has_loaded_image = false
-                        return
-                    end
+                    --[[
+                    core.import_texture = rl.loadTextureFromImage(core.image_to_import)
+                    core.has_import_texture = true
 
+                    core.dialog_step = DialogStep.TEXTURE_CONFIG
+                    ]]
+
+                    -- texture data loading
                     vm.gpu:loadTextureData(vm.gpu.current_texbank - GPUBank.TEXBANK0, 0, 0, 0, 0, 1024, 1024)
                     vm.gpu.update_tex = true
 
+                    rl.unloadTexture(core.import_texture)
+                    core.has_import_texture = false
                     rl.unloadImage(core.image_to_import)
 	                core.has_loaded_image = false
                     sm.queued_dialog = DialogID.NONE
                     core:log(LogEntryType.INFO, "texture loaded", true)
+                    --]]
             end
-        --case DialogStep.TEXTURE_POSITION then
-        --    texturePositionUpdate(sm, vm)
-        --case DialogStep.TEXTURE_CROP then
-        --    textureCropUpdate(sm, vm)
+        case DialogStep.TEXTURE_CONFIG then
+            textureConfigUpdate(sm, vm)
     end
 end
 
@@ -623,11 +653,8 @@ global function dialogImportTextureDraw(sm: *StateMachine, vm: *EVM): void
     switch core.dialog_step do
         case DialogStep.FILE_BROWSER then
             fileBrowserDraw(sm, vm)
-        -- TODO: complete this!
-        --case DialogStep.TEXTURE_POSITION then
-        --    texturePositionDraw(sm, vm)
-        --case DialogStep.TEXTURE_CROP then
-        --    textureCropDraw(sm, vm)
+        case DialogStep.TEXTURE_CONFIG then
+            textureConfigDraw(sm, vm)
     end
 end
 
@@ -723,8 +750,6 @@ global function dialogImportSampleUpdate(sm: *StateMachine, vm: *EVM): void
 
                     core.dialog_step = DialogStep.SAMPLE_CONFIG
             end
-        --case DialogStep.SAMPLE_CROP then
-        --    sampleCropUpdate(sm, vm)
         case DialogStep.SAMPLE_CONFIG then
             sampleConfigUpdate(sm, vm)
     end
@@ -734,8 +759,6 @@ global function dialogImportSampleDraw(sm: *StateMachine, vm: *EVM): void
     switch core.dialog_step do
         case DialogStep.FILE_BROWSER then
             fileBrowserDraw(sm, vm)
-        --case DialogStep.SAMPLE_CROP then
-        --    sampleCropDraw(sm, vm)
         case DialogStep.SAMPLE_CONFIG then
             sampleConfigDraw(sm, vm)
     end

@@ -21,46 +21,44 @@ global docs.APICatagory = @enum {
 global docs.doc_strings: hashmap(string, string)
 global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
   { -- ALL
+    "alloc",
+    "ambientColor",
+    "ambientFactor",
     "beginMesh",
+    "blendFactors",
+    "blendFactorsEx",
+    "blendMode",
+    "cam3DForward",
+    "cam3DRight",
     "camera2D",
     "camera3D",
     "ceil",
     "checkCollision",
     "clear",
+    "clearColor",
+    "clearDepth",
+    "clearStencil",
+    "colorMask",
     "cos",
+    "cullMode",
     "deg",
-    "drawObjEx",
+    "depthFunc",
+    "depthMask",
+    "depthTest",
     "drawObj",
+    "drawObjEx",
     "endMesh",
     "floor",
+    "fogColor",
+    "fogEnd",
+    "fogMode",
+    "fogStart",
     "fract",
+    "free",
     "frustum",
-    "getAmbientColor",
-    "getAmbientFactor",
-    "getBlendMode",
-    "getCam2DAngle",
-    "getCam2DOrigin",
-    "getCam2DTarget",
-    "getCam2DZoom",
-    "getCam3DForward",
-    "getCam3DFOV",
-    "getCam3DPosition",
-    "getCam3DProjection",
-    "getCam3DRight",
-    "getCam3DTarget",
-    "getCam3DUp",
-    "getCullMode",
-    "getFogColor",
-    "getFogEnd",
-    "getFogMode",
-    "getFogStart",
-    "getLightColor",
-    "getLightDirection",
-    "getLightEnabled",
-    "getLightingMode",
-    "getLightPosition",
-    "getLightRadius",
-    "getLightType",
+    "getCam2D",
+    "getCam3D",
+    "getLight",
     "getModelViewMatrix",
     "getMouseDelta",
     "getMouseDrag",
@@ -70,22 +68,23 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "getProjectionMatrix",
     "getRaycastNormal",
     "getRaycastPoint",
-    "getTextureMode",
     "getTopMatrix",
     "getTrackBPM",
     "getTrackPan",
     "getTrackVolume",
-    "getWireMode",
     "held",
     "identity",
     "initMemCard",
+    "lightingMode",
     "loadObjBank",
     "loadSeqBank",
     "loadTexBank",
     "loadWavBank",
+    "lookAt",
     "matrixAdd",
     "matrixIdentity",
     "matrixInvert",
+    "matrixLookAt",
     "matrixMode",
     "matrixMultiply",
     "matrixRotate",
@@ -100,8 +99,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "meshColor",
     "meshNormal",
     "meshUV",
-    "meshVertex2D",
     "meshVertex",
+    "meshVertex2D",
     "midf",
     "midi",
     "minf",
@@ -111,97 +110,80 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "mousePressed",
     "mouseReleased",
     "multiplyTopMatrix",
-    "muteTracks",
     "muteTrack",
+    "muteTracks",
     "ortho",
-    "pauseTracks",
     "pauseTrack",
-    "peek8",
+    "pauseTracks",
     "peek32",
+    "peek8",
     "playPattern",
     "playSong",
     "playTrack",
-    "playWavEx",
     "playWav",
-    "poke8",
+    "playWavEx",
     "poke32",
+    "poke8",
+    "polygonMode",
     "popMatrix",
     "powf",
     "pressed",
     "print2D",
     "pushMatrix",
     "rad",
-    "randfEx",
     "randf",
-    "randiEx",
+    "randfEx",
     "randi",
-    "randomizeEx",
+    "randiEx",
     "randomize",
+    "randomizeEx",
     "raycast",
+    "realloc",
     "released",
     "repeated",
-    "resumeTracks",
     "resumeTrack",
+    "resumeTracks",
     "rotate",
     "round",
     "scale",
-    "setAmbientColor",
-    "setAmbientFactor",
-    "setBlendMode",
-    "setCam2DAngle",
-    "setCam2DOrigin",
-    "setCam2DTarget",
-    "setCam2DZoom",
-    "setCam3DFOV",
-    "setCam3DPosition",
-    "setCam3DProjection",
-    "setCam3DTarget",
-    "setCam3DUp",
-    "setCullMode",
-    "setFogColor",
-    "setFogEnd",
-    "setFogMode",
-    "setFogStart",
-    "setLightColor",
-    "setLightDirection",
-    "setLightEnabled",
-    "setLightingMode",
-    "setLightPosition",
-    "setLightRadius",
-    "setLightType",
+    "scissor",
+    "scissorMode",
     "setModelViewMatrix",
     "setMouseLock",
     "setProjectionMatrix",
-    "setTextureMode",
     "setTrackBPM",
     "setTrackPan",
     "setTrackVolume",
-    "setWireMode",
     "signf",
     "signi",
     "sin",
-    "sprite2DEx",
     "sprite2D",
-    "stopTracks",
+    "sprite2DEx",
+    "stencilFunc",
+    "stencilMask",
+    "stencilMode",
+    "stencilOp",
     "stopTrack",
+    "stopTracks",
     "texture",
+    "textureMode",
     "time",
     "translate",
-    "unmuteTracks",
     "unmuteTrack",
+    "unmuteTracks",
     "vargc",
     "vargv",
     "vec2Angle",
     "vec2Cross",
     "vec2Direction",
-    "vec2DistanceSq",
     "vec2Distance",
+    "vec2DistanceSq",
     "vec2Dot",
     "vec2Down",
     "vec2Invert",
     "vec2Left",
-    "vec2LengthSq",
     "vec2Length",
+    "vec2LengthSq",
     "vec2Lerp",
     "vec2MoveToward",
     "vec2Normalize",
@@ -215,15 +197,15 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "vec3Back",
     "vec3Cross",
     "vec3Direction",
-    "vec3DistanceSq",
     "vec3Distance",
+    "vec3DistanceSq",
     "vec3Dot",
     "vec3Down",
     "vec3Forward",
     "vec3Invert",
     "vec3Left",
-    "vec3LengthSq",
     "vec3Length",
+    "vec3LengthSq",
     "vec3Lerp",
     "vec3MoveToward",
     "vec3Normalize",
@@ -252,12 +234,12 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "mini",
     "powf",
     "rad",
-    "randfEx",
     "randf",
-    "randiEx",
+    "randfEx",
     "randi",
-    "randomizeEx",
+    "randiEx",
     "randomize",
+    "randomizeEx",
     "round",
     "signf",
     "signi",
@@ -266,6 +248,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "wrapi"
   },
   { -- VECTORS
+    "cam3DForward",
+    "cam3DRight",
     "vec2Angle",
     "vec2Cross",
     "vec2Direction",
@@ -314,6 +298,7 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "matrixAdd",
     "matrixIdentity",
     "matrixInvert",
+    "matrixLookAt",
     "matrixMultiply",
     "matrixRotate",
     "matrixScale",
@@ -337,90 +322,65 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "setMouseLock"
   },
   { -- GRAPHICS
+    "ambientColor",
+    "ambientFactor",
     "beginMesh",
+    "blendFactors",
+    "blendFactorsEx",
+    "blendMode",
     "camera2D",
     "camera3D",
     "clear",
-    "drawObjEx",
+    "clearColor",
+    "clearDepth",
+    "clearStencil",
+    "colorMask",
+    "cullMode",
+    "depthFunc",
+    "depthMask",
+    "depthTest",
     "drawObj",
+    "drawObjEx",
     "endMesh",
+    "fogColor",
+    "fogEnd",
+    "fogMode",
+    "fogStart",
     "frustum",
-    "getAmbientColor",
-    "getAmbientFactor",
-    "getBlendMode",
-    "getCam2DAngle",
-    "getCam2DOrigin",
-    "getCam2DTarget",
-    "getCam2DZoom",
-    "getCam3DForward",
-    "getCam3DFOV",
-    "getCam3DPosition",
-    "getCam3DProjection",
-    "getCam3DRight",
-    "getCam3DTarget",
-    "getCam3DUp",
-    "getCullMode",
-    "getFogColor",
-    "getFogEnd",
-    "getFogMode",
-    "getFogStart",
-    "getLightColor",
-    "getLightDirection",
-    "getLightEnabled",
-    "getLightingMode",
-    "getLightPosition",
-    "getLightRadius",
-    "getLightType",
+    "getCam2D",
+    "getCam3D",
+    "getLight",
     "getModelViewMatrix",
     "getProjectionMatrix",
-    "getTextureMode",
     "getTopMatrix",
-    "getWireMode",
     "identity",
-    "matrixMode",
+    "lightingMode",
+    "lookAt",
     "meshColor",
     "meshNormal",
     "meshUV",
-    "meshVertex2D",
     "meshVertex",
+    "meshVertex2D",
     "multiplyTopMatrix",
     "ortho",
+    "polygonMode",
     "popMatrix",
     "print2D",
     "pushMatrix",
     "rotate",
     "scale",
-    "setAmbientColor",
-    "setAmbientFactor",
-    "setBlendMode",
-    "setCam2DAngle",
-    "setCam2DOrigin",
-    "setCam2DTarget",
-    "setCam2DZoom",
-    "setCam3DFOV",
-    "setCam3DPosition",
-    "setCam3DProjection",
-    "setCam3DTarget",
-    "setCam3DUp",
-    "setCullMode",
-    "setFogColor",
-    "setFogEnd",
-    "setFogMode",
-    "setFogStart",
-    "setLightColor",
-    "setLightDirection",
-    "setLightEnabled",
-    "setLightingMode",
-    "setLightPosition",
-    "setLightRadius",
-    "setLightType",
+    "scissor",
+    "scissorMode",
     "setModelViewMatrix",
     "setProjectionMatrix",
-    "setTextureMode",
-    "setWireMode",
-    "sprite2DEx",
     "sprite2D",
+    "sprite2DEx",
+    "stencilFunc",
+    "stencilMask",
+    "stencilMode",
+    "stencilOp",
     "texture",
+    "textureMode",
     "translate",
     "viewport"
   },
@@ -428,24 +388,24 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "getTrackBPM",
     "getTrackPan",
     "getTrackVolume",
-    "muteTracks",
     "muteTrack",
-    "pauseTracks",
+    "muteTracks",
     "pauseTrack",
+    "pauseTracks",
     "playPattern",
     "playSong",
     "playTrack",
-    "playWavEx",
     "playWav",
-    "resumeTracks",
+    "playWavEx",
     "resumeTrack",
+    "resumeTracks",
     "setTrackBPM",
     "setTrackPan",
     "setTrackVolume",
-    "stopTracks",
     "stopTrack",
-    "unmuteTracks",
-    "unmuteTrack"
+    "stopTracks",
+    "unmuteTrack",
+    "unmuteTracks"
   },
   { -- PHYSICS
     "checkCollision",
@@ -454,6 +414,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "raycast"
   },
   { -- MEMORY
+    "alloc",
+    "free",
     "initMemCard",
     "loadObjBank",
     "loadSeqBank",
@@ -464,7 +426,8 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "peek8",
     "peek32",
     "poke8",
-    "poke32"
+    "poke32",
+    "realloc"
   },
   { -- MISC
     "time",
@@ -473,217 +436,336 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
   }
 }
 
-docs.doc_strings["vec2Zero"] =
+docs.doc_strings["alloc"] =
 [[
-  vec2 vec2Zero()
-  
+  void* alloc(int size)
+
+  ARGUMENTS:
+    int size: the number of bytes to allocate
   DESCRIPTION:
-    returns a vec2 with the value vec2(0.0, 0.0)
+    allocates a memory block of at least size bytes on the heap.
+
+    returns a pointer to the allocated block on success,
+
+    returns null if size is 0 or if allocation fails.
 ]]
-docs.doc_strings["vec2One"] =
+docs.doc_strings["ambientColor"] =
 [[
-  vec2 vec2One()
-  
+  void ambientColor(int color)
+
+  ARGUMENTS:
+    int color: the ambient light color to use (RGBA32 format)
   DESCRIPTION:
-    returns a vec2 with the value vec2(1.0, 1.0)
+    sets the current ambient lighting color.
 ]]
-docs.doc_strings["vec2Up"] =
+docs.doc_strings["ambientFactor"] =
 [[
-  vec2 vec2Up()
-  
-  DESCRIPTION:
-    returns a vec2 with the value vec2(0.0, 1.0)
-]]
-docs.doc_strings["vec2Down"] =
-[[
-  vec2 vec2Down()
-  
-  DESCRIPTION:
-    returns a vec2 with the value vec2(0.0, -1.0)
-]]
-docs.doc_strings["vec2Left"] =
-[[
-  vec2 vec2Left()
-  
-  DESCRIPTION:
-    returns a vec2 with the value vec2(-1.0, 0.0)
-]]
-docs.doc_strings["vec2Right"] =
-[[
-  vec2 vec2Right()
-  
-  DESCRIPTION:
-    returns a vec2 with the value vec2(1.0, 0.0)
-]]
-docs.doc_strings["vec3Zero"] =
-[[
-  vec3 vec3Zero()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(0.0, 0.0, 0.0)
-]]
-docs.doc_strings["vec3One"] =
-[[
-  vec3 vec3One()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(1.0, 1.0, 1.0)
-]]
-docs.doc_strings["vec3Up"] =
-[[
-  vec3 vec3Up()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(0.0, -1.0, 0.0)
-]]
-docs.doc_strings["vec3Down"] =
-[[
-  vec3 vec3Down()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(0.0, 1.0, 0.0)
-]]
-docs.doc_strings["vec3Left"] =
-[[
-  vec3 vec3Left()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(-1.0, 0.0, 0.0)
-]]
-docs.doc_strings["vec3Right"] =
-[[
-  vec3 vec3Right()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(1.0, 0.0, 0.0)
-]]
-docs.doc_strings["vec3Forward"] =
-[[
-  vec3 vec3Forward()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(0.0, 0.0, -1.0)
-]]
-docs.doc_strings["vec3Back"] =
-[[
-  vec3 vec3Back()
-  
-  DESCRIPTION:
-    returns a vec3 with the value vec3(0.0, 0.0, 1.0)
-]]
-docs.doc_strings["vargc"] =
-[[
-  int vargc()
-  
-  DESCRIPTION:
-    returns the remaining number of vararg bytes for a vararg function.
- 
-    must only be called from a vararg function.
-]]
-docs.doc_strings["vargv"] =
-[[
-  void* vargv(int offset)
+  void ambientFactor(float factor)
   
   ARGUMENTS:
-    int offset: the number of bytes to advance the vararg pointer
-  DESCRIPTION:
-    returns a pointer to the current vararg argument and advances the
-    vararg pointer by $offset bytes.
- 
-    must only be called from a vararg function.
+    float factor: percentage of ambient light tinting [0.0-100.0]
+  DESCRIPTIONS:
+    sets the current ambient light factor.
+
+    the ambient factor is the percentage of tinting that objects will
+    recieve from ambient lighting. (0.0 to 100.0)
 ]]
-docs.doc_strings["pressed"] =
+docs.doc_strings["beginMesh"] =
 [[
-  int pressed(int player, int button)
+  void beginMesh(int primitive)
   
   ARGUMENTS:
-    int player: the player to check [0-4]
-    int button: the button to check [0-13]
+    int primitive: the type of mesh primitive to construct [0-2]
   DESCRIPTION:
-    returns 1 if the given player has pressed the given button this frame.
-    otherwise, returns 0.
+    begins construction of a mesh using the given primitive type.
+
+    primitive must be one of the following values:
+      0: lines     (2 vertices)
+      1: triangles (3 vertices)
+      2: quads     (4 vertices)
+    
+    must eventually be followed by a call to endMesh().
 ]]
-docs.doc_strings["repeated"] =
+docs.doc_strings["blendFactors"] =
 [[
-  int repeated(int player, int button)
+  void blendFactors(int src, int dest, int eq)
+
+  ARGUMENTS:
+    int src : the new blending source factor to use [0-14]
+    int dest: the new blending destination factor to use [0-14]
+    int eq  : the new blending equation to use [0-4]
+  DESCRIPTION:
+    changes the current color blending factors and equations
+    for both rgb and alpha. must be called before blendMode().
+    blend mode must be set to 6 (custom blending) after this call.
+
+    src and dest must be one of the following values:
+      0 : 0.0 (dest default) 1 : 1.0 (src default)    2 : src color
+      3 : 1.0 - src color    4 : dest color           5 : 1.0 - dest color
+      6 : src alpha          7 : 1.0 - src alpha      8 : dest alpha
+      9 : 1.0 - dest alpha   10: constant color       11: 1.0 - constant color
+      12: constant alpha     13: 1.0 - constant alpha 14: src alpha saturate
+    
+    eq must be one of the following values:
+      0: add    1: subtract    2: reverse subtract    3: min    4: max
+]]
+docs.doc_strings["blendFactorsEx"] =
+[[
+  void blendFactorsEx(
+    int src_rgb, int dest_rgb,
+    int src_alpha, int dest_alpha,
+    int eq_rgb, int eq_alpha)
+
+  ARGUMENTS:
+    int src_rgb   : blending source rgb factor to use [0-14]
+    int dest_rgb  : blending destination rgb factor to use [0-14]
+    int src_alpha : blending source alpha factor to use [0-14]
+    int dest_alpha: blending destination alpha factor to use [0-14]
+    int eq_rgb    : blending rgb equation to use [0-4]
+    int eq_alpha  : blending alpha equation to use [0-4]
+  DESCRIPTION:
+    changes the current blending factors and equations
+    for both rgb and alpha individually.
+
+    must be called before blendMode().
+    blend mode must be set to 7 (separate custom blending) after this call.
+
+    see blendFactors() for a list of factors and equations.
+]]
+docs.doc_strings["blendMode"] =
+[[
+  void blendMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new blending mode to use [0-4]
+  DESCRIPTION:
+    changes the current color blending mode setting.
+
+    mode must be one of the following values:
+      0: alpha blending (default)
+      1: additive blending
+      2: multiplicative blending
+      3: additive blending (alternative)
+      4: subtractive blending
+      5: blend using premultiplied alpha
+      6: custom blending (see blendFactors())
+      7: separate custom blending (see blendFactorsEx())
+]]
+docs.doc_strings["cam3DRight"] = [[]]
+docs.doc_strings["cam3DForward"] = [[]]
+docs.doc_strings["camera2D"] =
+[[
+  void camera2D(int camera)
+
+  ARGUMENTS:
+    int camera: index of the 2D camera to use [0-3]
+  DESCRIPTION:
+    configures the topmost matrix on the stack to match
+    the view of the given 2D camera.
+]]
+docs.doc_strings["camera3D"] =
+[[
+  void camera3D(int camera)
+
+  ARGUMENTS:
+    int camera: index of the 3D camera to use [0-3]
+  DESCRIPTION:
+    configures the topmost matrix on the stack to match
+    the view of the given 3D camera.
+
+    before the call to draw() each frame, an implicit call to
+    camera3D(0) is made.
+]]
+docs.doc_strings["ceil"] =
+[[
+  float ceil(float x)
   
   ARGUMENTS:
-    int player: the player to check [0-4]
-    int button: the button to check [0-13]
+    float x: input value
   DESCRIPTION:
-    returns 1 the frame the given player presses the given button,
-    and returns 1 periodically while the button is held.
-    otherwise, returns 0.
+    returns x rounded upward to the nearest whole number.
+    this function always rounds toward positive infinity.
 ]]
-docs.doc_strings["released"] =
+docs.doc_strings["checkCollision"] = [[]]
+docs.doc_strings["clear"] =
 [[
-  int released(int player, int button)
+  void clear(int flags)
   
   ARGUMENTS:
-    int player: the player to check [0-4]
-    int button: the button to check [0-13]
+    int flags: the buffers to clear
   DESCRIPTION:
-    returns 1 if the given player has released the given button this frame.
-    otherwise, returns 0.
+    clears the given buffers.
+
+    flags is a 3-bit bitmask, with each bit controlling the following buffers:
+      binary 0b001 (decimal 1): color buffer
+      binary 0b010 (decimal 2): depth buffer
+      binary 0b100 (decimal 4): stencil buffer
 ]]
-docs.doc_strings["held"] =
+docs.doc_strings["clearColor"] = [[]]
+docs.doc_strings["clearDepth"] = [[]]
+docs.doc_strings["clearStencil"] = [[]]
+docs.doc_strings["colorMask"] = [[]]
+docs.doc_strings["cos"] =
 [[
-  int held(int player, int button)
+  float cos(float x)
   
   ARGUMENTS:
-    int player: the player to check [0-4]
-    int button: the button to check [0-13]
+    float x: input value
   DESCRIPTION:
-    returns 1 if the given player is holding the given button.
-    otherwise, returns 0.
+    returns the cosine of x.
+    return value ranges from -1.0 to 1.0.
 ]]
-docs.doc_strings["mousePressed"] =
+docs.doc_strings["cullMode"] =
 [[
-  int mousePressed(int button)
+  void cullMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new face culling mode to use [0-2]
+  DESCRIPTION:
+    changes the current face culling mode setting.
+
+    mode must be one of the following values:
+      0: cull backfaces (default)
+      1: cull frontfaces
+      2: disable face culling
+]]
+docs.doc_strings["deg"] =
+[[
+  float deg(float angle)
   
   ARGUMENTS:
-    int button: the mouse button to check [0-2]
+    float angle: input angle (in radians)
   DESCRIPTION:
-    returns 1 if the given mouse button has been pressed this frame.
-    otherwise, returns 0.
+    returns the given angle in degrees.
 ]]
-docs.doc_strings["mouseReleased"] =
+docs.doc_strings["depthFunc"] = [[]]
+docs.doc_strings["depthMask"] = [[]]
+docs.doc_strings["depthTest"] = [[]]
+docs.doc_strings["drawObj"] = [[]]
+docs.doc_strings["drawObjEx"] = [[]]
+docs.doc_strings["endMesh"] =
 [[
-  int mouseReleased(int button)
+  void endMesh()
+
+  DESCRIPTION:
+    finalizes the construction of a mesh.
+
+    must only be called after a matching call to beginMesh().
+]]
+docs.doc_strings["floor"] =
+[[
+  float floor(float x)
   
   ARGUMENTS:
-    int button: the mouse button to check [0-2]
+    float x: input value
   DESCRIPTION:
-    returns 1 if the given mouse button has been released this frame.
-    otherwise, returns 0.
+    returns x rounded downward to the nearest whole number.
+    this function always rounds toward negative infinity.
 ]]
-docs.doc_strings["mouseHeld"] =
+docs.doc_strings["fogColor"] =
 [[
-  int mouseHeld(int button)
+  void fogColor(int color)
+
+  ARGUMENTS:
+    int color: the fog color to use (RGBA32 format)
+  DESCRIPTION:
+    sets the current fog tint color.
+
+    see fogMode().
+]]
+docs.doc_strings["fogEnd"] =
+[[
+  void fogEnd(float end);
   
   ARGUMENTS:
-    int button: the button to check [0-13]
+    float end: the distance from the camera where the
+               fog ends. [0.0-1000.0]
   DESCRIPTION:
-    returns 1 if the given mouse button is being held.
-    otherwise, returns 0.
+    sets the fog end distance setting.
+
+    see fogMode().
 ]]
-docs.doc_strings["mouseDragging"] =
+docs.doc_strings["fogMode"] =
 [[
-  int mouseDragging(int button)
+  void fogMode(int mode)
+
+  ARGUMENTS:
+    int mode: the fog mode to use [true/false]
+  DESCRIPTION:
+    enables/disables fog.
+
+    if mode is true, fog rendering will be enabled.
+    otherwise, fog rendering will be disabled.
+
+    fog is rendered by fading the color of geometry to the set fog color.
+    the fog start setting determines how far from the camera the fade begins.
+    the fog end setting is the distance from the camera where objects
+    will be fully tinted to the fog color.
+]]
+docs.doc_strings["fogStart"] =
+[[
+  void fogStart(float start);
   
   ARGUMENTS:
-    int button: the mouse button to check [0-2]
+    float start: the distance from the camera to start
+                 rendering fog. [0.0-1000.0]
   DESCRIPTION:
-    returns 1 if the given mouse button has been held for at least 1 frame
-    and the mouse has moved since being held.
-    otherwise, returns 0.
+    sets the fog starting distance setting.
+
+    see fogMode().
 ]]
-docs.doc_strings["getMousePosition"] =
+docs.doc_strings["fract"] =
 [[
-  vec2 getMousePosition()
+  float fract(float n)
   
+  ARGUMENTS:
+    float n: the value to get the fractional component of
   DESCRIPTION:
-    returns a 2D vector containing the mouse's screen coordinates.
+    returns the fractional component of a float.
+]]
+docs.doc_strings["free"] =
+[[
+  void free(void* block)
+
+  ARGUMENTS:
+    void* block: pointer to the block to free
+  DESCRIPTION:
+    frees a memory block allocated by alloc().
+]]
+docs.doc_strings["frustum"] = [[]]
+docs.doc_strings["getCam2D"] =
+[[
+  cam2d* getCam2D(int camera)
+
+  ARGUMENTS:
+    int camera: index of the 2D camera to get [0-3]
+  DESCRIPTION:
+    returns a pointer to the given 2D camera.
+]]
+docs.doc_strings["getCam3D"] =
+[[
+  cam3d* getCam3D(int camera)
+
+  ARGUMENTS:
+    int camera: index of the 3D camera to get [0-3]
+  DESCRIPTION:
+    returns a pointer to the given 3D camera.
+]]
+docs.doc_strings["getLight"] =
+[[
+  light* getLight(int light)
+
+  ARGUMENTS:
+    int light: index of the light to get [0-7]
+  DESCRIPTION:
+    returns a pointer to the given light.
+]]
+docs.doc_strings["getModelViewMatrix"] =
+[[
+  matrix getModelViewMatrix()
+
+  DESCRIPTION:
+    returns a copy of the topmost model-view matrix.
 ]]
 docs.doc_strings["getMouseDelta"] =
 [[
@@ -703,6 +785,21 @@ docs.doc_strings["getMouseDrag"] =
     returns a 2D vector containing the distance the mouse has been dragged
     since the given mouse button was pressed.
 ]]
+docs.doc_strings["getMouseLock"] =
+[[
+  int getMouseLock()
+
+  DESCRIPTION:
+    returns 1 if the mouse is currently locked.
+    otherwise, returns 0.
+]]
+docs.doc_strings["getMousePosition"] =
+[[
+  vec2 getMousePosition()
+  
+  DESCRIPTION:
+    returns a 2D vector containing the mouse's screen coordinates.
+]]
 docs.doc_strings["getMouseWheel"] =
 [[
   int getMouseWheel()
@@ -712,894 +809,65 @@ docs.doc_strings["getMouseWheel"] =
     returns -1 if the mouse wheel is being scrolled down.
     otherwise, returns 0.
 ]]
-docs.doc_strings["getMouseLock"] =
+docs.doc_strings["getProjectionMatrix"] =
 [[
-  int getMouseLock()
+  matrix getProjectionMatrix()
 
   DESCRIPTION:
-    returns 1 if the mouse is currently locked.
+    returns a copy of the topmost projection matrix.
+]]
+docs.doc_strings["getRaycastNormal"] = [[]]
+docs.doc_strings["getRaycastPoint"] = [[]]
+docs.doc_strings["getTopMatrix"] =
+[[
+  matrix getTopMatrix()
+
+  DESCRIPTION:
+    returns a copy of the topmost matrix of the current matrix stack.
+]]
+docs.doc_strings["getTrackBPM"] = [[]]
+docs.doc_strings["getTrackPan"] = [[]]
+docs.doc_strings["getTrackVolume"] = [[]]
+docs.doc_strings["held"] =
+[[
+  int held(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player is holding the given button.
     otherwise, returns 0.
 ]]
-docs.doc_strings["setMouseLock"] =
+docs.doc_strings["identity"] =
 [[
-  void setMouseLock(int lock)
-
-  ARGUMENTS:
-    int lock: lock setting [true/false]
-  DESCRIPTION:
-    if lock is true, hides and locks the mouse to the screen.
-    if lock is false, shows and unlocks the mouse.
-]]
-docs.doc_strings["mini"] =
-[[
-  int mini(int a, int b)
-  
-  ARGUMENTS:
-    int a: the first value to check
-    int b: the second value to check
-  DESCRIPTION:
-    returns the lower of the two given integers.
-]]
-docs.doc_strings["maxi"] =
-[[
-  int maxi(int a, int b)
-  
-  ARGUMENTS:
-    int a: the first value to check
-    int b: the second value to check
-  DESCRIPTION:
-    returns the higher of the two given integers.
-]]
-docs.doc_strings["midi"] =
-[[
-  int midi(int a, int b, int c)
-  
-  ARGUMENTS:
-    int a: the first value to check
-    int b: the second value to check
-    int c: the third value to check
-  DESCRIPTION:
-    returns the middle of the three given integers.
-]]
-docs.doc_strings["wrapi"] =
-[[
-  int wrapi(int n, int min, int max)
-  
-  ARGUMENTS:
-    int n  : the value to wrap
-    int min: the minimum range value
-    int max: the maximum range value (exclusive)
-  DESCRIPTION:
-    returns an integer value within the range [min, max).
-    if n is < min or >= max, it wraps around to the other end of the range.
-]]
-docs.doc_strings["minf"] =
-[[
-  float minf(float a, float b)
-  
-  ARGUMENTS:
-    float a: the first value to check
-    float b: the second value to check
-  DESCRIPTION:
-    returns the lower of the two given floats.
-]]
-docs.doc_strings["maxf"] =
-[[
-  float maxf(float a, float b)
-  
-  ARGUMENTS:
-    float a: the first value to check
-    float b: the second value to check
-  DESCRIPTION:
-    returns the higher of the two given floats.
-]]
-docs.doc_strings["midf"] =
-[[
-  float midf(float a, float b, float c)
-  
-  ARGUMENTS:
-    float a: the first value to check
-    float b: the second value to check
-    float c: the third value to check
-  DESCRIPTION:
-    returns the middle of the three given floats.
-]]
-docs.doc_strings["wrapf"] =
-[[
-  float wrapf(float n, float min, float max)
-  
-  ARGUMENTS:
-    float n  : the value to wrap
-    float min: the minimum range value
-    float max: the maximum range value (exclusive)
-  DESCRIPTION:
-    returns a float value within the range [min, max).
-    if n is < min or >= max, it wraps around to the other end of the range.
-]]
-docs.doc_strings["signi"] =
-[[
-  int signi(int n)
-  
-  ARGUMENTS:
-    int n: the value to get the sign of
-  DESCRIPTION:
-    returns the sign of the integer n.
-    
-    if n < 0, returns -1.
-    if n > 0, returns 1.
-    if n == 0, returns 0.
-]]
-docs.doc_strings["signf"] =
-[[
-  float signf(float n)
-  
-  ARGUMENTS:
-    float n: the value to get the sign of
-  DESCRIPTION:
-    returns the sign of the float n.
-    
-    if n < 0, returns -1.
-    if n > 0, returns 1.
-    if n == 0, returns 0.
-]]
-docs.doc_strings["fract"] =
-[[
-  float fract(float n)
-  
-  ARGUMENTS:
-    float n: the value to get the fractional component of
-  DESCRIPTION:
-    returns the fractional component of a float.
-]]
-docs.doc_strings["deg"] =
-[[
-  float deg(float angle)
-  
-  ARGUMENTS:
-    float angle: input angle (in radians)
-  DESCRIPTION:
-    returns the given angle in degrees.
-]]
-docs.doc_strings["rad"] =
-[[
-  float rad(float angle)
-  
-  ARGUMENTS:
-    float angle: input angle (in degrees)
-  DESCRIPTION:
-    returns the given angle in radians.
-]]
-docs.doc_strings["sin"] =
-[[
-  float sin(float x)
-  
-  ARGUMENTS:
-    float x: input value
-  DESCRIPTION:
-    returns the sine of x.
-    return value ranges from -1.0 to 1.0.
-]]
-docs.doc_strings["cos"] =
-[[
-  float cos(float x)
-  
-  ARGUMENTS:
-    float x: input value
-  DESCRIPTION:
-    returns the cosine of x.
-    return value ranges from -1.0 to 1.0.
-]]
-docs.doc_strings["powf"] =
-[[
-  float powf(float x, float exp)
-  
-  ARGUMENTS:
-    float x: the base value
-    float y: the exponent value
-  DESCRIPTION:
-    returns x raised to the power of y.
-]]
-docs.doc_strings["floor"] =
-[[
-  float floor(float x)
-  
-  ARGUMENTS:
-    float x: input value
-  DESCRIPTION:
-    returns x rounded downward to the nearest whole number.
-    this function always rounds toward negative infinity.
-]]
-docs.doc_strings["ceil"] =
-[[
-  float ceil(float x)
-  
-  ARGUMENTS:
-    float x: input value
-  DESCRIPTION:
-    returns x rounded upward to the nearest whole number.
-    this function always rounds toward positive infinity.
-]]
-docs.doc_strings["round"] =
-[[
-  float round(float x)
-  
-  ARGUMENTS:
-    float x: input value
-  DESCRIPTION:
-    returns x rounded toward to the nearest whole number.
-    halfway cases are rounded away from zero.
-]]
-docs.doc_strings["randomize"] =
-[[
-  void randomize()
-  
-  DESCRIPTION:
-    initializes the random number generator with a weak seed.
-    it is not strictly necessary to call this function on init,
-    as the system will initialize RNG when a cart is ran.
-]]
-docs.doc_strings["randomizeEx"] =
-[[
-  void randomizeEx(int seed)
-  
-  ARGUMENTS:
-    int seed: initialization value for RNG
-  DESCRIPTION:
-    initializes the random number generator with the given seed.
-    identical seeds will produce the same sequence of numbers.
-]]
-docs.doc_strings["randi"] =
-[[
-  int randi(int min, int max)
-  
-  ARGUMENTS:
-    int min: the minimum range value (inclusive)
-    int max: the maximum range value (inclusive)
-  DESCRIPTION:
-    returns a random integer in the range [min, max].
-]]
-docs.doc_strings["randiEx"] =
-[[
-  int randiEx()
-  
-  DESCRIPTION:
-    returns an integer with individually randomized bits.
-]]
-docs.doc_strings["randf"] =
-[[
-  float randf(float min, float max)
-  
-  ARGUMENTS:
-    float min: the minimum range value (inclusive)
-    float max: the maximum range value (inclusive)
-  DESCRIPTION:
-    returns a random float in the range [min, max].
-]]
-docs.doc_strings["randfEx"] =
-[[
-  float randfEx()
-  
-  DESCRIPTION:
-    returns a random float in the range [0.0, 1.0).
-]]
-docs.doc_strings["time"] =
-[[
-  float time()
-  
-  DESCRIPTION:
-    returns the number of seconds that the current cart has been running.
-]]
-docs.doc_strings["vec2Length"] =
-[[
-  float vec2Length(vec2 v)
-  
-  ARGUMENTS:
-    vec2 v: the vector to get the length of
-  DESCRIPTION:
-    returns the length (magnitude) of a 2D vector.
-]]
-docs.doc_strings["vec2LengthSq"] =
-[[
-  float vec2LengthSq(vec2 v)
-  
-  ARGUMENTS:
-    vec2 v: the vector to get the length of
-  DESCRIPTION:
-    returns the squared length (squared magnitude) of a 2D vector.
-    this function is less costly to compute than vec2Length().
-    as such, it is recommended to use this function when
-    exact magnitude is not needed. (i.e. comparing vectors)
-]]
-docs.doc_strings["vec2Normalize"] =
-[[
-  vec2 vec2Normalize(vec2 v)
-  
-  ARGUMENTS:
-    vec2 v: the vector to normalize
-  DESCRIPTION:
-    returns a 2D vector that points in the same direction as v,
-    but has a length (magnitude) of 1.0.
-]]
-docs.doc_strings["vec2Dot"] =
-[[
-  float vec2Dot(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: first input vector
-    vec2 b: second input vector
-  DESCRIPTION:
-    returns the dot product of a and b.
-    use this function to compare the angle between two 2D vectors.
-    
-    for un-normalized vectors:
-      returns 0 when the angle is 90 degrees.
-      returns a negative value when the angle is greater than 90 degrees.
-      returns a positive value when the angle is less than 90 degrees.
-    for normalized vectors:
-      returns a value in the range [-1.0, 1.0],
-      -1.0 for a 180 degree angle and 1.0 when a and b are aligned.
-]]
-docs.doc_strings["vec2Cross"] =
-[[
-  float vec2Cross(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: first input vector
-    vec2 b: second input vector
-  DESCRIPTION:
-    returns the cross product of a and b.
-    this value is computed as (a.x * b.y - a.y * b.x).
-]]
-docs.doc_strings["vec2Distance"] =
-[[
-  float vec2Distance(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: first input vector
-    vec2 b: second input vector
-  DESCRIPTION:
-    returns the distance between a and b.
-]]
-docs.doc_strings["vec2DistanceSq"] =
-[[
-  float vec2DistanceSq(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: first input vector
-    vec2 b: second input vector
-  DESCRIPTION:
-    returns the squared distance between a and b.
-    this function is less costly to compute than vec2Distance().
-    as such, it is recommended to use this function when
-    exact distance is not needed.
-]]
-docs.doc_strings["vec2Direction"] =
-[[
-  vec2 vec2Direction(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: start vector
-    vec2 b: end vector
-  DESCRIPTION:
-    returns a normalized 2D vector pointing from a to b.
-]]
-docs.doc_strings["vec2Angle"] =
-[[
-  float vec2Angle(vec2 a, vec2 b)
-  
-  ARGUMENTS:
-    vec2 a: first input vector
-    vec2 b: second input vector
-  DESCRIPTION:
-    returns the angle (in degrees) from a to b.
-]]
-docs.doc_strings["vec2Lerp"] =
-[[
-  vec2 vec2Lerp(vec2 start, vec2 end, float amount)
-  
-  ARGUMENTS:
-    vec2 start  : start vector
-    vec2 end    : destination vector
-    float amount: amount to interpolate by (1.0 = 100%)
-  DESCRIPTION:
-    returns the linear interpolation between two 2D vectors.
-]]
-docs.doc_strings["vec2Reflect"] =
-[[
-  vec2 vec2Reflect(vec2 v, vec2 normal)
-  
-  ARGUMENTS:
-    vec2 v     : the vector to reflect
-    vec2 normal: the normal vector to reflect off of
-  DESCRIPTION:
-    returns the 2D vector v reflected off of the normal vector.
-]]
-docs.doc_strings["vec2Rotate"] =
-[[
-  vec2 vec2Rotate(vec2 v, float angle)
-  
-  ARGUMENTS:
-    vec2 v    : the starting vector
-    vec2 angle: the angle to rotate by (in degrees)
-  DESCRIPTION:
-    returns the 2D vector v rotated by the given angle.
-]]
-docs.doc_strings["vec2MoveToward"] =
-[[
-  vec2 vec2MoveToward(vec2 a, vec2 b, float distance)
-  
-  ARGUMENTS:
-    vec2 a        : the starting vector
-    vec2 b        : the destination vector
-    float distance: the maximum distance to travel
-  DESCRIPTION:
-    returns the 2D vector a after being moved toward b by the given distance.
-    if distance is greater than the amount required to reach b,
-    returns b.
-]]
-docs.doc_strings["vec2Invert"] =
-[[
-  vec2 vec2Invert(vec2 v)
-  
-  ARGUMENTS:
-    vec2 v: the vector to invert
-  DESCRIPTION:
-    returns the inverse of the given vector.
-    equivelent to (vec2){1.0 / v.x, 1.0 / v.y}.
-]]
-docs.doc_strings["vec3Length"] =
-[[
-  float vec3Length(vec3 v)
-  
-  ARGUMENTS:
-    vec3 v: the vector to get the length of
-  DESCRIPTION:
-    returns the length (magnitude) of a 3D vector.
-]]
-docs.doc_strings["vec3LengthSq"] =
-[[
-  float vec3LengthSq(vec3 v)
-  
-  ARGUMENTS:
-    vec3 v: the vector to get the length of
-  DESCRIPTION:
-    returns the squared length (squared magnitude) of a 3D vector.
-    this function is less costly to compute than vec3Length().
-    as such, it is recommended to use this function when
-    exact magnitude is not needed. (i.e. comparing vectors)
-]]
-docs.doc_strings["vec3Normalize"] =
-[[
-  vec3 vec3Normalize(vec3 v)
-  
-  ARGUMENTS:
-    vec3 v: the vector to normalize
-  DESCRIPTION:
-    returns a 3D vector that points in the same direction as v,
-    but has a length (magnitude) of 1.0.
-]]
-docs.doc_strings["vec3Dot"] =
-[[
-  float vec3Dot(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: first input vector
-    vec3 b: second input vector
-  DESCRIPTION:
-    returns the dot product of a and b.
-    use this function to compare the angle between two 3D vectors.
-    
-    for un-normalized vectors:
-      returns 0 when the angle is 90 degrees.
-      returns a negative value when the angle is greater than 90 degrees.
-      returns a positive value when the angle is less than 90 degrees.
-    for normalized vectors:
-      returns a value in the range [-1.0, 1.0],
-      -1.0 for a 180 degree angle and 1.0 when a and b are aligned.
-]]
-docs.doc_strings["vec3Cross"] =
-[[
-  float vec3Cross(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: first input vector
-    vec3 b: second input vector
-  DESCRIPTION:
-    returns the cross product of a and b.
-]]
-docs.doc_strings["vec3Distance"] =
-[[
-  float vec3Distance(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: first input vector
-    vec3 b: second input vector
-  DESCRIPTION:
-    returns the distance between a and b.
-]]
-docs.doc_strings["vec3DistanceSq"] =
-[[
-  float vec3DistanceSq(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: first input vector
-    vec3 b: second input vector
-  DESCRIPTION:
-    returns the squared distance between a and b.
-    this function is less costly to compute than vec3Distance().
-    as such, it is recommended to use this function when
-    exact distance is not needed.
-]]
-docs.doc_strings["vec3Direction"] =
-[[
-  vec3 vec3Direction(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: start vector
-    vec3 b: end vector
-  DESCRIPTION:
-    returns a normalized 3D vector pointing from a to b.
-]]
-docs.doc_strings["vec3Angle"] =
-[[
-  float vec3Angle(vec3 a, vec3 b)
-  
-  ARGUMENTS:
-    vec3 a: first input vector
-    vec3 b: second input vector
-  DESCRIPTION:
-    returns the angle (in degrees) from a to b.
-]]
-docs.doc_strings["vec3Lerp"] =
-[[
-  vec2 vec3Lerp(vec3 start, vec3 end, float amount)
-  
-  ARGUMENTS:
-    vec3 start  : start vector
-    vec3 end    : destination vector
-    float amount: amount to interpolate by (1.0 = 100%)
-  DESCRIPTION:
-    returns the linear interpolation between two 3D vectors.
-]]
-docs.doc_strings["vec3Reflect"] =
-[[
-  vec3 vec3Reflect(vec3 v, vec3 normal)
-  
-  ARGUMENTS:
-    vec3 v     : the vector to reflect
-    vec3 normal: the normal vector to reflect off of
-  DESCRIPTION:
-    returns the 3D vector v reflected off of the normal vector.
-]]
-docs.doc_strings["vec3Rotate"] =
-[[
-  vec3 vec3Rotate(vec3 v, vec3 axis, float angle)
-  
-  ARGUMENTS:
-    vec2 v    : the starting vector
-    vec2 axis : the axis to rotate along
-    vec2 angle: the angle to rotate by (in degrees)
-  DESCRIPTION:
-    returns the 3D vector v rotated along the given axis by the given angle.
-]]
-docs.doc_strings["vec3MoveToward"] =
-[[
-  vec3 vec3MoveToward(vec3 a, vec3 b, float distance)
-  
-  ARGUMENTS:
-    vec3 a        : the starting vector
-    vec3 b        : the destination vector
-    float distance: the maximum distance to travel
-  DESCRIPTION:
-    returns the 3D vector a after being moved toward b by the given distance.
-    if distance is greater than the amount required to reach b,
-    returns b.
-]]
-docs.doc_strings["vec3Invert"] =
-[[
-  vec3 vec3Invert(vec3 v)
-  
-  ARGUMENTS:
-    vec3 v: the vector to invert
-  DESCRIPTION:
-    returns the inverse of the given vector.
-    equivelent to (vec3){1.0 / v.x, 1.0 / v.y, 1.0 / v,z}.
-]]
-docs.doc_strings["vec3ToScreen"] =
-[[
-  vec2 vec3ToScreen(vec3 v, int camera)
-  
-  ARGUMENTS:
-    vec3 v    : the vector to project
-    int camera: the index of the 3D camera to use for the projection
-  DESCRIPTION:
-    returns a 2D vector containing the screen coordinates of the
-    3D vector v as viewed from the perspective of the given 3D camera.
-]]
-docs.doc_strings["matrixIdentity"] =
-[[
-  matrix matrixIdentity()
+  void identity()
 
   DESCRIPTION:
-    returns an identity matrix. (a matrix with no transformations applied)
+    resets the topmost matrix of the current matrix stack to an identity matrix.
+    (a matrix with no transformations applied)
 ]]
-docs.doc_strings["matrixAdd"] = [[]]
-docs.doc_strings["matrixSubtract"] = [[]]
-docs.doc_strings["matrixMultiply"] = [[]]
-docs.doc_strings["matrixTranslate"] = [[]]
-docs.doc_strings["matrixRotate"] = [[]]
-docs.doc_strings["matrixScale"] = [[]]
-docs.doc_strings["matrixTranspose"] = [[]]
-docs.doc_strings["matrixInvert"] = [[]]
-docs.doc_strings["camera2D"] =
+docs.doc_strings["initMemCard"] =
 [[
-  void camera2D(int camera)
+  void initMemCard(string id)
 
   ARGUMENTS:
-    int camera: index of the 2D camera to use [0-3]
+    string id: unique identifier for memory card data
   DESCRIPTION:
-    configures the topmost matrix on the stack to match
-    the view of the given 2D camera.
+    initializes the system's memory card memory range.
+    memory card data is stored in the address range 0x05800000 to 0x05800FFF.
+
+    id is a string used to identify saved memory card data.
+    id must be between 1 and 16 characters long and may only contain
+    the characters A-Z, a-z, 0-9, and _
+
+    if save data matching the given id exists, it will be loaded.
+    write bytes to the address range 0x05800000 to 0x05800FFF to save
+    data to the memory card.
 ]]
-docs.doc_strings["getCam2DOrigin"] = [[]]
-docs.doc_strings["setCam2DOrigin"] = [[]]
-docs.doc_strings["getCam2DTarget"] = [[]]
-docs.doc_strings["setCam2DTarget"] = [[]]
-docs.doc_strings["getCam2DAngle"] = [[]]
-docs.doc_strings["setCam2DAngle"] = [[]]
-docs.doc_strings["getCam2DZoom"] = [[]]
-docs.doc_strings["setCam2DZoom"] = [[]]
-docs.doc_strings["camera3D"] =
+docs.doc_strings["lightingMode"] =
 [[
-  void camera3D(int camera)
-
-  ARGUMENTS:
-    int camera: index of the 3D camera to use [0-3]
-  DESCRIPTION:
-    configures the topmost matrix on the stack to match
-    the view of the given 3D camera.
-
-    before the call to draw() each frame, an implicit call to
-    camera3D(0) is made.
-]]
-docs.doc_strings["getCam3DPosition"] = [[]]
-docs.doc_strings["setCam3DPosition"] = [[]]
-docs.doc_strings["getCam3DTarget"] = [[]]
-docs.doc_strings["setCam3DTarget"] = [[]]
-docs.doc_strings["getCam3DUp"] = [[]]
-docs.doc_strings["setCam3DUp"] = [[]]
-docs.doc_strings["getCam3DFOV"] = [[]]
-docs.doc_strings["setCam3DFOV"] = [[]]
-docs.doc_strings["getCam3DProjection"] = [[]]
-docs.doc_strings["setCam3DProjection"] = [[]]
-docs.doc_strings["getCam3DRight"] = [[]]
-docs.doc_strings["getCam3DForward"] = [[]]
-docs.doc_strings["viewport"] =
-[[
-  void viewport(int x, int y, int width, int height)
-
-  ARGUMENTS:
-    int x     : viewport screen x position
-    int y     : viewport screen y position
-    int width : viewport width
-    int height: viewport height
-  DESCRIPTION:
-    restricts rendering to the given screen rectangle.
-]]
-docs.doc_strings["texture"] =
-[[
-  void texture(int x, int y, int width, int height)
-
-  ARGUMENTS:
-    int x     : texture window x position [0-1023]
-    int y     : texture window y position [0-1023]
-    int width : texture window width [1-256]
-    int height: texture window height [1-256]
-  DESCRIPTION:
-    changes the window of texture memory to use as the current texture.
-
-    a maximum texture size of 256x256 can be specified.
-
-    texture UV coordinates will be mapped to the specified texture window.
-]]
-docs.doc_strings["getTextureMode"] =
-[[
-  int getTextureMode()
-
-  DESCRIPTION:
-    returns the current texture mode.
-
-    see setTextureMode() for a list of modes.
-]]
-docs.doc_strings["setTextureMode"] =
-[[
-  void setTextureMode(int mode)
-
-  ARGUMENTS:
-    int mode: the new texture mode to use [0-2]
-  DESCRIPTION:
-    changes the current texture mode setting.
-
-    mode must be one of the following values:
-      0: repeat texture (default)
-      1: clamp texture to edges
-      2: disable texturing
-    
-    modes 0 and 1 determine whether UVs outside of the 0.0-1.0 range
-    will be cause the texture to be repeated accross a surface, or
-    if UVs should be clamped to the 0.0-1.0 range.
-
-    mode 2 will ignore texture pixel colors and output
-    pure white instead.
-]]
-docs.doc_strings["getCullMode"] =
-[[
-  int getCullMode()
-
-  DESCRIPTION:
-    returns the current face culling mode.
-
-    see setCullMode() for a list of modes.
-]]
-docs.doc_strings["setCullMode"] =
-[[
-  void setCullMode(int mode)
-
-  ARGUMENTS:
-    int mode: the new face culling mode to use [0-2]
-  DESCRIPTION:
-    changes the current face culling mode setting.
-
-    mode must be one of the following values:
-      0: cull backfaces (default)
-      1: cull frontfaces
-      2: disable face culling
-]]
-docs.doc_strings["getWireMode"] =
-[[
-  int getWireMode()
-
-  DESCRIPTION:
-    returns true if wireframe mode is currently enabled.
-    otherwise, returns false.
-]]
-docs.doc_strings["setWireMode"] =
-[[
-  void setWireMode(int mode)
-
-  ARGUMENTS:
-    int mode: the wireframe mode to use [true/false]
-  DESCRIPTION:
-    enables/disables wireframe mode.
-
-    if mode is true, wireframe mode will be enabled.
-    otherwise, wireframe mode will be disabled.
-]]
-docs.doc_strings["getFogMode"] =
-[[
-  int getFogMode()
-
-  DESCRIPTION:
-    returns true if fog is currently enabled.
-    otherwise, returns false.
-]]
-docs.doc_strings["setFogMode"] =
-[[
-  void setFogMode(int mode)
-
-  ARGUMENTS:
-    int mode: the fog mode to use [true/false]
-  DESCRIPTION:
-    enables/disables fog.
-
-    if mode is true, fog rendering will be enabled.
-    otherwise, fog rendering will be disabled.
-
-    fog is rendered by fading the color of geometry to the set fog color.
-    the fog start setting determines how far from the camera the fade begins.
-    the fog end setting is the distance from the camera where objects
-    will be fully tinted to the fog color.
-]]
-docs.doc_strings["getFogStart"] =
-[[
-  float getFogStart();
-
-  DESCRIPTION:
-    returns the fog starting distance setting.
-
-    see setFogMode().
-]]
-docs.doc_strings["setFogStart"] =
-[[
-  void setFogStart(float start);
-  
-  ARGUMENTS:
-    float start: the distance from the camera to start
-                 rendering fog. [0.0-1000.0]
-  DESCRIPTION:
-    sets the fog starting distance setting.
-
-    see setFogMode().
-]]
-docs.doc_strings["getFogEnd"] =
-[[
-  float getFogEnd();
-
-  DESCRIPTION:
-    returns the fog end distance setting.
-
-    see setFogMode().
-]]
-docs.doc_strings["setFogEnd"] =
-[[
-  void setFogEnd(float end);
-  
-  ARGUMENTS:
-    float end: the distance from the camera where the
-               fog ends. [0.0-1000.0]
-  DESCRIPTION:
-    sets the fog end distance setting.
-
-    see setFogMode().
-]]
-docs.doc_strings["getFogColor"] =
-[[
-  int getFogColor()
-
-  DESCRIPTION:
-    returns the current fog tint color.
-
-    see setFogMode().
-]]
-docs.doc_strings["setFogColor"] =
-[[
-  void setFogColor(int color)
-
-  ARGUMENTS:
-    int color: the fog color to use (RGBA32 format)
-  DESCRIPTION:
-    sets the current fog tint color.
-
-    see setFogMode().
-]]
-docs.doc_strings["getBlendMode"] =
-[[
-  int getBlendMode()
-
-  DESCRIPTION:
-    returns the current blending mode.
-
-    see setBlendMode().
-]]
-docs.doc_strings["setBlendMode"] =
-[[
-  void setBlendMode(int mode)
-
-  ARGUMENTS:
-    int mode: the new blending mode to use [0-4]
-  DESCRIPTION:
-    changes the current color blending mode setting.
-
-    mode must be one of the following values:
-      0: blend considering alpha (default)
-      1: additive blending
-      2: multiplicative blending
-      3: additive blending (alternative)
-      4: subtractive blending
-]]
-docs.doc_strings["getLightingMode"] =
-[[
-  int getLightingMode()
-
-  DESCRIPTION:
-    returns true if lighting is currently enabled.
-    otherwise, returns false.
-
-    see setLightingMode().
-]]
-docs.doc_strings["setLightingMode"] =
-[[
-  void setLightingMode(int mode)
+  void lightingMode(int mode)
 
   ARGUMENTS:
     int mode: the lighting mode to use [true/false]
@@ -1616,201 +884,65 @@ docs.doc_strings["setLightingMode"] =
     ambient lighting is a form of light that every object
     recieves equally.
 ]]
-docs.doc_strings["getAmbientFactor"] =
+docs.doc_strings["loadObjBank"] =
 [[
-  float getAmbientFactor()
-
-  DESCRIPTIONS:
-    returns the current ambient light factor.
-
-    see setAmbientFactor().
-]]
-docs.doc_strings["setAmbientFactor"] =
-[[
-  void setAmbientFactor(float factor)
-  
-  ARGUMENTS:
-    float factor: percentage of ambient light tinting [0.0-100.0]
-  DESCRIPTIONS:
-    sets the current ambient light factor.
-
-    the ambient factor is the percentage of tinting that objects will
-    recieve from ambient lighting. (0.0 to 100.0)
-]]
-docs.doc_strings["getAmbientColor"] =
-[[
-  int getAmbientColor()
-
-  DESCRIPTION:
-    returns the current ambient lighting color.
-
-    see setAmbientColor().
-]]
-docs.doc_strings["setAmbientColor"] =
-[[
-  void setAmbientColor(int color)
+  void loadObjBank(int bank)
 
   ARGUMENTS:
-    int color: the ambient light color to use (RGBA32 format)
+    int bank: index of the object bank to load [0-3]
   DESCRIPTION:
-    sets the current ambient lighting color.
+    loads an object bank from the cartridge into system memory.
+
+    system object data is stored in the address range
+    0x00C00000 to 0x00F5FFFF.
 ]]
-docs.doc_strings["getLightEnabled"] =
+docs.doc_strings["loadSeqBank"] =
 [[
-  int getLightEnabled(int light)
+  void loadSeqBank(int bank)
 
   ARGUMENTS:
-    int light: index of the light to query [0-7]
+    int bank: index of the sequencer bank to load [0-7]
   DESCRIPTION:
-    returns true if the given light is enabled,
-    otherwise, returns false.
+    loads a sequencer bank from the cartridge into system memory.
 
-    see setLightEnabled().
+    system sequencer data is stored in the address range
+    0x01700000 to 0x0173FFFF.
 ]]
-docs.doc_strings["setLightEnabled"] =
+docs.doc_strings["loadTexBank"] =
 [[
-  void setLightEnabled(int light, int enabled)
+  void loadTexBank(int bank)
 
   ARGUMENTS:
-    int light  : index of the light [0-7]
-    int enabled: the enabled mode to use [true/false]
+    int bank: index of the texture bank to load [0-3]
   DESCRIPTION:
-    sets the enabled flag on the given light.
+    loads a texture bank from the cartridge into system memory.
 
-    when a light is enabled, it will be used in lighting calculations.
+    system texture data is stored in the address range
+    0x00800000 to 0x00BFFFFF.
 ]]
-docs.doc_strings["getLightType"] =
+docs.doc_strings["loadWavBank"] =
 [[
-  int getLightType(int light)
+  void loadWavBank(int bank)
 
   ARGUMENTS:
-    int light: index of the light to query [0-7]
+    int bank: index of the wave bank to load [0-1]
   DESCRIPTION:
-    returns the type of the given light.
+    loads a wave bank from the cartridge into system memory.
 
-    see setLightType().
+    system wave data is stored in the address range
+    0x01000000 to 0x016FFFFF.
 ]]
-docs.doc_strings["setLightType"] =
+docs.doc_strings["lookAt"] = [[]]
+docs.doc_strings["matrixAdd"] = [[]]
+docs.doc_strings["matrixIdentity"] =
 [[
-  void setLightType(int light, int type)
+  matrix matrixIdentity()
 
-  ARGUMENTS:
-    int light: index of the light [0-7]
-    int type : the type to use [0-1]
   DESCRIPTION:
-    sets the type flag on the given light.
-
-    type must be one of the following values:
-      0: point light
-      1: directional light
-    
-    point lights emit light in a radius around them, like a lightbulb.
-    directional lights cast light on all objects regardless of distance,
-    but only in one direction.
-    
-    for example, a directional light could be used to simulate sunlight.
+    returns an identity matrix. (a matrix with no transformations applied)
 ]]
-docs.doc_strings["getLightRadius"] =
-[[
-  float getLightRadius(int light)
-
-  ARGUMENTS:
-    int light: index of the light to query [0-7]
-  DESCRIPTION:
-    returns the radius value of the given light.
-
-    see setLightRadius().
-]]
-docs.doc_strings["setLightRadius"] =
-[[
-  void setLightRadius(int light, float radius)
-
-  ARGUMENTS:
-    int light   : index of the light [0-7]
-    float radius: the radius value to use
-  DESCRIPTION:
-    sets the radius value on the given light.
-
-    directional lights ignore this value.
-]]
-docs.doc_strings["getLightPosition"] =
-[[
-  vec3 getLightPosition(int light)
-
-  ARGUMENTS:
-    int light: index of the light to query [0-7]
-  DESCRIPTION:
-    returns the position of the given light.
-
-    see setLightPosition().
-]]
-docs.doc_strings["setLightPosition"] =
-[[
-  void setLightPosition(int light, vec3 position)
-
-  ARGUMENTS:
-    int light    : index of the light [0-7]
-    vec3 position: the position value to use
-  DESCRIPTION:
-    sets the position of the given light.
-
-    directional lights ignore this value.
-]]
-docs.doc_strings["getLightDirection"] =
-[[
-  vec3 getLightDirection(int light)
-
-  ARGUMENTS:
-    int light: index of the light to query [0-7]
-  DESCRIPTION:
-    returns the direction of the given light.
-
-    see setLightDirection().
-]]
-docs.doc_strings["setLightDirection"] =
-[[
-  void setLightDirection(int light, vec3 direction)
-
-  ARGUMENTS:
-    int light     : index of the light [0-7]
-    vec3 direction: the direction value to use
-  DESCRIPTION:
-    sets the direction of the given light.
-
-    direction must be normalized.
-
-    points lights ignore this value.
-]]
-docs.doc_strings["getLightColor"] =
-[[
-  int getLightColor(int light)
-
-  ARGUMENTS:
-    int light: index of the light to query [0-7]
-  DESCRIPTION:
-    returns the color of the given light.
-]]
-docs.doc_strings["setLightColor"] =
-[[
-  void setLightColor(int light, int color)
-
-  ARGUMENTS:
-    int light: index of the light [0-7]
-    int color: the color value to use (RGBA32 format)
-  DESCRIPTION:
-    sets the color the given light.
-]]
-docs.doc_strings["clear"] =
-[[
-  void clear(int color)
-  
-  ARGUMENTS:
-    int color: the color to clear the screen with (RGBA32 format)
-  DESCRIPTION:
-    fills the screen or current viewport with the given color.
-
-    if an alpha value of 0 is given, only the depth buffer is cleared.
-]]
+docs.doc_strings["matrixInvert"] = [[]]
+docs.doc_strings["matrixLookAt"] = [[]]
 docs.doc_strings["matrixMode"] =
 [[
   void matrixMode(int mode)
@@ -1824,106 +956,107 @@ docs.doc_strings["matrixMode"] =
       0: projection matrix stack
       1: model-view matrix stack
 ]]
-docs.doc_strings["pushMatrix"] =
+docs.doc_strings["matrixMultiply"] = [[]]
+docs.doc_strings["matrixRotate"] = [[]]
+docs.doc_strings["matrixScale"] = [[]]
+docs.doc_strings["matrixSubtract"] = [[]]
+docs.doc_strings["matrixTranslate"] = [[]]
+docs.doc_strings["matrixTranspose"] = [[]]
+docs.doc_strings["maxf"] =
 [[
-  void pushMatrix()
-
-  DESCRIPTION:
-    pushes a copy of the current matrix to the top of the current matrix stack.
-]]
-docs.doc_strings["popMatrix"] =
-[[
-  void popMatrix()
-
-  DESCRIPTION:
-    pops the topmost matrix off of the current matrix stack.
-]]
-docs.doc_strings["getProjectionMatrix"] =
-[[
-  matrix getProjectionMatrix()
-
-  DESCRIPTION:
-    returns a copy of the topmost projection matrix.
-]]
-docs.doc_strings["setProjectionMatrix"] =
-[[
-  void setProjectionMatrix(matrix m)
+  float maxf(float a, float b)
   
   ARGUMENTS:
-    matrix m: the matrix to use
+    float a: the first value to check
+    float b: the second value to check
   DESCRIPTION:
-    sets the topmost projection matrix to the given matrix.
+    returns the higher of the two given floats.
 ]]
-docs.doc_strings["getModelViewMatrix"] =
+docs.doc_strings["maxi"] =
 [[
-  matrix getModelViewMatrix()
+  int maxi(int a, int b)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+  DESCRIPTION:
+    returns the higher of the two given integers.
+]]
+docs.doc_strings["memcpy"] =
+[[
+  void memcpy(void* destination, void* source, int n)
 
-  DESCRIPTION:
-    returns a copy of the topmost model-view matrix.
-]]
-docs.doc_strings["setModelViewMatrix"] =
-[[
-  void setModelViewMatrix(matrix m)
-  
   ARGUMENTS:
-    matrix m: the matrix to use
+    void* destination: the memory address to write to
+    void* source     : the memory address to read from
+    int n            : the amount of bytes to read
   DESCRIPTION:
-    sets the topmost model-view matrix to the given matrix.
-]]
-docs.doc_strings["getTopMatrix"] =
-[[
-  matrix getTopMatrix()
+    copies n bytes from source to destination.
 
-  DESCRIPTION:
-    returns a copy of the topmost matrix of the current matrix stack.
+    source and destination buffers may safely overlap.
 ]]
-docs.doc_strings["multiplyTopMatrix"] =
+docs.doc_strings["memset"] =
 [[
-  void multiplyTopMatrix(matrix m)
-  
-  ARGUMENTS:
-    matrix m: the matrix to multiply by
-  DESCRIPTION:
-    multiplies the topmost matrix of the current stack by the given matrix.
-]]
-docs.doc_strings["identity"] =
-[[
-  void identity()
+  void memset(void* destination, int n, int value)
 
-  DESCRIPTION:
-    resets the topmost matrix of the current matrix stack to an identity matrix.
-    (a matrix with no transformations applied)
-]]
-docs.doc_strings["translate"] =
-[[
-  void translate(vec3 v)
-  
   ARGUMENTS:
-    vec3 v: the vector to translate by
+    void* destination: the memory address to write to
+    int n            : the amount of bytes to write
+    int value        : byte value to write
   DESCRIPTION:
-    translates the topmost matrix of the current matrix by the 3D vector v.
+    copies the given byte value to the first n bytes
+    starting at the destination address.
 ]]
-docs.doc_strings["rotate"] =
+docs.doc_strings["meshColor"] =
 [[
-  void rotate(vec3 v)
-  
+  void meshColor(int color)
+
   ARGUMENTS:
-    vec3 v: the vector to rotate by
+    int color: the color to use for the current vertex (RGBA32 format)
   DESCRIPTION:
-    rotates the topmost matrix of the current matrix by the 3D vector v.
-    rotation angles must be in degrees.
+    submits the tint color for the current mesh vertex.
+
+    vertex colors can be used to tint the texture of a mesh.
+    the colors of each vertex are blended across the mesh surface.
+
+    vertex colors are multiplied with texture pixel colors,
+    so a vertex color of pure white will result in the
+    original pixel color.
+
+    if lighting is enabled, this function does nothing.
 ]]
-docs.doc_strings["scale"] =
+docs.doc_strings["meshNormal"] =
 [[
-  void scale(vec3 v)
-  
+  void meshNormal(vec3 normal)
+
   ARGUMENTS:
-    vec3 v: the vector to scale by
+    vec3 normal: the 3D normal vector to use for the current vertex
   DESCRIPTION:
-    scales the topmost matrix of the current matrix by the 3D vector v.
+    submits the 3D normal vector for the current mesh vertex.
+    the vector must be normalized. (normal must have a length of 1)
+
+    normal vectors are used when calculating lighting.
+    a vertex with a normal vector pointing toward a light will recieve more
+    light than one with a normal vector pointing away from the light.
+
+    if lighting is not enabled, this function does nothing.
 ]]
-docs.doc_strings["frustum"] = [[]]
-docs.doc_strings["ortho"] = [[]]
+docs.doc_strings["meshUV"] =
+[[
+  void meshUV(vec2 uv)
+
+  ARGUMENTS:
+    vec2 uv: the 2D texture coordinates to use for the current vertex
+  DESCRIPTION:
+    submits the 2D texture coordinates for the current mesh vertex.
+
+    (0.0, 0.0) corresponds to the top-left corner of the texture.
+    (1.0, 1.0) corresponds to the bottom-right corner of the texture.
+
+    the normal range for UV coordinates is (0.0, 0.0) to (1.0, 1.0),
+    values outside the 0.0-1.0 range will be treated differently
+    depending on the current texture mode. (see setTextureMode())
+]]
 docs.doc_strings["meshVertex"] =
 [[
   void meshVertex(vec3 v)
@@ -1950,80 +1083,177 @@ docs.doc_strings["meshVertex2D"] =
     this function should be called after all other desired vertex properties
     (uv, color, normal) have been submitted.
 ]]
-docs.doc_strings["meshUV"] =
+docs.doc_strings["midf"] =
 [[
-  void meshUV(vec2 uv)
-
-  ARGUMENTS:
-    vec2 uv: the 2D texture coordinates to use for the current vertex
-  DESCRIPTION:
-    submits the 2D texture coordinates for the current mesh vertex.
-
-    (0.0, 0.0) corresponds to the top-left corner of the texture.
-    (1.0, 1.0) corresponds to the bottom-right corner of the texture.
-
-    the normal range for UV coordinates is (0.0, 0.0) to (1.0, 1.0),
-    values outside the 0.0-1.0 range will be treated differently
-    depending on the current texture mode. (see setTextureMode())
-]]
-docs.doc_strings["meshNormal"] =
-[[
-  void meshNormal(vec3 normal)
-
-  ARGUMENTS:
-    vec3 normal: the 3D normal vector to use for the current vertex
-  DESCRIPTION:
-    submits the 3D normal vector for the current mesh vertex.
-    the vector must be normalized. (normal must have a length of 1)
-
-    normal vectors are used when calculating lighting.
-    a vertex with a normal vector pointing toward a light will recieve more
-    light than one with a normal vector pointing away from the light.
-
-    if lighting is not enabled, this function does nothing.
-]]
-docs.doc_strings["meshColor"] =
-[[
-  void meshColor(int color)
-
-  ARGUMENTS:
-    int color: the color to use for the current vertex (RGBA32 format)
-  DESCRIPTION:
-    submits the tint color for the current mesh vertex.
-
-    vertex colors can be used to tint the texture of a mesh.
-    the colors of each vertex are blended across the mesh surface.
-
-    vertex colors are multiplied with texture pixel colors,
-    so a vertex color of pure white will result in the
-    original pixel color.
-
-    if lighting is enabled, this function does nothing.
-]]
-docs.doc_strings["beginMesh"] =
-[[
-  void beginMesh(int primitive)
+  float midf(float a, float b, float c)
   
   ARGUMENTS:
-    int primitive: the type of mesh primitive to construct [0-2]
+    float a: the first value to check
+    float b: the second value to check
+    float c: the third value to check
   DESCRIPTION:
-    begins construction of a mesh using the given primitive type.
-
-    primitive must be one of the following values:
-      0: lines     (2 vertices)
-      1: triangles (3 vertices)
-      2: quads     (4 vertices)
-    
-    must eventually be followed by a call to endMesh().
+    returns the middle of the three given floats.
 ]]
-docs.doc_strings["endMesh"] =
+docs.doc_strings["midi"] =
 [[
-  void endMesh()
+  int midi(int a, int b, int c)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+    int c: the third value to check
+  DESCRIPTION:
+    returns the middle of the three given integers.
+]]
+docs.doc_strings["minf"] =
+[[
+  float minf(float a, float b)
+  
+  ARGUMENTS:
+    float a: the first value to check
+    float b: the second value to check
+  DESCRIPTION:
+    returns the lower of the two given floats.
+]]
+docs.doc_strings["mini"] =
+[[
+  int mini(int a, int b)
+  
+  ARGUMENTS:
+    int a: the first value to check
+    int b: the second value to check
+  DESCRIPTION:
+    returns the lower of the two given integers.
+]]
+docs.doc_strings["mouseDragging"] =
+[[
+  int mouseDragging(int button)
+  
+  ARGUMENTS:
+    int button: the mouse button to check [0-2]
+  DESCRIPTION:
+    returns 1 if the given mouse button has been held for at least 1 frame
+    and the mouse has moved since being held.
+    otherwise, returns 0.
+]]
+docs.doc_strings["mouseHeld"] =
+[[
+  int mouseHeld(int button)
+  
+  ARGUMENTS:
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given mouse button is being held.
+    otherwise, returns 0.
+]]
+docs.doc_strings["mousePressed"] =
+[[
+  int mousePressed(int button)
+  
+  ARGUMENTS:
+    int button: the mouse button to check [0-2]
+  DESCRIPTION:
+    returns 1 if the given mouse button has been pressed this frame.
+    otherwise, returns 0.
+]]
+docs.doc_strings["mouseReleased"] =
+[[
+  int mouseReleased(int button)
+  
+  ARGUMENTS:
+    int button: the mouse button to check [0-2]
+  DESCRIPTION:
+    returns 1 if the given mouse button has been released this frame.
+    otherwise, returns 0.
+]]
+docs.doc_strings["multiplyTopMatrix"] =
+[[
+  void multiplyTopMatrix(matrix m)
+  
+  ARGUMENTS:
+    matrix m: the matrix to multiply by
+  DESCRIPTION:
+    multiplies the topmost matrix of the current stack by the given matrix.
+]]
+docs.doc_strings["muteTrack"] = [[]]
+docs.doc_strings["muteTracks"] = [[]]
+docs.doc_strings["ortho"] = [[]]
+docs.doc_strings["pauseTrack"] = [[]]
+docs.doc_strings["pauseTracks"] = [[]]
+docs.doc_strings["peek32"] =
+[[
+  int peek32(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the 32-bit integer value starting at the given memory address.
+]]
+docs.doc_strings["peek8"] =
+[[
+  int peek8(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the value of the byte at the given memory address.
+]]
+docs.doc_strings["playPattern"] = [[]]
+docs.doc_strings["playSong"] = [[]]
+docs.doc_strings["playTrack"] = [[]]
+docs.doc_strings["playWav"] = [[]]
+docs.doc_strings["playWavEx"] = [[]]
+docs.doc_strings["poke32"] =
+[[
+  void poke32(void* address, int value)
+
+  ARGUMENTS:
+    void* address: memory pointer to write to
+    int value    : 32-bit integer value to write
+  DESCRIPTION:
+    writes the 32-bit integer to the given memory address.
+]]
+docs.doc_strings["poke8"] =
+[[
+  void poke8(void* address, int value)
+
+  ARGUMENTS:
+    void* address: memory pointer to write to
+    int value    : byte value to write
+  DESCRIPTION:
+    writes the given byte to the given memory address.
+]]
+docs.doc_strings["polygonMode"] =
+[[
+  void polygonMode(int face, int mode)
+]]
+docs.doc_strings["popMatrix"] =
+[[
+  void popMatrix()
 
   DESCRIPTION:
-    finalizes the construction of a mesh.
-
-    must only be called after a matching call to beginMesh().
+    pops the topmost matrix off of the current matrix stack.
+]]
+docs.doc_strings["powf"] =
+[[
+  float powf(float x, float exp)
+  
+  ARGUMENTS:
+    float x  : the base value
+    float exp: the exponent value
+  DESCRIPTION:
+    returns x raised to the power of exp.
+]]
+docs.doc_strings["pressed"] =
+[[
+  int pressed(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player has pressed the given button this frame.
+    otherwise, returns 0.
 ]]
 docs.doc_strings["print2D"] =
 [[
@@ -2048,163 +1278,757 @@ docs.doc_strings["print2D"] =
     %v2      vec2 value
     %v3      vec3 value
 ]]
-docs.doc_strings["sprite2D"] = [[]]
-docs.doc_strings["sprite2DEx"] = [[]]
-docs.doc_strings["drawObj"] = [[]]
-docs.doc_strings["drawObjEx"] = [[]]
-docs.doc_strings["playSong"] = [[]]
-docs.doc_strings["playTrack"] = [[]]
-docs.doc_strings["playPattern"] = [[]]
-docs.doc_strings["playWav"] = [[]]
-docs.doc_strings["playWavEx"] = [[]]
-docs.doc_strings["pauseTrack"] = [[]]
-docs.doc_strings["pauseTracks"] = [[]]
+docs.doc_strings["pushMatrix"] =
+[[
+  void pushMatrix()
+
+  DESCRIPTION:
+    pushes a copy of the current matrix to the top of the current matrix stack.
+]]
+docs.doc_strings["rad"] =
+[[
+  float rad(float angle)
+  
+  ARGUMENTS:
+    float angle: input angle (in degrees)
+  DESCRIPTION:
+    returns the given angle in radians.
+]]
+docs.doc_strings["randf"] =
+[[
+  float randf(float min, float max)
+  
+  ARGUMENTS:
+    float min: the minimum range value (inclusive)
+    float max: the maximum range value (inclusive)
+  DESCRIPTION:
+    returns a random float in the range [min, max].
+]]
+docs.doc_strings["randfEx"] =
+[[
+  float randfEx()
+  
+  DESCRIPTION:
+    returns a random float in the range [0.0, 1.0).
+]]
+docs.doc_strings["randi"] =
+[[
+  int randi(int min, int max)
+  
+  ARGUMENTS:
+    int min: the minimum range value (inclusive)
+    int max: the maximum range value (inclusive)
+  DESCRIPTION:
+    returns a random int in the range [min, max].
+]]
+docs.doc_strings["randiEx"] =
+[[
+  int randiEx()
+  
+  DESCRIPTION:
+    returns an int with individually randomized bits.
+]]
+docs.doc_strings["randomize"] =
+[[
+  void randomize()
+  
+  DESCRIPTION:
+    initializes the random number generator with a weak seed.
+    it is not strictly necessary to call this function on init,
+    as the system will initialize RNG when a cart is ran.
+]]
+docs.doc_strings["randomizeEx"] =
+[[
+  void randomizeEx(int seed)
+  
+  ARGUMENTS:
+    int seed: initialization value for RNG
+  DESCRIPTION:
+    initializes the random number generator with the given seed.
+    identical seeds will produce the same sequence of numbers.
+]]
+docs.doc_strings["raycast"] = [[]]
+docs.doc_strings["realloc"] =
+[[
+  void* realloc(void* block, int size)
+
+  ARGUMENTS:
+    void* block: pointer to block to resize
+    int size   : the new number of bytes to allocate
+  DESCRIPTION:
+    reallocates a memory block allocated by alloc().
+
+    returns a pointer to the reallocated block on success,
+
+    returns null if size is 0 or if reallocation fails.
+]]
+docs.doc_strings["released"] =
+[[
+  int released(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 if the given player has released the given button this frame.
+    otherwise, returns 0.
+]]
+docs.doc_strings["repeated"] =
+[[
+  int repeated(int player, int button)
+  
+  ARGUMENTS:
+    int player: the player to check [0-4]
+    int button: the button to check [0-13]
+  DESCRIPTION:
+    returns 1 the frame the given player presses the given button,
+    and returns 1 periodically while the button is held.
+    otherwise, returns 0.
+]]
 docs.doc_strings["resumeTrack"] = [[]]
 docs.doc_strings["resumeTracks"] = [[]]
+docs.doc_strings["rotate"] =
+[[
+  void rotate(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to rotate by
+  DESCRIPTION:
+    rotates the topmost matrix of the current matrix by the 3D vector v.
+    rotation angles must be in degrees.
+]]
+docs.doc_strings["round"] =
+[[
+  float round(float x)
+  
+  ARGUMENTS:
+    float x: input value
+  DESCRIPTION:
+    returns x rounded toward to the nearest whole number.
+    halfway cases are rounded away from zero.
+]]
+docs.doc_strings["scale"] =
+[[
+  void scale(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to scale by
+  DESCRIPTION:
+    scales the topmost matrix of the current matrix by the 3D vector v.
+]]
+docs.doc_strings["scissor"] = [[]]
+docs.doc_strings["scissorMode"] = [[]]
+docs.doc_strings["setModelViewMatrix"] =
+[[
+  void setModelViewMatrix(matrix m)
+  
+  ARGUMENTS:
+    matrix m: the matrix to use
+  DESCRIPTION:
+    sets the topmost model-view matrix to the given matrix.
+]]
+docs.doc_strings["setMouseLock"] =
+[[
+  void setMouseLock(int lock)
+
+  ARGUMENTS:
+    int lock: lock setting [true/false]
+  DESCRIPTION:
+    if lock is true, hides and locks the mouse to the screen.
+    if lock is false, shows and unlocks the mouse.
+]]
+docs.doc_strings["setProjectionMatrix"] =
+[[
+  void setProjectionMatrix(matrix m)
+  
+  ARGUMENTS:
+    matrix m: the matrix to use
+  DESCRIPTION:
+    sets the topmost projection matrix to the given matrix.
+]]
+docs.doc_strings["setTrackBPM"] = [[]]
+docs.doc_strings["setTrackPan"] = [[]]
+docs.doc_strings["setTrackVolume"] = [[]]
+docs.doc_strings["signf"] =
+[[
+  float signf(float x)
+  
+  ARGUMENTS:
+    float x: input value
+  DESCRIPTION:
+    returns the sign of the float x.
+    
+    if x < 0, returns -1.
+    if x > 0, returns 1.
+    if x == 0, returns 0.
+]]
+docs.doc_strings["signi"] =
+[[
+  int signi(int n)
+  
+  ARGUMENTS:
+    int x: the value to get the sign of
+  DESCRIPTION:
+    returns the sign of the int x.
+    
+    if x < 0, returns -1.
+    if x > 0, returns 1.
+    if x == 0, returns 0.
+]]
+docs.doc_strings["sin"] =
+[[
+  float sin(float x)
+  
+  ARGUMENTS:
+    float x: input value
+  DESCRIPTION:
+    returns the sine of x.
+    return value will be in the range [-1.0, 1.0].
+]]
+docs.doc_strings["sprite2D"] = [[]]
+docs.doc_strings["sprite2DEx"] = [[]]
+docs.doc_strings["stencilFunc"] = [[]]
+docs.doc_strings["stencilMask"] = [[]]
+docs.doc_strings["stencilMode"] = [[]]
+docs.doc_strings["stencilOp"] = [[]]
 docs.doc_strings["stopTrack"] = [[]]
 docs.doc_strings["stopTracks"] = [[]]
-docs.doc_strings["muteTrack"] = [[]]
-docs.doc_strings["muteTracks"] = [[]]
+docs.doc_strings["texture"] =
+[[
+  void texture(int x, int y, int width, int height)
+
+  ARGUMENTS:
+    int x     : texture window x position [0-1023]
+    int y     : texture window y position [0-1023]
+    int width : texture window width [1-256]
+    int height: texture window height [1-256]
+  DESCRIPTION:
+    changes the window of texture memory to use as the current texture.
+
+    a maximum texture size of 256x256 can be specified.
+
+    texture UV coordinates will be mapped to the specified texture window.
+]]
+docs.doc_strings["textureMode"] =
+[[
+  void textureMode(int mode)
+
+  ARGUMENTS:
+    int mode: the new texture mode to use [0-2]
+  DESCRIPTION:
+    changes the current texture mode setting.
+
+    mode must be one of the following values:
+      0: repeat texture (default)
+      1: clamp texture to edges
+      2: disable texturing
+    
+    modes 0 and 1 determine whether UVs outside of the 0.0-1.0 range
+    will cause the texture to be repeated accross a surface, or
+    if UVs should be clamped to the 0.0-1.0 range.
+
+    mode 2 will ignore texture pixel colors and output
+    pure white instead. useful when used with vertex colors.
+]]
+docs.doc_strings["time"] =
+[[
+  float time()
+  
+  DESCRIPTION:
+    returns the number of seconds that the current cart has been running.
+]]
+docs.doc_strings["translate"] =
+[[
+  void translate(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to translate by
+  DESCRIPTION:
+    translates the topmost matrix of the current matrix by the 3D vector v.
+]]
 docs.doc_strings["unmuteTrack"] = [[]]
 docs.doc_strings["unmuteTracks"] = [[]]
-docs.doc_strings["getTrackVolume"] = [[]]
-docs.doc_strings["setTrackVolume"] = [[]]
-docs.doc_strings["getTrackPan"] = [[]]
-docs.doc_strings["setTrackPan"] = [[]]
-docs.doc_strings["getTrackBPM"] = [[]]
-docs.doc_strings["setTrackBPM"] = [[]]
-docs.doc_strings["checkCollision"] = [[]]
-docs.doc_strings["raycast"] = [[]]
-docs.doc_strings["getRaycastPoint"] = [[]]
-docs.doc_strings["getRaycastNormal"] = [[]]
-docs.doc_strings["loadTexBank"] =
+docs.doc_strings["vargc"] =
 [[
-  void loadTexBank(int bank)
-
-  ARGUMENTS:
-    int bank: index of the texture bank to load [0-3]
+  int vargc()
+  
   DESCRIPTION:
-    loads a texture bank from the cartridge into system memory.
-
-    system texture data is stored in the address range
-    0x00800000 to 0x00BFFFFF.
+    returns the remaining number of vararg bytes for a vararg function.
+ 
+    must only be called from a vararg function.
 ]]
-docs.doc_strings["loadObjBank"] =
+docs.doc_strings["vargv"] =
 [[
-  void loadObjBank(int bank)
-
+  void* vargv(int offset)
+  
   ARGUMENTS:
-    int bank: index of the object bank to load [0-3]
+    int offset: the number of bytes to advance the vararg pointer
   DESCRIPTION:
-    loads an object bank from the cartridge into system memory.
-
-    system object data is stored in the address range
-    0x00C00000 to 0x00F5FFFF.
+    returns a pointer to the current vararg argument and advances the
+    vararg pointer by $offset bytes.
+ 
+    must only be called from a vararg function.
 ]]
-docs.doc_strings["loadWavBank"] =
+docs.doc_strings["vec2Angle"] =
 [[
-  void loadWavBank(int bank)
-
+  float vec2Angle(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    int bank: index of the wave bank to load [0-1]
+    vec2 a: first input vector
+    vec2 b: second input vector
   DESCRIPTION:
-    loads a wave bank from the cartridge into system memory.
-
-    system wave data is stored in the address range
-    0x01000000 to 0x016FFFFF.
+    returns the angle (in degrees) from a to b.
 ]]
-docs.doc_strings["loadSeqBank"] =
+docs.doc_strings["vec2Cross"] =
 [[
-  void loadSeqBank(int bank)
-
+  float vec2Cross(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    int bank: index of the sequencer bank to load [0-7]
+    vec2 a: first input vector
+    vec2 b: second input vector
   DESCRIPTION:
-    loads a sequencer bank from the cartridge into system memory.
-
-    system sequencer data is stored in the address range
-    0x01700000 to 0x0173FFFF.
+    returns the cross product of a and b.
+    this value is computed as (a.x * b.y - a.y * b.x).
 ]]
-docs.doc_strings["initMemCard"] =
+docs.doc_strings["vec2Direction"] =
 [[
-  void initMemCard(string id)
-
+  vec2 vec2Direction(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    string id: unique identifier for memory card data
+    vec2 a: start vector
+    vec2 b: end vector
   DESCRIPTION:
-    initializes the system's memory card memory range.
-    memory card data is stored in the address range 0x05800000 to 0x05800FFF.
-
-    id is a string used to identify saved memory card data.
-    id must be between 1 and 16 characters long and may only contain
-    the characters A-Z, a-z, 0-9, and _
-
-    if save data matching the given id exists, it will be loaded.
-    write bytes to the address range 0x05800000 to 0x05800FFF to save
-    data to the memory card.
+    returns a normalized 2D vector pointing from a to b.
 ]]
-docs.doc_strings["peek8"] =
+docs.doc_strings["vec2Distance"] =
 [[
-  int peek8(void* address)
-
+  float vec2Distance(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    void* address: memory pointer to read from
+    vec2 a: first input vector
+    vec2 b: second input vector
   DESCRIPTION:
-    returns the value of the byte at the given memory address.
+    returns the distance between a and b.
 ]]
-docs.doc_strings["poke8"] =
+docs.doc_strings["vec2DistanceSq"] =
 [[
-  void poke8(void* address, int value)
-
+  float vec2DistanceSq(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    void* address: memory pointer to write to
-    int value    : byte value to write
+    vec2 a: first input vector
+    vec2 b: second input vector
   DESCRIPTION:
-    writes the given byte to the given memory address.
+    returns the squared distance between a and b.
+    this function is less costly to compute than vec2Distance().
+    as such, it is recommended to use this function when
+    exact distance is not needed.
 ]]
-docs.doc_strings["peek32"] =
+docs.doc_strings["vec2Dot"] =
 [[
-  int peek32(void* address)
-
+  float vec2Dot(vec2 a, vec2 b)
+  
   ARGUMENTS:
-    void* address: memory pointer to read from
+    vec2 a: first input vector
+    vec2 b: second input vector
   DESCRIPTION:
-    returns the 32-bit integer value starting at the given memory address.
+    returns the dot product of a and b.
+    use this function to compare the angle between two 2D vectors.
+    
+    for un-normalized vectors:
+      returns 0 when the angle is 90 degrees.
+      returns a negative value when the angle is greater than 90 degrees.
+      returns a positive value when the angle is less than 90 degrees.
+    for normalized vectors:
+      returns a value in the range [-1.0, 1.0],
+      -1.0 for a 180 degree angle and 1.0 when a and b are aligned.
 ]]
-docs.doc_strings["poke32"] =
+docs.doc_strings["vec2Down"] =
 [[
-  void poke32(void* address, int value)
-
-  ARGUMENTS:
-    void* address: memory pointer to write to
-    int value    : 32-bit integer value to write
+  vec2 vec2Down()
+  
   DESCRIPTION:
-    writes the 32-bit integer to the given memory address.
+    returns a vec2 with the value vec2(0.0, -1.0)
 ]]
-docs.doc_strings["memcpy"] =
+docs.doc_strings["vec2Invert"] =
 [[
-  void memcpy(void* destination, void* source, int n)
-
+  vec2 vec2Invert(vec2 v)
+  
   ARGUMENTS:
-    void* destination: the memory address to write to
-    void* source     : the memory address to read from
-    int n            : the amount of bytes to read
+    vec2 v: the vector to invert
   DESCRIPTION:
-    copies n bytes from source to destination.
-
-    source and destination buffers may safely overlap.
+    returns the inverse of the given vector.
+    equivelent to (vec2){1.0 / v.x, 1.0 / v.y}.
 ]]
-docs.doc_strings["memset"] =
+docs.doc_strings["vec2Left"] =
 [[
-  void memset(void* destination, int n, int value)
+  vec2 vec2Left()
+  
+  DESCRIPTION:
+    returns a vec2 with the value vec2(-1.0, 0.0)
+]]
+docs.doc_strings["vec2Length"] =
+[[
+  float vec2Length(vec2 v)
+  
+  ARGUMENTS:
+    vec2 v: the vector to get the length of
+  DESCRIPTION:
+    returns the length (magnitude) of a 2D vector.
+]]
+docs.doc_strings["vec2LengthSq"] =
+[[
+  float vec2LengthSq(vec2 v)
+  
+  ARGUMENTS:
+    vec2 v: the vector to get the length of
+  DESCRIPTION:
+    returns the squared length (squared magnitude) of a 2D vector.
+    this function is less costly to compute than vec2Length().
+    as such, it is recommended to use this function when
+    exact magnitude is not needed. (i.e. comparing vectors)
+]]
+docs.doc_strings["vec2Lerp"] =
+[[
+  vec2 vec2Lerp(vec2 start, vec2 end, float amount)
+  
+  ARGUMENTS:
+    vec2 start  : start vector
+    vec2 end    : destination vector
+    float amount: amount to interpolate by (1.0 = 100%)
+  DESCRIPTION:
+    returns the linear interpolation between two 2D vectors.
+]]
+docs.doc_strings["vec2MoveToward"] =
+[[
+  vec2 vec2MoveToward(vec2 a, vec2 b, float distance)
+  
+  ARGUMENTS:
+    vec2 a        : the starting vector
+    vec2 b        : the destination vector
+    float distance: the maximum distance to travel
+  DESCRIPTION:
+    returns the 2D vector a after being moved toward b by the given distance.
+    if distance is greater than the amount required to reach b,
+    returns b.
+]]
+docs.doc_strings["vec2Normalize"] =
+[[
+  vec2 vec2Normalize(vec2 v)
+  
+  ARGUMENTS:
+    vec2 v: the vector to normalize
+  DESCRIPTION:
+    returns a 2D vector that points in the same direction as v,
+    but has a length (magnitude) of 1.0.
+]]
+docs.doc_strings["vec2One"] =
+[[
+  vec2 vec2One()
+  
+  DESCRIPTION:
+    returns a vec2 with the value vec2(1.0, 1.0)
+]]
+docs.doc_strings["vec2Reflect"] =
+[[
+  vec2 vec2Reflect(vec2 v, vec2 normal)
+  
+  ARGUMENTS:
+    vec2 v     : the vector to reflect
+    vec2 normal: the normal vector to reflect off of
+  DESCRIPTION:
+    returns the 2D vector v reflected off of the normal vector.
+]]
+docs.doc_strings["vec2Right"] =
+[[
+  vec2 vec2Right()
+  
+  DESCRIPTION:
+    returns a vec2 with the value vec2(1.0, 0.0)
+]]
+docs.doc_strings["vec2Rotate"] =
+[[
+  vec2 vec2Rotate(vec2 v, float angle)
+  
+  ARGUMENTS:
+    vec2 v    : the starting vector
+    vec2 angle: the angle to rotate by (in degrees)
+  DESCRIPTION:
+    returns the 2D vector v rotated by the given angle.
+]]
+docs.doc_strings["vec2Up"] =
+[[
+  vec2 vec2Up()
+  
+  DESCRIPTION:
+    returns a vec2 with the value vec2(0.0, 1.0)
+]]
+docs.doc_strings["vec2Zero"] =
+[[
+  vec2 vec2Zero()
+  
+  DESCRIPTION:
+    returns a vec2 with the value vec2(0.0, 0.0)
+]]
+docs.doc_strings["vec3Angle"] =
+[[
+  float vec3Angle(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: first input vector
+    vec3 b: second input vector
+  DESCRIPTION:
+    returns the angle (in degrees) from a to b.
+]]
+docs.doc_strings["vec3Back"] =
+[[
+  vec3 vec3Back()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(0.0, 0.0, 1.0)
+]]
+docs.doc_strings["vec3Cross"] =
+[[
+  float vec3Cross(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: first input vector
+    vec3 b: second input vector
+  DESCRIPTION:
+    returns the cross product of a and b.
+]]
+docs.doc_strings["vec3Direction"] =
+[[
+  vec3 vec3Direction(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: start vector
+    vec3 b: end vector
+  DESCRIPTION:
+    returns a normalized 3D vector pointing from a to b.
+]]
+docs.doc_strings["vec3Distance"] =
+[[
+  float vec3Distance(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: first input vector
+    vec3 b: second input vector
+  DESCRIPTION:
+    returns the distance between a and b.
+]]
+docs.doc_strings["vec3DistanceSq"] =
+[[
+  float vec3DistanceSq(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: first input vector
+    vec3 b: second input vector
+  DESCRIPTION:
+    returns the squared distance between a and b.
+    this function is less costly to compute than vec3Distance().
+    as such, it is recommended to use this function when
+    exact distance is not needed.
+]]
+docs.doc_strings["vec3Dot"] =
+[[
+  float vec3Dot(vec3 a, vec3 b)
+  
+  ARGUMENTS:
+    vec3 a: first input vector
+    vec3 b: second input vector
+  DESCRIPTION:
+    returns the dot product of a and b.
+    use this function to compare the angle between two 3D vectors.
+    
+    for un-normalized vectors:
+      returns 0 when the angle is 90 degrees.
+      returns a negative value when the angle is greater than 90 degrees.
+      returns a positive value when the angle is less than 90 degrees.
+    for normalized vectors:
+      returns a value in the range [-1.0, 1.0],
+      -1.0 for a 180 degree angle and 1.0 when a and b are aligned.
+]]
+docs.doc_strings["vec3Down"] =
+[[
+  vec3 vec3Down()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(0.0, 1.0, 0.0)
+]]
+docs.doc_strings["vec3Forward"] =
+[[
+  vec3 vec3Forward()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(0.0, 0.0, -1.0)
+]]
+docs.doc_strings["vec3Invert"] =
+[[
+  vec3 vec3Invert(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to invert
+  DESCRIPTION:
+    returns the inverse of the given vector.
+    equivelent to (vec3){1.0 / v.x, 1.0 / v.y, 1.0 / v,z}.
+]]
+docs.doc_strings["vec3Left"] =
+[[
+  vec3 vec3Left()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(-1.0, 0.0, 0.0)
+]]
+docs.doc_strings["vec3Length"] =
+[[
+  float vec3Length(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to get the length of
+  DESCRIPTION:
+    returns the length (magnitude) of a 3D vector.
+]]
+docs.doc_strings["vec3LengthSq"] =
+[[
+  float vec3LengthSq(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to get the length of
+  DESCRIPTION:
+    returns the squared length (squared magnitude) of a 3D vector.
+    this function is less costly to compute than vec3Length().
+    as such, it is recommended to use this function when
+    exact magnitude is not needed. (i.e. comparing vectors)
+]]
+docs.doc_strings["vec3Lerp"] =
+[[
+  vec2 vec3Lerp(vec3 start, vec3 end, float amount)
+  
+  ARGUMENTS:
+    vec3 start  : start vector
+    vec3 end    : destination vector
+    float amount: amount to interpolate by (1.0 = 100%)
+  DESCRIPTION:
+    returns the linear interpolation between two 3D vectors.
+]]
+docs.doc_strings["vec3MoveToward"] =
+[[
+  vec3 vec3MoveToward(vec3 a, vec3 b, float distance)
+  
+  ARGUMENTS:
+    vec3 a        : the starting vector
+    vec3 b        : the destination vector
+    float distance: the maximum distance to travel
+  DESCRIPTION:
+    returns the 3D vector a after being moved toward b by the given distance.
+    if distance is greater than the amount required to reach b,
+    returns b.
+]]
+docs.doc_strings["vec3Normalize"] =
+[[
+  vec3 vec3Normalize(vec3 v)
+  
+  ARGUMENTS:
+    vec3 v: the vector to normalize
+  DESCRIPTION:
+    returns a 3D vector that points in the same direction as v,
+    but has a length (magnitude) of 1.0.
+]]
+docs.doc_strings["vec3One"] =
+[[
+  vec3 vec3One()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(1.0, 1.0, 1.0)
+]]
+docs.doc_strings["vec3Reflect"] =
+[[
+  vec3 vec3Reflect(vec3 v, vec3 normal)
+  
+  ARGUMENTS:
+    vec3 v     : the vector to reflect
+    vec3 normal: the normal vector to reflect off of
+  DESCRIPTION:
+    returns the 3D vector v reflected off of the normal vector.
+]]
+docs.doc_strings["vec3Right"] =
+[[
+  vec3 vec3Right()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(1.0, 0.0, 0.0)
+]]
+docs.doc_strings["vec3Rotate"] =
+[[
+  vec3 vec3Rotate(vec3 v, vec3 axis, float angle)
+  
+  ARGUMENTS:
+    vec2 v    : the starting vector
+    vec2 axis : the axis to rotate along
+    vec2 angle: the angle to rotate by (in degrees)
+  DESCRIPTION:
+    returns the 3D vector v rotated along the given axis by the given angle.
+]]
+docs.doc_strings["vec3ToScreen"] =
+[[
+  vec2 vec3ToScreen(vec3 v, int camera)
+  
+  ARGUMENTS:
+    vec3 v    : the vector to project
+    int camera: the index of the 3D camera to use for the projection
+  DESCRIPTION:
+    returns a 2D vector containing the screen coordinates of the
+    3D vector v as viewed from the perspective of the given 3D camera.
+]]
+docs.doc_strings["vec3Up"] =
+[[
+  vec3 vec3Up()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(0.0, -1.0, 0.0)
+]]
+docs.doc_strings["vec3Zero"] =
+[[
+  vec3 vec3Zero()
+  
+  DESCRIPTION:
+    returns a vec3 with the value vec3(0.0, 0.0, 0.0)
+]]
+docs.doc_strings["viewport"] =
+[[
+  void viewport(int x, int y, int width, int height)
 
   ARGUMENTS:
-    void* destination: the memory address to write to
-    int n            : the amount of bytes to write
-    int value        : byte value to write
+    int x     : viewport screen x position
+    int y     : viewport screen y position
+    int width : viewport width
+    int height: viewport height
   DESCRIPTION:
-    copies the given byte value to the first n bytes
-    starting at the destination address.
+    restricts rendering to the given screen rectangle.
+]]
+docs.doc_strings["wrapf"] =
+[[
+  float wrapf(float x, float min, float max)
+  
+  ARGUMENTS:
+    float x  : the value to wrap
+    float min: the minimum range value
+    float max: the maximum range value (exclusive)
+  DESCRIPTION:
+    returns a float value within the range [min, max).
+    if x is < min or x >= max, it wraps around to the other end of the range.
+]]
+docs.doc_strings["wrapi"] =
+[[
+  int wrapi(int x, int min, int max)
+  
+  ARGUMENTS:
+    int x  : the value to wrap
+    int min: the minimum range value
+    int max: the maximum range value (exclusive)
+  DESCRIPTION:
+    returns an int value within the range [min, max).
+    if x is < min or x >= max, it wraps around to the other end of the range.
 ]]
 
 function docs.getDocString(func: string): string

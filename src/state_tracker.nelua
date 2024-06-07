@@ -809,7 +809,10 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateTrackerDraw(sm: *StateMachine, vm: *EVM): void
-    rl.clearBackground({0, 0, 0, 0})
+    vm.gpu:colorMask(0b0001)
+	vm.gpu:clearColor(0)
+	vm.gpu:clear(GPU_CLEAR_ALL)
+	vm.gpu:colorMask(0b1111)
     vm.gpu:camera2D(-1)
 
     -- TODO: disable editing when in empty phrase/instrument

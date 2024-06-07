@@ -34,12 +34,16 @@ SYSTEM MEMORY:
   TEXMEM            (4MiB          ) 0x00800000 - 0x00BFFFFF (texture data (1024*1024, 32BPP))
   OBJMEM            (3MiB + 384KiB ) 0x00C00000 - 0x00F5FFFF (mesh data (32768 triangles; 36 bytes per vertex (pos, normal, uv, color)))
   AOBMEM            (8KiB          ) 0x00F60000 - 0x00F61FFF (audio output buffer (2048 16bit stereo audio samples))
-  SYSMEM            (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state registers)
+  SYSMEM            (632KiB        ) 0x00F62000 - 0x00FFFFFF (system state memory)
     audio state     (1B            )                         (1 byte (track playing flags))
     track state     (80B           )                         (8 * 10 bytes (playflags, bpm, volume, pan, song id+pos, pattern id+pos, groove id+pos))
     padding         (3B            )                         (unused)
     objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
     wavmem map      (8KiB          )                         (WAVMEM map (512 entries; 4 words each (sample start, sample end, sustain start, sustain end)))
+	3D cameras      (176B          ) 0x00F65854 - 0x00F65903 (3D camera data (4 cameras; 11 words each (pos, target, up, fov, projection)))
+	2D cameras      (96B           ) 0x00F65904 - 0x00F65963 (2D camera data (4 cameras; 6 words each (offset, target, rotation, zoom)))
+	lights          (320B          ) 0x00F65964 - 0x00F65AA3 (light data (8 lights; 10 words each (enabled, type, radius, color, position, direction)))
+	render state    (???B          ) 0x00F65AA4 - 0x00FFFFFF (system render state registers; see RenderState record)
   WAVMEM            (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
   SEQMEM            (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
     song data       (2KiB          )                         (256 * 8 bytes)
@@ -105,6 +109,13 @@ local mem_regions = {
 
 global MEMORY_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
 global MEMORY_WAVMAP_SIZE <comptime> = (512 * 16) -- 8KiB
+global MEMORY_CAMERAS3D_SIZE <comptime> = 176
+global MEMORY_CAMERAS2D_SIZE <comptime> = 96
+global MEMORY_LIGHTS_SIZE <comptime> = 320
+global MEMORY_CAMERAS3D_INDEX <comptime> = (84 + MEMORY_OBJMAP_SIZE + MEMORY_WAVMAP_SIZE)
+global MEMORY_CAMERAS2D_INDEX <comptime> = (MEMORY_CAMERAS3D_INDEX + MEMORY_CAMERAS3D_SIZE)
+global MEMORY_LIGHTS_INDEX <comptime> = (MEMORY_CAMERAS2D_INDEX + MEMORY_CAMERAS2D_SIZE)
+global MEMORY_RENDER_STATE_INDEX <comptime> = (MEMORY_LIGHTS_INDEX + MEMORY_LIGHTS_SIZE)
 global MEMORY_MAX_ADDR <comptime> = #[mem_region_offset - 1]#
 global MEMORY_NULL <comptime> = 0xFFFFFFFF
 
@@ -152,8 +163,86 @@ global GPU_VSCREEN_HALF_H <comptime> = (GPU_VSCREEN_H /// 2)
 global GPU_LINES <comptime> = 0
 global GPU_TRIANGLES <comptime> = 1
 global GPU_QUADS <comptime> = 2
+
 global GPU_PROJECTION <comptime> = 0
 global GPU_MODELVIEW <comptime> = 1
+
+-- geometry face types
+global GPU_FRONT <comptime> = 0
+global GPU_BACK <comptime> = 1
+global GPU_FRONT_AND_BACK <comptime> = 2
+
+-- polygon modes
+global GPU_POINT <comptime> = 0
+global GPU_LINE <comptime> = 1
+global GPU_FILL <comptime> = 2
+
+-- depth/stencil comparison functions
+global GPU_LESS <comptime> = 0
+global GPU_LEQUAL <comptime> = 1
+global GPU_GREATER <comptime> = 2
+global GPU_GEQUAL <comptime> = 3
+global GPU_EQUAL <comptime> = 4
+global GPU_NOTEQUAL <comptime> = 5
+global GPU_ALWAYS <comptime> = 6
+global GPU_NEVER <comptime> = 7
+
+-- blend factors
+global GPU_BLEND_ZERO <comptime> = 0
+global GPU_BLEND_ONE <comptime> = 1
+global GPU_SRC_COLOR <comptime> = 2
+global GPU_ONE_MINUS_SRC_COLOR <comptime> = 3
+global GPU_DST_COLOR <comptime> = 4
+global GPU_ONE_MINUS_DST_COLOR <comptime> = 5
+global GPU_SRC_ALPHA <comptime> = 6
+global GPU_ONE_MINUS_SRC_ALPHA <comptime> = 7
+global GPU_DST_ALPHA <comptime> = 8
+global GPU_ONE_MINUS_DST_ALPHA <comptime> = 9
+global GPU_CONSTANT_COLOR <comptime> = 10
+global GPU_ONE_MINUS_CONSTANT_COLOR <comptime> = 11
+global GPU_CONSTANT_ALPHA <comptime> = 12
+global GPU_ONE_MINUS_CONSTANT_ALPHA <comptime> = 13
+global GPU_SRC_ALPHA_SATURATE <comptime> = 14
+
+-- blend equations
+global GPU_ADD <comptime> = 0
+global GPU_SUBTRACT <comptime> = 1
+global GPU_REVERSE_SUBTRACT <comptime> = 2
+global GPU_MIN <comptime> = 3
+global GPU_MAX <comptime> = 4
+
+-- stencil actions
+global GPU_KEEP <comptime> = 0
+global GPU_REPLACE <comptime> = 1
+global GPU_INCR <comptime> = 2
+global GPU_INCR_WRAP <comptime> = 3
+global GPU_DECR <comptime> = 4
+global GPU_DECR_WRAP <comptime> = 5
+global GPU_STENCIL_ZERO <comptime> = 6
+global GPU_INVERT <comptime> = 7
+
+-- render state masks and constants
+global GPU_DEPTH_TEST_BIT <comptime>     = 0b10000000
+global GPU_DEPTH_MASK_BIT <comptime>     = 0b01000000
+global GPU_CULL_MODE_MASK <comptime>     = 0b00110000
+global GPU_STENCIL_BIT <comptime>        = 0b00001000
+global GPU_UNUSED_BIT <comptime>         = 0b00000100
+global GPU_FOG_BIT <comptime>            = 0b00000010
+global GPU_LIGHTING_BIT <comptime>       = 0b00000001
+global GPU_SCISSOR_BIT       <comptime>  = 0b00100000
+global GPU_TEXTURE_MODE_MASK <comptime>  = 0b00011000
+global GPU_BLEND_MODE_MASK <comptime>    = 0b00000111
+global GPU_POLYGON_MODE_MASK <comptime>  = 0b00110000
+global GPU_COLOR_MASK_MASK <comptime>    = 0b00001111
+global GPU_CLEAR_COLOR <comptime>   = 0b100
+global GPU_CLEAR_DEPTH <comptime>   = 0b010
+global GPU_CLEAR_STENCIL <comptime> = 0b001
+global GPU_CLEAR_ALL <comptime>     = 0b111
+global GPU_COLOR_MASK_R <comptime>   = 0b1000
+global GPU_COLOR_MASK_G <comptime>   = 0b0100
+global GPU_COLOR_MASK_B <comptime>   = 0b0010
+global GPU_COLOR_MASK_A <comptime>   = 0b0001
+global GPU_COLOR_MASK_ALL <comptime> = 0b1111
 
 global GPU_TEXMEM_WIDTH <comptime> = 1024
 global GPU_TEXMEM_HEIGHT <comptime> = 1024
@@ -432,6 +521,18 @@ global Hook = @enum {
 	COUNT
 }
 
+global GPUBank = @enum {
+	SYSTEM = 0,
+	TEXBANK0 = 1,
+	TEXBANK1,
+	TEXBANK2,
+	TEXBANK3,
+	OBJBANK0 = 1,
+	OBJBANK1,
+	OBJBANK2,
+	OBJBANK3
+}
+
 global RenderTexture = @enum {
     CODE = 0,
     TRACKER,
@@ -444,9 +545,9 @@ global LightAttribute = @enum {
 	ENABLED = 0,
 	TYPE,
 	RADIUS,
+	COLOR,
 	POSITION,
 	DIRECTION,
-	COLOR,
 	COUNT -- not an actual attribute, used to count the number of attributes
 }
 
@@ -462,18 +563,6 @@ global Icon = @enum {
 	TOOL_BUCKET,
 	TOOL_SELECT,
 	COUNT -- not an actual icon, used to count the number of icons
-}
-
-global GPUBank = @enum {
-	SYSTEM = 0,
-	TEXBANK0 = 1,
-	TEXBANK1,
-	TEXBANK2,
-	TEXBANK3,
-	OBJBANK0 = 1,
-	OBJBANK1,
-	OBJBANK2,
-	OBJBANK3
 }
 
 global SoundchipBank = @enum {
@@ -543,11 +632,9 @@ global DialogID = @enum {
 
 global DialogStep = @enum {
     FILE_BROWSER = 0,
-	TEXTURE_POSITION,
-	TEXTURE_CROP,
+	TEXTURE_CONFIG,
 	MODEL_CONFIG,
-	SAMPLE_CONFIG,
-	SAMPLE_CROP
+	SAMPLE_CONFIG
 }
 
 global FileBrowserMode = @enum {
@@ -719,24 +806,270 @@ global Cart = @record {
     rom: [MEMORY_ROM_SIZE_ELEMENTS]uint8,
 }
 
-global Light = @record {
-	enabled: cint,
-	light_type: cint,
-	radius: float32,
-	position: rl.vector3,
-	direction: rl.vector3,
-	color: rl.vector3
+-- rendertexture wrapper that also stores a stencil attachment
+global GPURenderTexture = @record {
+	rl_rendertexture: rl.renderTexture,
+	stencil: rl.texture
+}
+
+-- memory-mapped 3D camera object
+-- stored in SYSMEM
+global EVMCam3D = @record {
+	-- vec3 position
+	position_x0: uint8,
+	position_x1: uint8,
+	position_x2: uint8,
+	position_x3: uint8,
+	position_y0: uint8,
+	position_y1: uint8,
+	position_y2: uint8,
+	position_y3: uint8,
+	position_z0: uint8,
+	position_z1: uint8,
+	position_z2: uint8,
+	position_z3: uint8,
+
+	-- vec3 target
+	target_x0: uint8,
+	target_x1: uint8,
+	target_x2: uint8,
+	target_x3: uint8,
+	target_y0: uint8,
+	target_y1: uint8,
+	target_y2: uint8,
+	target_y3: uint8,
+	target_z0: uint8,
+	target_z1: uint8,
+	target_z2: uint8,
+	target_z3: uint8,
+
+	-- vec3 up
+	up_x0: uint8,
+	up_x1: uint8,
+	up_x2: uint8,
+	up_x3: uint8,
+	up_y0: uint8,
+	up_y1: uint8,
+	up_y2: uint8,
+	up_y3: uint8,
+	up_z0: uint8,
+	up_z1: uint8,
+	up_z2: uint8,
+	up_z3: uint8,
+
+	-- float fov
+	fov0: uint8,
+	fov1: uint8,
+	fov2: uint8,
+	fov3: uint8,
+
+	-- int projection
+	projection0: uint8,
+	projection1: uint8,
+	projection2: uint8,
+	projection3: uint8
+}
+
+-- memory-mapped 2D camera object
+-- stored in SYSMEM
+global EVMCam2D = @record {
+	-- vec2 offset
+	offset_x0: uint8,
+	offset_x1: uint8,
+	offset_x2: uint8,
+	offset_x3: uint8,
+	offset_y0: uint8,
+	offset_y1: uint8,
+	offset_y2: uint8,
+	offset_y3: uint8,
+
+	-- vec2 target
+	target_x0: uint8,
+	target_x1: uint8,
+	target_x2: uint8,
+	target_x3: uint8,
+	target_y0: uint8,
+	target_y1: uint8,
+	target_y2: uint8,
+	target_y3: uint8,
+
+	-- float rotation
+	rotation0: uint8,
+	rotation1: uint8,
+	rotation2: uint8,
+	rotation3: uint8,
+
+	-- float zoom
+	zoom0: uint8,
+	zoom1: uint8,
+	zoom2: uint8,
+	zoom3: uint8
+}
+
+-- memory-mapped light object
+-- stored in SYSMEM
+global EVMLight = @record {
+	-- int enabled
+	enabled0: uint8,
+	enabled1: uint8,
+	enabled2: uint8,
+	enabled3: uint8,
+
+	-- int type
+	type0: uint8,
+	type1: uint8,
+	type2: uint8,
+	type3: uint8,
+
+	-- float radius
+	radius0: uint8,
+	radius1: uint8,
+	radius2: uint8,
+	radius3: uint8,
+
+	-- int color
+	color_r: uint8,
+	color_g: uint8,
+	color_b: uint8,
+	color_a: uint8,
+
+	-- vec3 position
+	position_x0: uint8,
+	position_x1: uint8,
+	position_x2: uint8,
+	position_x3: uint8,
+	position_y0: uint8,
+	position_y1: uint8,
+	position_y2: uint8,
+	position_y3: uint8,
+	position_z0: uint8,
+	position_z1: uint8,
+	position_z2: uint8,
+	position_z3: uint8,
+
+	-- vec3 direction
+	direction_x0: uint8,
+	direction_x1: uint8,
+	direction_x2: uint8,
+	direction_x3: uint8,
+	direction_y0: uint8,
+	direction_y1: uint8,
+	direction_y2: uint8,
+	direction_y3: uint8,
+	direction_z0: uint8,
+	direction_z1: uint8,
+	direction_z2: uint8,
+	direction_z3: uint8
+}
+
+-- memory-mapped render state object
+-- stored in SYSMEM
+global RenderState = @record {
+	-- ERA-C int-type state
+	clear_color_r: uint8,
+	clear_color_g: uint8,
+	clear_color_b: uint8,
+	clear_color_a: uint8,
+	fog_color_r: uint8,
+	fog_color_g: uint8,
+	fog_color_b: uint8,
+	fog_color_a: uint8,
+	ambient_color_r: uint8,
+	ambient_color_g: uint8,
+	ambient_color_b: uint8,
+	ambient_color_a: uint8,
+	texture_x0: uint8,
+	texture_x1: uint8,
+	texture_x2: uint8,
+	texture_x3: uint8,
+	texture_y0: uint8,
+	texture_y1: uint8,
+	texture_y2: uint8,
+	texture_y3: uint8,
+	viewport_x0: uint8,
+	viewport_x1: uint8,
+	viewport_x2: uint8,
+	viewport_x3: uint8,
+	viewport_y0: uint8,
+	viewport_y1: uint8,
+	viewport_y2: uint8,
+	viewport_y3: uint8,
+	viewport_width0: uint8,
+	viewport_width1: uint8,
+	viewport_width2: uint8,
+	viewport_width3: uint8,
+	viewport_height0: uint8,
+	viewport_height1: uint8,
+	viewport_height2: uint8,
+	viewport_height3: uint8,
+	scissor_x0: uint8,
+	scissor_x1: uint8,
+	scissor_x2: uint8,
+	scissor_x3: uint8,
+	scissor_y0: uint8,
+	scissor_y1: uint8,
+	scissor_y2: uint8,
+	scissor_y3: uint8,
+	scissor_width0: uint8,
+	scissor_width1: uint8,
+	scissor_width2: uint8,
+	scissor_width3: uint8,
+	scissor_height0: uint8,
+	scissor_height1: uint8,
+	scissor_height2: uint8,
+	scissor_height3: uint8,
+
+	-- ERA-C float-type state
+	clear_depth0: uint8,
+	clear_depth1: uint8,
+	clear_depth2: uint8,
+	clear_depth3: uint8,
+	fog_start0: uint8,
+	fog_start1: uint8,
+	fog_start2: uint8,
+	fog_start3: uint8,
+	fog_end0: uint8,
+	fog_end1: uint8,
+	fog_end2: uint8,
+	fog_end3: uint8,
+	ambient_factor0: uint8,
+	ambient_factor1: uint8,
+	ambient_factor2: uint8,
+	ambient_factor3: uint8,
+
+	-- single-byte state
+	flags_tmccs0fl: uint8, -- TMCCS0FL (depth test, depth mask, cull, stencil, 0, fog, lighting)
+	flags_00sttbbb: uint8, -- 00STTBBB (scissor test, texture, blend)
+	flags_00ppcccc: uint8, -- 00PPCCCC (polygon mode, color mask)
+	stencil_functions: uint8, -- FFFFBBBB (front, back)
+
+	stencil_mask_front: uint8,
+	stencil_ref_front: uint8,
+	stencil_func_mask_front: uint8,
+	stencil_mask_back: uint8,
+
+	stencil_ref_back: uint8,
+	stencil_func_mask_back: uint8,
+	stencil_sfails: uint8, -- FFFFBBBB (front, back)
+	stencil_dpfails: uint8, -- FFFFBBBB (front, back)
+
+	stencil_dppasses: uint8, -- FFFFBBBB (front, back)
+	clear_stencil: uint8,
+	depth_function: uint8,
+	rgb_factors: uint8, -- SSSSDDDD (source, dest)
+
+	alpha_factors: uint8, -- SSSSDDDD (source, dest)
+	blend_equations: uint8, -- RRRRAAAA (rgb, alpha)
+	texture_width: uint8,
+	texture_height: uint8
 }
 
 -- holds graphics information for the vm
 global GPU = @record {
 	texmem: [MEMORY_TEXMEM_SIZE_ELEMENTS]rl.color,
 	objmem: [MEMORY_OBJMEM_SIZE_ELEMENTS]IntFloat,
-	cameras2D: [GPU_CAMERAS_COUNT]rl.camera2D,
+	system_cam3d: rl.camera,
 	system_cam2d: rl.camera2D,
-	cameras: [GPU_CAMERAS_COUNT]rl.camera,
-	system_cam: rl.camera,
-	lights: [GPU_LIGHTS_COUNT]Light,
 	gfx_master_rendertexture: rl.renderTexture,
 	gfx_rendertextures: [RenderTexture.COUNT]rl.renderTexture,
 	gfx_texture: rl.texture,
@@ -750,6 +1083,10 @@ global GPU = @record {
 	texture_data: *[0]rl.color,
 	model_data: *[0]IntFloat,
 	objmap_data: *[0]uint8,
+	cameras3D: *[0]EVMCam3D,
+	cameras2D: *[0]EVMCam2D,
+	lights: *[0]EVMLight,
+	render_state: *RenderState,
 	current_texbank: uint8,
 	current_objbank: uint8,
 	
@@ -770,6 +1107,7 @@ global GPU = @record {
 	ambient_color_loc: cint,
 
 	update_tex: boolean, -- set when TEXMEM is updated. when set, TEXMEM is uploaded to the real GPU
+	update_lights: boolean, -- set when SYSMEM lights are updated. when set, SYSMEM lights are updated on the real GPU
 
 	-- "triangle mode" data
 	--
@@ -781,33 +1119,15 @@ global GPU = @record {
 	proj_matrix_count: uinteger, -- used to track matrix stack
 	view_matrix_count: uinteger, -- used to track matrix stack
 	matrix_mode: uinteger,
-	
-	-- graphics state
-	cull_mode: uinteger,
-	wire_mode: boolean,
-	tex_mode: cint,
-	tex_x: cint,
-	tex_y: cint,
-	tex_w: cint,
-	tex_h: cint,
-	fog_mode: cint,
-	fog_start: float32,
-	fog_end: float32,
-	fog_color: rl.vector4,
 	master_dest_rect: rl.rectangle,
-	lighting_mode: cint,
-	ambient_factor: float32,
-	ambient_color: rl.vector3,
-	blend_mode: cint,
-	viewport_w: cint,
-	viewport_h: cint,
 	screen_w: int32,
 	screen_h: int32,
 	prev_screen_x: cint,
 	prev_screen_y: cint,
 	prev_screen_w: cint,
 	prev_screen_h: cint,
-	is_fullscreen: boolean
+	is_fullscreen: boolean,
+	enable_flush: boolean -- when true, uploads matrices to shader and flushes render batch upon rlgl/raylib state change
 }
 
 global SoundChip <forwarddecl> = @record {}
@@ -867,6 +1187,13 @@ SoundChip = @record {
     track_state: *[0]uint8
 }
 
+global HeapBlock = @record {
+	next: *HeapBlock,
+	address: uint32,
+	size: uint32,
+	used: boolean
+}
+
 EVM = @record {
     -- vm vars
     heap: [MEMORY_HEAP_SIZE_ELEMENTS]uint8,
@@ -894,6 +1221,7 @@ EVM = @record {
     current_hook: uinteger,
     objmap_ptr: *[0]uint8,
     wavmap_ptr: *[0]uint8,
+	heap_head: *HeapBlock,
     
     -- compiler vars
     src_index: uinteger, -- line character index
@@ -1054,6 +1382,7 @@ global CoreData = @record {
 	dialog_val3: int32, -- general purpose integer used by dialogs
 	file_paths: rl.filePathList,
 	image_to_import: rl.image,
+	import_texture: rl.texture,
 	sample_to_import: rl.wave,
 	model_to_import: rl.model,
 	model_vertex_count: uint32,
@@ -1070,6 +1399,7 @@ global CoreData = @record {
 	queued_log_state: integer,
 	has_loaded_paths: boolean,
 	has_loaded_image: boolean,
+	has_import_texture: boolean,
 	has_loaded_sample: boolean,
 	has_loaded_model: boolean,
 

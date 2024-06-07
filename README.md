@@ -19,10 +19,7 @@ Scripting: Custom langauge similar to C
 
 ## Documentation
 
-> [!WARNING]
-> ERA-3D is currently lacking documentation for many features.
-
-The [ERA-3D Wiki](https://github.com/AuzFox/ERA-3D/wiki) contains details on the system's memory map and scripting laguage (ERA-C).
+Check out the [ERA-3D Docs](https://auzfox.github.io/ERA-3D-Docs/)!
 
 ## Building
 

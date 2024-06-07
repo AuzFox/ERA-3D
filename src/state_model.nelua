@@ -19,8 +19,11 @@ global function stateModelUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateModelDraw(sm: *StateMachine, vm: *EVM): void
-    rl.clearBackground({0, 0, 0, 0})
-    vm.gpu:camera2D(-1)
+    vm.gpu:colorMask(0b0001)
+	vm.gpu:clearColor(0)
+	vm.gpu:clear(GPU_CLEAR_ALL)
+	vm.gpu:colorMask(0b1111)
+	vm.gpu:camera2D(-1)
 
     vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((35 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 9, GPU_WHITE, "// TODO: MODEL EDITOR STUFF HERE...")
     vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((30 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT MODEL")

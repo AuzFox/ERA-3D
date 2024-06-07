@@ -275,14 +275,22 @@ function SoundChip:playPattern(track: uint8, pattern: uint8): void
 	end
 end
 
-function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: uint8, volume: uint8, flags: uint8): void
+function SoundChip:playWavEx(
+		track: uint8,
+		sample_start: uint32,
+		sample_end: uint32,
+		loop_start: uint32,
+		loop_end: uint32,
+		note: uint8,
+		volume: float32,
+		loop_mode: uint32): void
 	local tc: *TrackContext = &self.track_contexts[track]
 	local state: *TrackState = self:getTrackState(track)
 	
-	local range: [2]BKInt = {start, send + 1}
+	local range: [2]BKInt = {sample_start, sample_end + 1}
 	BKSetPtr(&tc.bk_track, BK_SAMPLE_RANGE, &range, #BKInt * 2)
 
-	switch flags & InstrumentFlag.LOOP_MASK do
+	switch loop_mode & InstrumentFlag.LOOP_MASK do
 		case InstrumentFlag.LOOP_OFF then
 			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
 		case InstrumentFlag.LOOP_FORWARD then
@@ -290,10 +298,9 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 		case InstrumentFlag.LOOP_PINGPONG then
 			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_PALINDROME)
 		case InstrumentFlag.LOOP_RANGE then
-			BKSetAttr(&tc.bk_track, BK_SAMPLE_REPEAT, BK_NO_REPEAT)
-			--range[0] = sustain_start
-			--range[1] = sustain_end
-			--BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
+			range[0] = loop_start
+			range[1] = loop_end + 1
+			BKSetPtr(&tc.bk_track, BK_SAMPLE_SUSTAIN_RANGE, &range, #BKInt * 2)
 	end
 	
 	BKInstrumentSetEnvelopeADSR(&tc.bk_instrument, 0, 0, BK_MAX_VOLUME, 4)
@@ -301,8 +308,7 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 	BKSetAttr(&tc.bk_track, BK_MASTER_VOLUME, BK_MAX_VOLUME /// 4)
 	state.volume = 0x3F
 	if volume ~= SOUNDCHIP_EMPTY_VALUE then
-		local percentage: float32 = (@float32)(volume) / 254.0
-		local value: BKInt = (@BKInt)(percentage * (@float32)(BK_MAX_VOLUME))
+		local value: BKInt = (@BKInt)((volume / 100.0) * (@float32)(BK_MAX_VOLUME))
 		BKSetAttr(&tc.bk_track, BK_VOLUME, value)-- note volume
 	end
 
@@ -326,14 +332,23 @@ function SoundChip:playWavEx(track: uint8, start: uint32, send: uint32, note: ui
 	state.playflags = PlayFlag.PLAY_SAMPLE
 end
 
-function SoundChip:playWav(track: uint8, id: uint32, volume: uint8): void
+function SoundChip:playWav(track: uint8, id: uint32, note: uint8, volume: float32, loop_mode: uint32): void
 	local sample_start: uint32
 	local sample_end: uint32
 	local sustain_start: uint32
 	local sustain_end: uint32
 	sample_start, sample_end, sustain_start, sustain_end = self:getWavMapEntryValues(id)
 
-	self:playWavEx(track, sample_start, sample_end, BK_C_4, volume, 0)
+	self:playWavEx(
+		track,
+		sample_start,
+		sample_end,
+		sustain_start,
+		sustain_end,
+		note,
+		volume,
+		loop_mode
+	)
 end
 
 function SoundChip:muteTrack(track: uint8): void

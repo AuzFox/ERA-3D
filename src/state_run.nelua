@@ -66,6 +66,8 @@ global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
     end
 
     vm.gpu:camera3D(0) -- configure default camera
+    vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT -- camera3D() enables depth test
+
     vm.gpu:enableRenderState()
     if not vm:callHook(Hook.DRAW) then
         core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)

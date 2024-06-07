@@ -460,6 +460,63 @@ local function next(vm: *EVM): void
 						break
 					end
 				end
+			elseif vm.token_val == 0 and getChar(vm) == 'n'_u8 then
+				-- soundchip note
+				local note: int32 = 0xFF
+				local octave: int32 = 0xFF
+				vm.src_index = vm.src_index + 1
+
+				-- get note name
+				getChar(vm)
+				if (vm.token >= 'a'_u8 and vm.token <= 'g'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'G'_u8) then
+					switch vm.token do
+						case 'a'_u8, 'A'_u8 then
+							note = 9 -- BK_A_0
+						case 'b'_u8, 'B'_u8 then
+							note = 11 -- BK_B_0
+						case 'c'_u8, 'C'_u8 then
+							note = 0 -- BK_C_0
+						case 'd'_u8, 'D'_u8 then
+							note = 2 -- BK_D_0
+						case 'e'_u8, 'E'_u8 then
+							note = 4 -- BK_E_0
+						case 'f'_u8, 'F'_u8 then
+							note = 5 -- BK_F_0
+						case 'g'_u8, 'G'_u8 then
+							note = 7 -- BK_G_0
+					end
+					vm.src_index = vm.src_index + 1
+				else
+					vm.error = string.format("line %d:\ninvalid or missing note in note literal", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+
+				-- get sharp symbol (if present)
+				getChar(vm)
+				if vm.token == '#'_u8 then
+					if note == 4 or note == 11 then
+						vm.error = string.format("line %d:\nnote in note literal cannot be made sharp", vm.line)
+						vm.compile_err = true
+						coroutine.yield()
+					else
+						note = note + 1
+						vm.src_index = vm.src_index + 1
+						getChar(vm)
+					end
+				end
+
+				-- octave
+				if (vm.token >= '0'_u8 and vm.token <= '8'_u8) then
+					octave = vm.token - '0'_u8
+					vm.src_index = vm.src_index + 1
+				else
+					vm.error = string.format("line %d:\ninvalid or missing octave in note literal", vm.line)
+					vm.compile_err = true
+					coroutine.yield()
+				end
+
+				vm.token_val = (octave * 12) + note
 			else
 				-- decimal
 				local fract: float32 = 1.0

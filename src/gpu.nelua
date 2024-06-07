@@ -1,9 +1,67 @@
 require("string")
 
 require("definitions")
+require("util")
 
+-- OpenGL constants and functions
+local GL_TEXTURE_2D <comptime> = 0x0DE1
+local GL_DEPTH24_STENCIL8 <comptime> = 0x88F0
+local GL_DEPTH_STENCIL <comptime> = 0x84F9
+local GL_UNSIGNED_INT_24_8 <comptime> = 0x84FA
+local GL_FRAMEBUFFER <comptime> = 0x8D40
+local GL_DEPTH_STENCIL_ATTACHMENT <comptime> = 0x821A
+
+local GL_STENCIL_TEST <comptime> = 0xB90
+
+local GL_COLOR_BUFFER_BIT <comptime> = 0x00004000
 local GL_DEPTH_BUFFER_BIT <comptime> = 0x00000100
-local function glClear(mask: cint): void <cimport> end
+local GL_STENCIL_BUFFER_BIT <comptime> = 0x00000400
+
+local GL_FRONT <comptime> = 0x404
+local GL_BACK <comptime> = 0x405
+local GL_FRONT_AND_BACK <comptime> = 0x408
+
+local GL_POINT <comptime> = 0x1B00
+local GL_LINE <comptime> = 0x1B01
+local GL_FILL <comptime> = 0x1B02
+
+local GL_NEVER <comptime> = 0x200
+local GL_LESS <comptime> = 0x201
+local GL_EQUAL <comptime> = 0x202
+local GL_LEQUAL <comptime> = 0x203
+local GL_GREATER <comptime> = 0x204
+local GL_NOTEQUAL <comptime> = 0x205
+local GL_GEQUAL <comptime> = 0x206
+local GL_ALWAYS <comptime> = 0x207
+
+local GL_ZERO <comptime> = 0
+local GL_KEEP <comptime> = 0x1E00
+local GL_REPLACE <comptime> = 0x1E01
+local GL_INCR <comptime> = 0x1E02
+local GL_INCR_WRAP <comptime> = 0x8507
+local GL_DECR <comptime> = 0x1E03
+local GL_DECR_WRAP <comptime> = 0x8508
+local GL_INVERT <comptime> = 0x150A
+
+local function glClear(mask: cuint): void <cimport> end
+local function glClearColor(r: float32, g: float32, b: float32, a: float32): void <cimport> end
+local function glClearDepth(depth: float64): void <cimport> end
+local function glClearStencil(s: cint): void <cimport> end
+local function glDepthFunc(func: cuint): void <cimport> end
+local function glEnable(flag: cint): void <cimport> end
+local function glDisable(flag: cint): void <cimport> end
+local function glColorMask(r: cint, g: cint, b: cint, a: cint): void <cimport> end
+local function glStencilMaskSeparate(face: cuint, mask: cuint): void <cimport> end
+local function glStencilFuncSeparate(face: cuint, func: cuint, ref: cint, mask: cuint): void <cimport> end
+local function glStencilOpSeparate(face: cuint, sfail: cuint, dpfail: cuint, dppass: cuint): void <cimport> end
+local function glPolygonMode(face: cuint, mode: cuint): void <cimport> end
+local function glGenTextures(n: cint, textures: *cuint): void <cimport> end
+local function glBindTexture(target: cuint, texture: cuint): void <cimport> end
+local function glTexImage2D(target: cuint, level: cint, internalFormat: cint, width: cint, height: cint, border: cint, format: cuint, type: cuint, data: pointer): void <cimport> end
+local function glBindFramebuffer(target: cuint, framebuffer: cuint): void <cimport> end
+local function glFramebufferTexture2D(target: cuint, attachment: cuint, textarget: cuint, texture: cuint, level: cint): void <cimport> end
+local function glDeleteTextures(n: cint, textures: *cuint): void <cimport> end
+local function glDeleteFramebuffers(n: cint, framebuffers: *cuint): void <cimport> end
 
 local GPU_VERT_SRC <const> = [[
 #version 330
@@ -31,9 +89,9 @@ struct Light {
 	int enabled;
 	int type;
 	float radius;
+	vec3 color;
 	vec3 position;
 	vec3 direction;
-	vec3 color;
 };
 
 // custom uniforms
@@ -186,6 +244,60 @@ void main()
 }
 ]]
 
+local face_types: []cuint = {
+	GL_FRONT,
+	GL_BACK,
+	GL_FRONT_AND_BACK
+}
+local comparison_functions: []cuint = {
+	GL_LESS,
+	GL_LEQUAL,
+	GL_GREATER,
+	GL_GEQUAL,
+	GL_EQUAL,
+	GL_NOTEQUAL,
+	GL_ALWAYS,
+	GL_NEVER
+}
+local blend_factors: []cint = {
+	rlgl.ZERO,
+	rlgl.ONE,
+	rlgl.SRC_COLOR,
+	rlgl.ONE_MINUS_SRC_COLOR,
+	rlgl.DST_COLOR,
+	rlgl.ONE_MINUS_DST_COLOR,
+	rlgl.SRC_ALPHA,
+	rlgl.ONE_MINUS_SRC_ALPHA,
+	rlgl.DST_ALPHA,
+	rlgl.ONE_MINUS_DST_ALPHA,
+	rlgl.CONSTANT_COLOR,
+	rlgl.ONE_MINUS_CONSTANT_COLOR,
+	rlgl.CONSTANT_ALPHA,
+	rlgl.ONE_MINUS_CONSTANT_ALPHA,
+	rlgl.SRC_ALPHA_SATURATE
+}
+local blend_equations: []cint = {
+	rlgl.FUNC_ADD,
+	rlgl.FUNC_SUBTRACT,
+	rlgl.FUNC_REVERSE_SUBTRACT,
+	rlgl.MIN,
+	rlgl.MAX
+}
+local stencil_actions: []cuint = {
+	GL_KEEP,
+	GL_REPLACE,
+	GL_INCR,
+	GL_INCR_WRAP,
+	GL_DECR,
+	GL_DECR_WRAP,
+	GL_ZERO,
+	GL_INVERT
+}
+local polygon_modes: []cuint = {
+	GL_POINT,
+	GL_LINE,
+	GL_FILL
+}
 local src_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), -(@float32)(GPU_VSCREEN_H)}
 local sub_dest_rect: rl.rectangle = {0.0, 0.0, (@float32)(GPU_VSCREEN_W), (@float32)(GPU_VSCREEN_H)}
 local light_attrib_locs: [GPU_LIGHTS_COUNT][LightAttribute.COUNT]cint
@@ -202,56 +314,193 @@ local icon_table: [Icon.COUNT]rl.rectangle = {
 	{198, 18, 12, 9}, -- TOOL_SELECT
 }
 
-function GPU:clear(col: uint32): void
-	local alpha: cuchar = (@cuchar)(col & 0xFF)
+function GPU:flush(): void
+	if self.enable_flush then
+		-- get required matrices
+		local matModel: rl.matrix = rlgl.getMatrixTransform()
+		local matNormal: rl.matrix = rl.matrix.transpose(rl.matrix.invert(matModel))
 
-	if alpha ~= 0 then
-		local clear_color: rl.color = {
-			(@cuchar)(col >> 24),
-			(@cuchar)((col & 0xFF0000) >> 16),
-			(@cuchar)((col & 0x00FF00) >> 8),
-			0xFF
-		}
+		-- upload to vertex shader
+		rl.setShaderValueMatrix(self.gfx_shader, self.mat_model_loc, matModel)
+		rl.setShaderValueMatrix(self.gfx_shader, self.mat_normal_loc, matNormal)
 
-		rl.clearBackground(clear_color)
+		rlgl.drawRenderBatchActive()
+	end
+end
+
+function GPU:clearColor(col: uint32): void
+	local fr: float32 = (@float32)(col >> 24) / 255.0
+	local fg: float32 = (@float32)((col & 0xFF0000) >> 16) / 255.0
+	local fb: float32 = (@float32)((col & 0x00FF00) >> 8) / 255.0
+	local fa: float32 = (@float32)(col & 0xFF) / 255.0
+
+	glClearColor(fr, fg, fb, fa)
+end
+
+function GPU:clearDepth(depth: float64): void
+	glClearDepth(depth)
+end
+
+function GPU:clearStencil(stencil: int32): void
+	glClearStencil(stencil)
+end
+
+function GPU:clear(flags: uint32): void
+	local glflags: cint = 0
+
+	if flags & GPU_CLEAR_COLOR ~= 0 then
+		glflags = glflags | GL_COLOR_BUFFER_BIT
+	end
+	if flags & GPU_CLEAR_DEPTH ~= 0 then
+		glflags = glflags | GL_DEPTH_BUFFER_BIT
+	end
+	if flags & GPU_CLEAR_STENCIL ~= 0 then
+		glflags = glflags | GL_STENCIL_BUFFER_BIT
+	end
+	
+	glClear(glflags)
+end
+
+function GPU:depthTest(enable: boolean): void
+	self:flush()
+
+	if enable then
+		rlgl.enableDepthTest()
 	else
-		glClear(GL_DEPTH_BUFFER_BIT) -- clear the depth buffer, but not the color buffer
+		rlgl.disableDepthTest()
+	end
+end
+
+function GPU:depthMask(enable: boolean): void
+	self:flush()
+
+	if enable then
+		rlgl.enableDepthMask()
+	else
+		rlgl.disableDepthMask()
+	end
+end
+
+function GPU:cullMode(mode: uint32): void
+	self:flush()
+
+	switch mode do
+		case 0 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
+		case 1 then
+			rlgl.enableBackfaceCulling()
+			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
+		case 2 then
+			rlgl.disableBackfaceCulling()
+	end
+end
+
+function GPU:polygonMode(mode: uint32): void
+	self:flush()
+
+	glPolygonMode(
+		GL_FRONT_AND_BACK,
+		polygon_modes[mode]
+	)
+end
+
+function GPU:scissorMode(enable: boolean): void
+	self:flush()
+
+	if enable then
+		rlgl.enableScissorTest()
+	else
+		rlgl.disableScissorTest()
 	end
 end
 
 function GPU:camera2D(id: integer): void
-	local cam: rl.camera2D
+	-- values to get from system camera/SYSMEM
+	local raycam: rl.camera2D
+	local viewport_w: int32
+	local viewport_h: int32
 
 	if id >= 0 then
-		cam = self.cameras2D[id]
+		local cam2d: *EVMCam2D = &self.cameras2D[id]
+
+		raycam.offset = {
+			util.peekF(&cam2d.offset_x0),
+			util.peekF(&cam2d.offset_y0)
+		}
+		raycam.target = {
+			util.peekF(&cam2d.target_x0),
+			util.peekF(&cam2d.target_y0)
+		}
+		raycam.rotation = util.peekF(&cam2d.rotation0)
+		raycam.zoom = util.peekF(&cam2d.zoom0)
 	else
-		cam = self.system_cam2d
+		raycam = self.system_cam2d
 	end
 
-	rlgl.disableDepthTest()
-	
-	rlgl.drawRenderBatchActive()
+	-- get viewport w+h
+	viewport_w = GPU_VSCREEN_W --util.peekI(&self.render_state.viewport_width0)
+	viewport_h = GPU_VSCREEN_H --util.peekI(&self.render_state.viewport_height0)
 
+	-- this takes parts of raylib's beginTextureMode() and beginMode2D().
+	-- we want a 2D orthographic projection, with a modelview configured to the 2D camera
+
+	rlgl.drawRenderBatchActive()
+	
 	rlgl.matrixMode(rlgl.PROJECTION)
 	rlgl.loadIdentity()
-	rlgl.ortho(0.0, self.viewport_w, self.viewport_h, 0.0, 0.0, 1.0)
-
+	rlgl.ortho(0.0, (float64)(viewport_w), (float64)(viewport_h), 0.0, 0.0, 1.0)
+	
 	rlgl.matrixMode(rlgl.MODELVIEW)
 	rlgl.loadIdentity()
 
-	rl.beginMode2D(cam)
+	rl.beginMode2D(raycam)
+
+	self:depthTest(false)
 	
 	self.matrix_mode = rlgl.MODELVIEW
 end
 
-function GPU:camera3D(id: integer): void
-	local cam: rl.camera
-	
+function GPU:camera3D(id: int32): void
+	-- values to get from system camera/SYSMEM
+	local position: rl.vector3
+	local target: rl.vector3
+	local up: rl.vector3
+	local fov: float32
+	local projection: int32
+	local viewport_w: int32
+	local viewport_h: int32
+
 	if id >= 0 then
-		cam = self.cameras[id]
+		local cam3d: *EVMCam3D = &self.cameras3D[id]
+
+		position = {
+			util.peekF(&cam3d.position_x0),
+			util.peekF(&cam3d.position_y0),
+			util.peekF(&cam3d.position_z0)
+		}
+		target = {
+			util.peekF(&cam3d.target_x0),
+			util.peekF(&cam3d.target_y0),
+			util.peekF(&cam3d.target_z0)
+		}
+		up = {
+			util.peekF(&cam3d.up_x0),
+			util.peekF(&cam3d.up_y0),
+			util.peekF(&cam3d.up_z0)
+		}
+		fov = util.peekF(&cam3d.fov0)
+		projection = util.peekI(&cam3d.projection0)
 	else
-		cam = self.system_cam
+		position = self.system_cam3d.position
+		target = self.system_cam3d.target
+		up = self.system_cam3d.up
+		fov = self.system_cam3d.fovy
+		projection = self.system_cam3d.projection
 	end
+
+	viewport_w = GPU_VSCREEN_W --util.peekI(&self.render_state.viewport_width0)
+	viewport_h = GPU_VSCREEN_H --util.peekI(&self.render_state.viewport_height0)
 
 	-- copy Raylib's BeginMode3D(),
 	-- but we don't need to push a new projection matrix
@@ -261,18 +510,18 @@ function GPU:camera3D(id: integer): void
 	rlgl.matrixMode(rlgl.PROJECTION)
     rlgl.loadIdentity()
 
-	local aspect: float32 = (@float32)(self.viewport_w) / (@float32)(self.viewport_h)
+	local aspect: float32 = (@float32)(viewport_w) / (@float32)(viewport_h)
 
 	-- 0.01 is the near clipping value
 	-- 1000.0 is the far clipping value
 	-- TODO: allow setting near/far?
-	if cam.projection == rl.cameraProjection.PERSPECTIVE then
-		local top: float64 = 0.01 * math.tan(cam.fovy * 0.5 * (math.pi / 180.0))
+	if projection == rl.cameraProjection.PERSPECTIVE then
+		local top: float64 = 0.01 * math.tan(fov * 0.5 * (math.pi / 180.0))
 		local right: float64 = top * aspect
 
 		rlgl.frustum(-right, right, -top, top, 0.01, 1000.0)
-	elseif cam.projection == rl.cameraProjection.ORTHOGRAPHIC then
-		local top: float64 = cam.fovy / 2.0
+	else
+		local top: float64 = fov / 2.0
 		local right: float64 = top * aspect
 
 		rlgl.ortho(-right, right, -top, top, 0.01, 1000.0)
@@ -281,11 +530,11 @@ function GPU:camera3D(id: integer): void
 	rlgl.matrixMode(rlgl.MODELVIEW)
 	rlgl.loadIdentity()
 
-	local mat_view: rl.matrix = rl.matrix.lookAt(cam.position, cam.target, cam.up)
+	local mat_view: rl.matrix = rl.matrix.lookAt(position, target, up)
 	local asfloat16: rl.float16 = rl.matrix.toFloatV(mat_view)
 	rlgl.multMatrixf((@*float32)(&asfloat16.v))
 
-	rlgl.enableDepthTest()
+	self:depthTest(true) -- enable depth testing for 3D
 
 	self.matrix_mode = rlgl.MODELVIEW
 end
@@ -361,9 +610,7 @@ function GPU:vertex2D(v: rl.vector2): void
 end
 
 function GPU:vertNormal(v: rl.vector3): void
-	if self.lighting_mode ~= 0 then
-		rlgl.color3f(v.x, v.y, v.z)
-	end
+	rlgl.color3f(v.x, v.y, v.z)
 end
 
 function GPU:vertUV(v: rl.vector2): void
@@ -371,14 +618,12 @@ function GPU:vertUV(v: rl.vector2): void
 end
 
 function GPU:vertColor(col: uint32): void
-	if self.lighting_mode == 0 then
-		local r: cuchar = (@cuchar)(col >> 24)
-		local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
-		local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
-		local a: cuchar = (@cuchar)(col & 0xFF)
-		
-		rlgl.color4ub(r, g, b, a)
-	end
+	local r: cuchar = (@cuchar)(col >> 24)
+	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
+	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
+	local a: cuchar = (@cuchar)(col & 0xFF)
+	
+	rlgl.color4ub(r, g, b, a)
 end
 
 function GPU:drawChar2D(c: uint8, x: *int32, y: int32, color: rl.color): void
@@ -744,84 +989,287 @@ function GPU:drawGFXTexture(srcx: int32, srcy: int32, srcw: int32, srch: int32, 
 	rl.drawTexturePro(self.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 end
 
+function GPU:textureMode(mode: uint32): void
+	--self:flush()
+
+	local cmode: cint = (@cint)(mode)
+	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
+end
+
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
-	self.tex_x = (@cint)(x)
-	self.tex_y = (@cint)(y)
-	self.tex_w = (@cint)(w)
-	self.tex_h = (@cint)(h)
-	
-	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &self.tex_x, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &self.tex_y, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &self.tex_w, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &self.tex_h, rl.shaderUniformDataType.UNIFORM_INT)
+	--self:flush()
+
+	--self.tex_x = (@cint)(x)
+	--self.tex_y = (@cint)(y)
+	--self.tex_w = (@cint)(w)
+	--self.tex_h = (@cint)(h)
+	local cx: cint = (@cint)(x)
+	local cy: cint = (@cint)(y)
+	local cw: cint = (@cint)(w)
+	local ch: cint = (@cint)(h)
+	rl.setShaderValue(self.gfx_shader, self.tex_x_loc, &cx, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_y_loc, &cy, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_w_loc, &cw, rl.shaderUniformDataType.UNIFORM_INT)
+	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &ch, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function GPU:updateVertexShaderMatrices(): void
-	-- get required matrices
-	local matModel: rl.matrix = rlgl.getMatrixTransform()
-	local matNormal: rl.matrix = rl.matrix.transpose(rl.matrix.invert(matModel))
+function GPU:viewport(x: cint, y: cint, w: cint, h: cint): void
+	--self:flush()?
 
-	-- upload to vertex shader
-	rl.setShaderValueMatrix(self.gfx_shader, self.mat_model_loc, matModel)
-	rl.setShaderValueMatrix(self.gfx_shader, self.mat_normal_loc, matNormal)
+	y = GPU_VSCREEN_H - (y + h) -- flip y
+
+	util.pokeI(&self.render_state.viewport_x0, x)
+	util.pokeI(&self.render_state.viewport_y0, y)
+	util.pokeI(&self.render_state.viewport_width0, w)
+	util.pokeI(&self.render_state.viewport_height0, h)
+
+	rlgl.viewport(x, y, w, h)
 end
 
-function GPU:setBlendMode(mode: uint32): void
-	self.blend_mode = mode
-	rlgl.setBlendMode(self.blend_mode)
+function GPU:scissor(x: cint, y: cint, w: cint, h: cint): void
+	--self:flush()?
+
+	y = GPU_VSCREEN_H - (y + h) -- flip y
+
+	util.pokeI(&self.render_state.scissor_x0, x)
+	util.pokeI(&self.render_state.scissor_y0, y)
+	util.pokeI(&self.render_state.scissor_width0, w)
+	util.pokeI(&self.render_state.scissor_height0, h)
+
+	rlgl.scissor(x, y, w, h)
 end
 
-function GPU:setLightingMode(mode: uint32): void
-	self.lighting_mode = mode
-	rl.setShaderValue(self.gfx_shader, self.lighting_mode_loc, &self.lighting_mode, rl.shaderUniformDataType.UNIFORM_INT)
+function GPU:colorMask(mask: uint8): void
+	--self:flush()
+
+	--self.color_mask = mask
+	local r: cint = mask & 0b1000 ~= 0 and 1 or 0
+	local g: cint = mask & 0b0100 ~= 0 and 1 or 0
+	local b: cint = mask & 0b0010 ~= 0 and 1 or 0
+	local a: cint = mask & 0b0001 ~= 0 and 1 or 0
+	glColorMask(r, g, b, a)
 end
 
-function GPU:setAmbientFactor(factor: float32): void
-	self.ambient_factor = factor / 100.0
-	rl.setShaderValue(self.gfx_shader, self.ambient_factor_loc, &self.ambient_factor, rl.shaderUniformDataType.UNIFORM_FLOAT)
+function GPU:depthFunc(fn: uint32): void
+	self:flush()
+
+	--self.depth_function = fn
+	glDepthFunc(comparison_functions[fn])
 end
 
-function GPU:setAmbientColor(col: uint32): void
-	self.ambient_color = {
+function GPU:blendMode(mode: uint32): void
+	self:flush()
+
+	--self.blend_mode = mode
+	rlgl.setBlendMode(mode)
+end
+
+function GPU:blendFactors(src_factor: uint32, dest_factor: uint32, equation: uint32): void
+	self:flush()
+
+	--self.blend_src_rgb = src_factor
+	--self.blend_dest_rgb = dest_factor
+	--self.blend_src_alpha = src_factor
+	--self.blend_dest_alpha = dest_factor
+	--self.blend_eq_rgb = equation
+	--self.blend_eq_alpha = equation
+	rlgl.setBlendFactors(
+		blend_factors[src_factor],
+		blend_factors[dest_factor],
+		blend_equations[equation]
+	)
+end
+
+function GPU:blendFactorsEx(
+	src_rgb_factor: uint32,
+	dest_rgb_factor: uint32,
+	src_alpha_factor: uint32,
+	dest_alpha_factor: uint32,
+	equation_rgb: uint32,
+	equation_alpha: uint32): void
+	self:flush()
+	--self.blend_src_rgb = src_rgb_factor
+	--self.blend_dest_rgb = dest_rgb_factor
+	--self.blend_src_alpha = src_alpha_factor
+	--self.blend_dest_alpha = dest_alpha_factor
+	--self.blend_eq_rgb = equation_rgb
+	--self.blend_eq_alpha = equation_alpha
+	rlgl.setBlendFactorsSeparate(
+		blend_factors[src_rgb_factor],
+		blend_factors[dest_rgb_factor],
+		blend_factors[src_alpha_factor],
+		blend_factors[dest_alpha_factor],
+		blend_equations[equation_rgb],
+		blend_equations[equation_alpha]
+	)
+end
+
+function GPU:stencilMode(mode: boolean): void
+	self:flush()
+
+	if mode then
+		glEnable(GL_STENCIL_TEST)
+	else
+		glDisable(GL_STENCIL_TEST)
+	end
+	--self.stencil_mode = mode
+end
+
+function GPU:stencilMask(face: uint32, mask: uint32): void
+	self:flush()
+
+	glStencilMaskSeparate(
+		face_types[face],
+		mask
+	)
+end
+
+function GPU:stencilFunc(face: uint32, func: uint32, ref: int32, mask: uint32): void
+	self:flush()
+
+	glStencilFuncSeparate(
+		face_types[face],
+		comparison_functions[func],
+		ref,
+		mask
+	)
+end
+
+function GPU:stencilOp(face: uint32, sfail: uint32, dpfail: uint32, dppass: uint32): void
+	self:flush()
+
+	glStencilOpSeparate(
+		face_types[face],
+		stencil_actions[sfail],
+		stencil_actions[dpfail],
+		stencil_actions[dppass]
+	)
+end
+
+function GPU:fogMode(enabled: boolean): void
+	--self:flush()
+
+	local cmode: cint = enabled and 1 or 0
+	rl.setShaderValue(self.gfx_shader, self.fog_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
+end
+
+function GPU:fogStart(start: float32): void
+	--self:flush()
+
+	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &start, rl.shaderUniformDataType.UNIFORM_FLOAT)
+end
+
+function GPU:fogEnd(fend: float32): void
+	--self:flush()
+
+	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &fend, rl.shaderUniformDataType.UNIFORM_FLOAT)
+end
+
+function GPU:fogColor(col: uint32): void
+	--self:flush()
+
+	local ccolor: rl.vector4 = {
+		(@float32)(col >> 24) / 255.0,
+		(@float32)((col >> 16) & 0xFF) / 255.0,
+		(@float32)((col >> 8) & 0xFF) / 255.0,
+		(@float32)(col & 0xFF) / 255.0
+	}
+	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &ccolor, rl.shaderUniformDataType.UNIFORM_VEC4)
+end
+
+function GPU:lightingMode(enabled: boolean): void
+	--self:flush()
+
+	--self.lighting_mode = mode
+	local cmode: cint = enabled and 1 or 0
+	rl.setShaderValue(self.gfx_shader, self.lighting_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
+end
+
+function GPU:ambientFactor(factor: float32): void
+	--self:flush()
+
+	--self.ambient_factor = factor / 100.0
+	local cfactor: float32 = factor / 100.0
+	rl.setShaderValue(self.gfx_shader, self.ambient_factor_loc, &cfactor, rl.shaderUniformDataType.UNIFORM_FLOAT)
+end
+
+function GPU:ambientColor(col: uint32): void
+	--self:flush()
+
+	local ccolor: rl.vector3 = {
 		(@float32)(col >> 24) / 255.0,
 		(@float32)((col >> 16) & 0xFF) / 255.0,
 		(@float32)((col >> 8) & 0xFF) / 255.0
 	}
-	rl.setShaderValue(self.gfx_shader, self.ambient_color_loc, &self.ambient_color, rl.shaderUniformDataType.UNIFORM_VEC3)
+	rl.setShaderValue(self.gfx_shader, self.ambient_color_loc, &ccolor, rl.shaderUniformDataType.UNIFORM_VEC3)
 end
 
-function GPU:setLightEnabled(id: uint32, enabled: uint32): void
-	self.lights[id].enabled = (enabled ~= 0) and 1 or 0
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.ENABLED], &self.lights[id].enabled, rl.shaderUniformDataType.UNIFORM_INT)
+function GPU:lightEnabled(id: uint32, enabled: boolean): void
+	--self.lights[id].enabled = (enabled ~= 0) and 1 or 0
+	local cenabled: cint = enabled and 1 or 0
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.ENABLED], &cenabled, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function GPU:setLightType(id: uint32, light_type: uint32): void
-	self.lights[id].light_type = (@cint)(light_type)
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.TYPE], &self.lights[id].light_type, rl.shaderUniformDataType.UNIFORM_INT)
+function GPU:lightType(id: uint32, light_type: uint32): void
+	--self.lights[id].light_type = (@cint)(light_type)
+	local ctype: cint = (@cint)(light_type)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.TYPE], &ctype, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function GPU:setLightRadius(id: uint32, radius: float32): void
-	self.lights[id].radius = radius
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.RADIUS], &self.lights[id].radius, rl.shaderUniformDataType.UNIFORM_FLOAT)
+function GPU:lightRadius(id: uint32, radius: float32): void
+	--self.lights[id].radius = radius
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.RADIUS], &radius, rl.shaderUniformDataType.UNIFORM_FLOAT)
 end
 
-function GPU:setLightPosition(id: uint32, pos: rl.vector3): void
-	self.lights[id].position = pos
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.POSITION], &self.lights[id].position, rl.shaderUniformDataType.UNIFORM_VEC3)
-end
-
-function GPU:setLightDirection(id: uint32, dir: rl.vector3): void
-	self.lights[id].direction = dir
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.DIRECTION], &self.lights[id].direction, rl.shaderUniformDataType.UNIFORM_VEC3)
-end
-
-function GPU:setLightColor(id: uint32, col: uint32): void
-	self.lights[id].color = {
+function GPU:lightColor(id: uint32, col: uint32): void
+	local ccolor: rl.vector3 = {
 		(@float32)(col >> 24) / 255.0,
 		(@float32)((col >> 16) & 0xFF) / 255.0,
 		(@float32)((col >> 8) & 0xFF) / 255.0
 	}
-	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.COLOR], &self.lights[id].color, rl.shaderUniformDataType.UNIFORM_VEC3)
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.COLOR], &ccolor, rl.shaderUniformDataType.UNIFORM_VEC3)
+end
+
+function GPU:lightPosition(id: uint32, pos: rl.vector3): void
+	--self.lights[id].position = pos
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.POSITION], &pos, rl.shaderUniformDataType.UNIFORM_VEC3)
+end
+
+function GPU:lightDirection(id: uint32, dir: rl.vector3): void
+	--self.lights[id].direction = dir
+	rl.setShaderValue(self.gfx_shader, light_attrib_locs[id][LightAttribute.DIRECTION], &dir, rl.shaderUniformDataType.UNIFORM_VEC3)
+end
+
+function GPU:updateLights(): void
+	for i = 0, < GPU_LIGHTS_COUNT do
+		local l: *EVMLight = &self.lights[i]
+
+		local cenabled: cint = util.peekI(&l.enabled0) ~= 0 and 1 or 0
+		local ctype: cint = (@cint)(util.peekI(&l.type0))
+		local radius: float32 = util.peekF(&l.radius0)
+		local col: uint32 = util.peekU(&l.color_r)
+		local ccolor: rl.vector3 = {
+			(@float32)(col >> 24) / 255.0,
+			(@float32)((col >> 16) & 0xFF) / 255.0,
+			(@float32)((col >> 8) & 0xFF) / 255.0
+		}
+		local pos: rl.vector3 = {
+			util.peekF(&l.position_x0),
+			util.peekF(&l.position_y0),
+			util.peekF(&l.position_z0)
+		}
+		local dir: rl.vector3 = {
+			util.peekF(&l.direction_x0),
+			util.peekF(&l.direction_y0),
+			util.peekF(&l.direction_z0)
+		}
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.ENABLED], &cenabled, rl.shaderUniformDataType.UNIFORM_INT)
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.TYPE], &ctype, rl.shaderUniformDataType.UNIFORM_INT)
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.RADIUS], &radius, rl.shaderUniformDataType.UNIFORM_FLOAT)
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.COLOR], &ccolor, rl.shaderUniformDataType.UNIFORM_VEC3)
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.POSITION], &pos, rl.shaderUniformDataType.UNIFORM_VEC3)
+		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.DIRECTION], &dir, rl.shaderUniformDataType.UNIFORM_VEC3)
+	end
 end
 
 function GPU:setPixel(x: int32, y: int32, col: uint32): void
@@ -1075,42 +1523,6 @@ function GPU:setRenderTexture(index: uinteger): void
 	self.gfx_rendertexture_index = index
 end
 
-function GPU:enableRenderState(): void
-	switch self.cull_mode do
-		case 0 then
-			rlgl.enableBackfaceCulling()
-			rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
-		case 1 then
-			rlgl.enableBackfaceCulling()
-			rlgl.setCullFace(rlgl.cullMode.FACE_FRONT)
-		else
-			rlgl.disableBackfaceCulling()
-	end
-
-	if self.wire_mode then
-		rlgl.enableWireMode()
-	else
-		rlgl.disableWireMode()
-	end
-
-	rlgl.enableScissorTest()
-
-	self:setBlendMode(self.blend_mode)
-
-	self.matrix_mode = rlgl.MODELVIEW
-end
-
-function GPU:disableRenderState(): void
-	rlgl.enableBackfaceCulling()
-	rlgl.setCullFace(rlgl.cullMode.FACE_BACK)
-	rlgl.disableWireMode()
-	rlgl.disableScissorTest()
-
-	-- TODO: properly disable all render state
-
-	self:setBlendMode(rl.blendMode.ALPHA)
-end
-
 function GPU:setBankPointers(texbank_index: uint8, objbank_index: uint8): void
 	self.current_texbank = texbank_index
 	self.current_objbank = objbank_index
@@ -1149,62 +1561,276 @@ function GPU:updateConfigFlags(): void
 	rl.setWindowState(flags)--| rl.configFlags.WINDOW_RESIZABLE)
 end
 
-function GPU:resetGPU(): void
-	for i = 0, < GPU_CAMERAS_COUNT do
-		self.cameras2D[i] = {
-			offset={0.0,0.0},
-			target={0.0,0.0},
-			rotation=0.0,
-			zoom=1.0
-		}
+function GPU:enableRenderState(): void
+	self.enable_flush = true
+	self:flush()
+	self.enable_flush = false
 
-		self.cameras[i] = {
-			position={0,0,4},
-			target={0,0,0},
-			up={0,1,0},
-			fovy=45,
-			projection=rl.cameraProjection.PERSPECTIVE
-		}
-	end
+	self:clearColor(util.peekU(&self.render_state.clear_color_r))
+	self:colorMask(self.render_state.flags_00ppcccc & GPU_COLOR_MASK_MASK)
 
-	for i = 0, < GPU_LIGHTS_COUNT do
-		self.lights[i] = {
-			0,
-			0,
-			0.0,
-			{0,0,0},
-			{0,-1,0},
-			{0,0,0}
-		}
-	end
+	self:clearDepth(util.peekF(&self.render_state.clear_depth0))
+	self:depthTest(self.render_state.flags_tmccs0fl & GPU_DEPTH_TEST_BIT ~= 0)
+	self:depthMask(self.render_state.flags_tmccs0fl & GPU_DEPTH_MASK_BIT ~= 0)
+	self:depthFunc(self.render_state.depth_function)
+	
+	self:clearStencil(self.render_state.clear_stencil)
+	self:stencilMode(self.render_state.flags_tmccs0fl & GPU_STENCIL_BIT ~= 0)
+	self:stencilMask(GPU_FRONT, self.render_state.stencil_mask_front)
+	self:stencilMask(GPU_BACK, self.render_state.stencil_mask_back)
+	self:stencilFunc(
+		GPU_FRONT,
+		self.render_state.stencil_functions >> 4,
+		self.render_state.stencil_ref_front,
+		self.render_state.stencil_func_mask_front
+	)
+	self:stencilFunc(
+		GPU_BACK,
+		self.render_state.stencil_functions & 0b1111,
+		self.render_state.stencil_ref_back,
+		self.render_state.stencil_func_mask_back
+	)
+	self:stencilOp(
+		GPU_FRONT,
+		self.render_state.stencil_sfails >> 4,
+		self.render_state.stencil_dpfails >> 4,
+		self.render_state.stencil_dppasses >> 4
+	)
+	self:stencilOp(
+		GPU_BACK,
+		self.render_state.stencil_sfails & 0b1111,
+		self.render_state.stencil_dpfails & 0b1111,
+		self.render_state.stencil_dppasses & 0b1111
+	)
+	
+	self:cullMode((self.render_state.flags_tmccs0fl & GPU_CULL_MODE_MASK) >> 4)
+	self:polygonMode(
+		(self.render_state.flags_00ppcccc & GPU_POLYGON_MODE_MASK) >> 4
+	)
 
-	self.cull_mode = 0
-	self.wire_mode = false
+	self:fogMode(self.render_state.flags_tmccs0fl & GPU_FOG_BIT ~= 0)
+	self:fogStart(util.peekF(&self.render_state.fog_start0))
+	self:fogEnd(util.peekF(&self.render_state.fog_end0))
+	self:fogColor(util.peekU(&self.render_state.fog_color_r))
+
+	self:lightingMode(self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT ~= 0)
+	-- lights...
+
+	self:ambientFactor(util.peekF(&self.render_state.ambient_factor0))
+	self:ambientColor(util.peekU(&self.render_state.ambient_color_r))
+
+	self:blendFactorsEx(
+		self.render_state.rgb_factors >> 4,
+		self.render_state.rgb_factors & 0xF,
+		self.render_state.alpha_factors >> 4,
+		self.render_state.alpha_factors & 0xF,
+		self.render_state.blend_equations >> 4,
+		self.render_state.blend_equations & 0xF
+	)
+	self:blendMode(self.render_state.flags_00sttbbb & GPU_BLEND_MODE_MASK)
+
+	self:textureMode((self.render_state.flags_00sttbbb & GPU_TEXTURE_MODE_MASK) >> 3)
+	self:texture(
+		util.peekI(&self.render_state.texture_x0),
+		util.peekI(&self.render_state.texture_y0),
+		(@int32)(self.render_state.texture_width) + 1,
+		(@int32)(self.render_state.texture_height) + 1
+	)
+	self:viewport(
+		util.peekI(&self.render_state.viewport_x0),
+		util.peekI(&self.render_state.viewport_y0),
+		util.peekI(&self.render_state.viewport_width0),
+		util.peekI(&self.render_state.viewport_height0)
+	)
+	self:scissorMode(self.render_state.flags_00sttbbb & GPU_SCISSOR_BIT ~= 0)
+	self:scissor(
+		util.peekI(&self.render_state.scissor_x0),
+		util.peekI(&self.render_state.scissor_y0),
+		util.peekI(&self.render_state.scissor_width0),
+		util.peekI(&self.render_state.scissor_height0)
+	)
+
+	self.enable_flush = true
+end
+
+function GPU:disableRenderState(): void
+	self.enable_flush = true
+	self:flush()
+	self.enable_flush = false
+
+	self:clearColor(GPU_BLACK)
+	self:colorMask(GPU_COLOR_MASK_ALL)
+
+	self:clearDepth(1.0)
+	self:depthTest(true)
+	self:depthMask(true)
+	self:depthFunc(GPU_LEQUAL)
 	
-	self.tex_mode = 0
-	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &self.tex_mode, rl.shaderUniformDataType.UNIFORM_INT)
+	self:clearStencil(0)
+	self:stencilMode(false)
+	self:stencilMask(GPU_FRONT_AND_BACK, 0xFF)
+	self:stencilFunc(GPU_FRONT_AND_BACK, GPU_ALWAYS, 0, 0xFF)
+	self:stencilOp(GPU_FRONT_AND_BACK, GPU_KEEP, GPU_KEEP, GPU_KEEP)
 	
-	self.fog_mode = 0
-	self.fog_start = 700.0
-	self.fog_end = 1000.0
-	self.fog_color = {1.0, 1.0, 1.0, 1.0}
-	self.lighting_mode = 0
-	self.ambient_factor = 0.0
-	self.ambient_color = {0.0, 0.0, 0.0}
-	rl.setShaderValue(self.gfx_shader, self.fog_mode_loc, &self.fog_mode, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.fog_start_loc, &self.fog_start, rl.shaderUniformDataType.UNIFORM_FLOAT)
-	rl.setShaderValue(self.gfx_shader, self.fog_end_loc, &self.fog_end, rl.shaderUniformDataType.UNIFORM_FLOAT)
-	rl.setShaderValue(self.gfx_shader, self.fog_color_loc, &self.fog_color, rl.shaderUniformDataType.UNIFORM_VEC4)
-	rl.setShaderValue(self.gfx_shader, self.lighting_mode_loc, &self.lighting_mode, rl.shaderUniformDataType.UNIFORM_INT)
-	rl.setShaderValue(self.gfx_shader, self.ambient_factor_loc, &self.ambient_factor, rl.shaderUniformDataType.UNIFORM_FLOAT)
-	rl.setShaderValue(self.gfx_shader, self.ambient_color_loc, &self.ambient_color, rl.shaderUniformDataType.UNIFORM_VEC3)
-	
+	self:cullMode(0)
+	self:polygonMode(GPU_FILL)
+
+	self:fogMode(false)
+	self:fogStart(700.0)
+	self:fogEnd(1000.0)
+	self:fogColor(GPU_RED)
+
+	self:lightingMode(false)
+	-- lights...
+
+	self:ambientFactor(0.0)
+	self:ambientColor(GPU_RED)
+
+	self:blendMode(0)
+
+	self:textureMode(2)
 	self:texture(0, 0, 64, 64)
+	self:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+	self:scissorMode(false)
 
-	self.viewport_w = GPU_VSCREEN_W
-	self.viewport_h = GPU_VSCREEN_H
+	self.enable_flush = true
+end
+
+function GPU:resetGPU(): void
+	-- reset camera state
+	memory.set(self.cameras3D, 0, MEMORY_CAMERAS3D_SIZE)
+	memory.set(self.cameras2D, 0, MEMORY_CAMERAS2D_SIZE)
+	for i = 0, < GPU_CAMERAS_COUNT do
+		local cam3d: *EVMCam3D = &self.cameras3D[i]
+		local cam2d: *EVMCam2D = &self.cameras2D[i]
+		
+		-- cam3d.position.z = 4.0
+		util.pokeF(&cam3d.position_z0, 4.0)
+
+		-- cam3d.up.y = 1.0
+		util.pokeF(&cam3d.up_y0, 1.0)
+
+		-- cam3d.fov = 45.0
+		util.pokeF(&cam3d.fov0, 45.0)
+
+		-- cam2d.zoom = 1.0
+		util.pokeF(&cam2d.zoom0, 1.0)
+	end
+
+	-- reset light state
+	memory.set(self.lights, 0, MEMORY_LIGHTS_SIZE)
+	for i = 0, < GPU_LIGHTS_COUNT do
+		local light: *EVMLight = &self.lights[i]
+
+		-- light.direction.y = -1.0
+		util.pokeF(&light.direction_y0, -1.0)
+	end
+
+	-- reset render state
+	memory.set(self.render_state, 0, #RenderState) -- clear everything
+
+	-- render state int values
+	self.render_state.clear_color_a = 0xFF
+	self.render_state.fog_color_a = 0xFF
+	self.render_state.ambient_color_a = 0xFF
+	util.pokeI(&self.render_state.viewport_width0, GPU_VSCREEN_W)
+	util.pokeI(&self.render_state.viewport_height0, GPU_VSCREEN_H)
+	util.pokeI(&self.render_state.scissor_width0, GPU_VSCREEN_W)
+	util.pokeI(&self.render_state.scissor_height0, GPU_VSCREEN_H)
+
+	-- render state float values
+	util.pokeF(&self.render_state.clear_depth0, 1.0)
+	util.pokeF(&self.render_state.fog_start0, 700.0)
+	util.pokeF(&self.render_state.fog_end0, 1000.0)
+
+	-- render state byte values
+	self.render_state.flags_tmccs0fl = GPU_DEPTH_TEST_BIT | GPU_DEPTH_MASK_BIT
+	self.render_state.flags_00ppcccc = 0b00100000 | GPU_COLOR_MASK_ALL -- fill polygon mode, full color mask
+	self.render_state.rgb_factors = 0x67 -- SRC_ALPHA, ONE_MINUS_SRC_ALPHA
+	self.render_state.alpha_factors = 0x67 -- SRC_ALPHA, ONE_MINUS_SRC_ALPHA
+	self.render_state.stencil_functions = 0x66 -- ALWAYS, ALWAYS
+	self.render_state.stencil_mask_front = 0xFF
+	self.render_state.stencil_func_mask_front = 0xFF
+	self.render_state.stencil_mask_back = 0xFF
+	self.render_state.stencil_func_mask_back = 0xFF
+	self.render_state.texture_width = 63
+	self.render_state.texture_height = 63
+
 	self.proj_matrix_count = 0
 	self.view_matrix_count = 0
+end
+
+-- copy rayblib's loadRenderTexture(), but also attach a stencil texture
+local function loadRenderTextureCustom(width: cint, height: cint): rl.renderTexture
+	local target: rl.renderTexture
+
+	target.id = rlgl.loadFramebuffer()
+
+	if target.id > 0 then
+		rlgl.enableFramebuffer(target.id)
+
+		-- create color texture
+		target.texture.id = rlgl.loadTexture(nilptr, width, height, rl.pixelFormat.UNCOMPRESSED_R8G8B8A8, 1)
+		target.texture.width = width
+		target.texture.height = height
+		target.texture.format = rl.pixelFormat.UNCOMPRESSED_R8G8B8A8
+		target.texture.mipmaps = 1
+
+		-- create depth+stencil texture manually
+		glGenTextures(1, &target.depth.id)
+		glBindTexture(GL_TEXTURE_2D, target.depth.id)
+		glTexImage2D(
+			GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
+			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nilptr
+		)
+		glBindTexture(GL_TEXTURE_2D, 0)
+
+		target.depth.width = width
+		target.depth.height = height
+		target.depth.format = 19 -- TODO: set to correct value (if any)
+		target.depth.mipmaps = 1
+
+		-- attach color texture to FBO
+		rlgl.framebufferAttach(
+			target.id,
+			target.texture.id,
+			rlgl.framebufferAttachType.COLOR_CHANNEL0,
+			rlgl.framebufferAttachTextureType.TEXTURE2D,
+			0
+		)
+		
+		-- attach depth+stencil texture to FBO manually
+		glBindFramebuffer(GL_FRAMEBUFFER, target.id)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, target.depth.id, 0)
+		glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+		-- check if FBO is complete
+		if rlgl.framebufferComplete(target.id) then
+			rl.traceLog(rl.traceLogLevel.INFO, "FBO: [ID %i] Framebuffer object created successfully", target.id)
+		end
+
+		rlgl.disableFramebuffer()
+	else
+		rl.traceLog(rl.traceLogLevel.WARNING, "FBO: Framebuffer object can not be created")
+	end
+
+	return target
+end
+
+local function unloadRenderTextureCustom(target: rl.renderTexture): void
+	if target.id > 0 then
+		if target.texture.id > 0 then
+			rlgl.unloadTexture(target.texture.id)
+		end
+
+		-- unload depth+stencil texture and framebuffer
+		glBindFramebuffer(GL_FRAMEBUFFER, target.id)
+		glDeleteTextures(1, &target.depth.id)
+		glBindFramebuffer(GL_FRAMEBUFFER, 0)
+		glDeleteFramebuffers(1, &target.id)
+
+		rl.traceLog(rl.traceLogLevel.INFO, "FBO: [ID %i] Unloaded framebuffer from VRAM (GPU)", target.id)
+	end
 end
 
 function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr: *[0]IntFloat, ompbank_ptr: *[0]uint8): void
@@ -1212,6 +1838,10 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.texbank_ptr = texbank_ptr
 	self.objbank_ptr = objbank_ptr
 	self.ompbank_ptr = ompbank_ptr
+	self.cameras3D = (@*[0]EVMCam3D)(&self.sysmem_ptr[MEMORY_CAMERAS3D_INDEX])
+	self.cameras2D = (@*[0]EVMCam2D)(&self.sysmem_ptr[MEMORY_CAMERAS2D_INDEX])
+	self.lights = (@*[0]EVMLight)(&self.sysmem_ptr[MEMORY_LIGHTS_INDEX])
+	self.render_state = (@*RenderState)(&self.sysmem_ptr[MEMORY_RENDER_STATE_INDEX])
 
 	local flags: cint = 0
 	if core.config.vsync then
@@ -1242,11 +1872,11 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	rl.setTargetFPS(60)
 	rl.setExitKey(rl.keyboardKey.NULL)
 
-	self.gfx_master_rendertexture = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+	self.gfx_master_rendertexture = loadRenderTextureCustom(GPU_VSCREEN_W, GPU_VSCREEN_H)
 
 	self.gfx_rendertexture_index = RenderTexture.CODE
 	for i = 0, < RenderTexture.COUNT do
-		self.gfx_rendertextures[i] = rl.loadRenderTexture(GPU_VSCREEN_W, GPU_VSCREEN_H)
+		self.gfx_rendertextures[i] = loadRenderTextureCustom(GPU_VSCREEN_W, GPU_VSCREEN_H)
 	end
 
 	local img: rl.image = rl.genImageColor(GPU_TEXMEM_WIDTH, GPU_TEXMEM_HEIGHT, {0,0,0,0})
@@ -1281,9 +1911,9 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 		light_attrib_locs[i][LightAttribute.ENABLED]   = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].enabled", i))
 		light_attrib_locs[i][LightAttribute.TYPE]      = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].type", i))
 		light_attrib_locs[i][LightAttribute.RADIUS]    = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].radius", i))
+		light_attrib_locs[i][LightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
 		light_attrib_locs[i][LightAttribute.POSITION]  = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].position", i))
 		light_attrib_locs[i][LightAttribute.DIRECTION] = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].direction", i))
-		light_attrib_locs[i][LightAttribute.COLOR]     = rl.getShaderLocation(self.gfx_shader, string.format("lights[%d].color", i))
 	end
 
 	self.system_cam2d = {
@@ -1293,7 +1923,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 		zoom=1.0
 	}
 
-	self.system_cam = {
+	self.system_cam3d = {
 		position={0,0,0},
 		target={0,0,-1},
 		up={0,1,0},
@@ -1307,6 +1937,12 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	)
 
 	self:resetGPU()
+
+	self:texture(0, 0, 64, 64)
+	self:textureMode(0)
+	self:fogMode(false)
+	self:lightingMode(false)
+	self:ambientFactor(0.0)
 end
 
 function GPU:cleanup(): void
@@ -1315,10 +1951,10 @@ function GPU:cleanup(): void
 	rl.unloadTexture(self.gfx_texture)
 
 	for i = 0, < RenderTexture.COUNT do
-		rl.unloadRenderTexture(self.gfx_rendertextures[i])
+		unloadRenderTextureCustom(self.gfx_rendertextures[i])
 	end
 
-	rl.unloadRenderTexture(self.gfx_master_rendertexture)
+	unloadRenderTextureCustom(self.gfx_master_rendertexture)
 
 	rl.closeWindow()
 end

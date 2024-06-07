@@ -83,3 +83,71 @@ function util.wrapF(x: float32, min: float32, max: float32): float32
     local temp: float32 = max - min
     return min + ((temp + ((x - min) %%% temp)) %%% temp)
 end
+
+-- read float value from pointer in big-endian order
+function util.peekF(ptr: *[0]uint8): float32
+	local intf: IntFloat
+	intf = {
+		u =
+		((@uint32)(ptr[0]) << 24) |
+		((@uint32)(ptr[1]) << 16) |
+		((@uint32)(ptr[2]) << 8) |
+		((@uint32)(ptr[3]))
+	}
+
+	return intf.f
+end
+
+-- read uint32 valuefromo pointer in big-endian order
+function util.peekU(ptr: *[0]uint8): uint32
+	local intf: IntFloat
+	intf = {
+		u =
+		((@uint32)(ptr[0]) << 24) |
+		((@uint32)(ptr[1]) << 16) |
+		((@uint32)(ptr[2]) << 8) |
+		((@uint32)(ptr[3]))
+	}
+
+	return intf.u
+end
+
+-- read int32 value from pointer in big-endian order
+function util.peekI(ptr: *[0]uint8): int32
+	local intf: IntFloat
+	intf = {
+		u =
+		((@uint32)(ptr[0]) << 24) |
+		((@uint32)(ptr[1]) << 16) |
+		((@uint32)(ptr[2]) << 8) |
+		((@uint32)(ptr[3]))
+	}
+
+	return intf.i
+end
+
+-- write float value to pointer in big-endian order
+function util.pokeF(ptr: *[0]uint8, x: float32): void
+	local intf: IntFloat = {f=x}
+	ptr[0] = (@uint8)((intf.u & 0xFF000000) >> 24)
+	ptr[1] = (@uint8)((intf.u & 0x00FF0000) >> 16)
+	ptr[2] = (@uint8)((intf.u & 0x0000FF00) >> 8)
+	ptr[3] = (@uint8)(intf.u & 0x000000FF)
+end
+
+-- write uint32 value to pointer in big-endian order
+function util.pokeU(ptr: *[0]uint8, x: uint32): void
+	ptr[0] = (@uint8)((x & 0xFF000000) >> 24)
+	ptr[1] = (@uint8)((x & 0x00FF0000) >> 16)
+	ptr[2] = (@uint8)((x & 0x0000FF00) >> 8)
+	ptr[3] = (@uint8)(x & 0x000000FF)
+end
+
+-- write int32 value to pointer in big-endian order
+function util.pokeI(ptr: *[0]uint8, x: int32): void
+	local intf: IntFloat = {i=x}
+	ptr[0] = (@uint8)((intf.u & 0xFF000000) >> 24)
+	ptr[1] = (@uint8)((intf.u & 0x00FF0000) >> 16)
+	ptr[2] = (@uint8)((intf.u & 0x0000FF00) >> 8)
+	ptr[3] = (@uint8)(intf.u & 0x000000FF)
+end

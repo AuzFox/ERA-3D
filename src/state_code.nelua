@@ -142,6 +142,60 @@ local function nextToken(vm: *EVM): void
 						break
 					end
 				end
+			elseif sh_token_val == 0 and getChar() == 'n'_u8 then
+				-- soundchip note
+				local note: int32 = 0xFF
+				local octave: int32 = 0xFF
+				
+				-- get note name
+				sh_char_index = sh_char_index + 1
+				getChar()
+				if (sh_token >= 'a'_u8 and sh_token <= 'g'_u8) or (sh_token >= 'A'_u8 and sh_token <= 'G'_u8) then
+					switch sh_token do
+						case 'a'_u8, 'A'_u8 then
+							note = 9 -- BK_A_0
+						case 'b'_u8, 'B'_u8 then
+							note = 11 -- BK_B_0
+						case 'c'_u8, 'C'_u8 then
+							note = 0 -- BK_C_0
+						case 'd'_u8, 'D'_u8 then
+							note = 2 -- BK_D_0
+						case 'e'_u8, 'E'_u8 then
+							note = 4 -- BK_E_0
+						case 'f'_u8, 'F'_u8 then
+							note = 5 -- BK_F_0
+						case 'g'_u8, 'G'_u8 then
+							note = 7 -- BK_G_0
+					end
+					sh_char_index = sh_char_index + 1
+				else
+					sh_token = Token.UNKNOWN
+					return
+				end
+
+				-- get sharp symbol (if present)
+				getChar()
+				if sh_token == '#'_u8 then
+					if note == 4 or note == 11 then
+						sh_token = Token.UNKNOWN
+						return
+					else
+						note = note + 1
+						sh_char_index = sh_char_index + 1
+						getChar()
+					end
+				end
+
+				-- octave
+				if (sh_token >= '0'_u8 and sh_token <= '8'_u8) then
+					octave = sh_token - '0'_u8
+					sh_char_index = sh_char_index + 1
+				else
+					sh_token = Token.UNKNOWN
+					return
+				end
+
+				sh_token_val = (octave * 12) + note
 			else
 				-- decimal
 				local fract: float32 = 1.0
@@ -160,6 +214,9 @@ local function nextToken(vm: *EVM): void
 							isfloat = true
 							sh_token_valf = (@float32)(sh_token_val)
 							sh_char_index = sh_char_index + 1
+						else
+							sh_token = Token.UNKNOWN
+							return
 						end
 					elseif sh_token == '_'_u8 then
 						sh_char_index = sh_char_index + 1
@@ -876,7 +933,12 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
-    rl.clearBackground({0, 0, 0, 0})
+    --vm.gpu:clearColor(0)
+    --vm.gpu:clear(GPU_CLEAR_ALL)
+	vm.gpu:colorMask(0b0001)
+	vm.gpu:clearColor(0)
+	vm.gpu:clear(GPU_CLEAR_ALL)
+	vm.gpu:colorMask(0b1111)
     vm.gpu:camera2D(-1)
 
     drawCode(vm)

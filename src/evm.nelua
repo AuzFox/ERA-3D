@@ -277,8 +277,15 @@ function EVM:popStr(): EVMString
 	}
 end
 
+function EVM:resetHeap(): void
+	self.heap_head.next = nilptr
+	self.heap_head.address = 0
+	self.heap_head.size = MEMORY_HEAP_SIZE_BYTES
+	self.heap_head.used = false
+end
+
 function EVM:resetVM(reset_all: boolean): void
-	-- TODO: free all vm program memory, clear ram?
+	self:resetHeap()
 
 	self.cf = {}
 	self.lsp = 0
@@ -409,7 +416,12 @@ function EVM:setMem8(addr: uint32, val: uint8): boolean
 		local shift: uinteger = 8 * (addr & 1)
 		$frame = ($frame & (0xFF00 >> shift)) | (val << 8) >> shift
 	elseif addr <= MEMORY_SYSMEM_MAX_ADDR then
-		self.sysmem[addr - MEMORY_SYSMEM_START_ADDR] = val
+		addr = addr - MEMORY_SYSMEM_START_ADDR
+		self.sysmem[addr] = val
+
+		if addr >= MEMORY_LIGHTS_INDEX and addr < MEMORY_RENDER_STATE_INDEX then
+			self.gpu.update_lights = true
+		end
 	elseif addr <= MEMORY_WAVMEM_MAX_ADDR then
 		local frame: *uint16 = (@*uint16)(&self.soundchip.wavmem[(addr - MEMORY_WAVMEM_START_ADDR) /// 2])
 		local shift: uinteger = 8 * (addr & 1)
@@ -544,6 +556,10 @@ function EVM:setMem32(addr: uint32, val: uint32): boolean
 		self.sysmem[addr + 1] = (val & 0xFF0000) >> 16
 		self.sysmem[addr + 2] = (val & 0x00FF00) >> 8
 		self.sysmem[addr + 3] = val & 0xFF
+
+		if addr >= MEMORY_LIGHTS_INDEX and addr < MEMORY_RENDER_STATE_INDEX then
+			self.gpu.update_lights = true
+		end
 	elseif addr <= MEMORY_WAVMEM_MAX_ADDR then
 		local frame0: uint16 = val >> 16
 		local frame1: uint16 = val & 0xFFFF
@@ -2415,10 +2431,8 @@ function EVM:callHook(hook: integer): boolean
 		self:popCallframe()
 
 		if self.current_hook == Hook.DRAW then
-			self.gpu.viewport_w = GPU_VSCREEN_W
-			self.gpu.viewport_h = GPU_VSCREEN_H
-			rlgl.viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
-			rlgl.scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+			self.gpu:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+			self.gpu:scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
 			rlgl.drawRenderBatchActive()
 		end
 
@@ -2937,6 +2951,133 @@ function EVM:loadCart(filename: string): boolean
 	return true
 end
 
+function EVM:heapAlloc(size: uint32): uint32
+	if size == 0 or size > MEMORY_HEAP_SIZE_ELEMENTS then
+		return MEMORY_NULL
+	end
+	
+	-- get size aligned to 4 bytes
+	size = (((size + 4) - 1) /// 4) * 4
+
+	local current: *HeapBlock = self.heap_head
+	while current ~= nilptr do
+		if not current.used then
+			if current.size > size then
+				-- split block
+				local new_block: *HeapBlock = new(@HeapBlock)
+				new_block.next = current.next
+				new_block.address = current.address + size
+				new_block.size = current.size - size
+				new_block.used = false
+
+				current.size = size
+				current.next = new_block
+				current.used = true
+				return current.address
+			elseif current.size == size then
+				current.used = true
+				return current.address
+			end
+		end
+
+		current = current.next
+	end
+
+	return MEMORY_NULL
+end
+
+function EVM:heapFree(ptr: uint32): void
+	if ptr > MEMORY_MAX_ADDR then
+		return
+	end
+
+	local prev: *HeapBlock = nilptr
+	local current: *HeapBlock = self.heap_head
+	while current ~= nilptr do
+		local next: *HeapBlock = current.next
+
+		if current.address == ptr then
+			if current.used then
+				current.used = false
+
+				-- coalesce neighboring free heap blocks if needed
+				local merge_flags: uinteger = 0
+				if prev ~= nilptr and not prev.used then
+					merge_flags = merge_flags | 0b10
+				end
+
+				if next ~= nilptr and not next.used then
+					merge_flags = merge_flags | 0b01
+				end
+
+				switch merge_flags do
+					case 0b01 then -- merge next only
+						current.size = current.size + next.size
+						current.next = next.next
+
+						next.next = nilptr
+					case 0b10 then -- merge prev only
+						prev.size = prev.size + current.size
+						prev.next = current.next
+
+						current.next = nilptr
+					case 0b11 then -- merge both prev and next
+						prev.size = prev.size + current.size + next.size
+						prev.next = next.next
+
+						current.next = nilptr
+						next.next = nilptr
+				end
+			end
+
+			return
+		end
+
+		prev = current
+		current = current.next
+	end
+end
+
+function EVM:heapRealloc(ptr: uint32, size: uint32): uint32
+	local new_ptr: uint32 = self:heapAlloc(size)
+	if new_ptr == MEMORY_NULL then
+		return MEMORY_NULL
+	elseif ptr == MEMORY_NULL then
+		return new_ptr
+	else
+		-- get old block
+		local old_block: *HeapBlock = self.heap_head
+		while old_block ~= nilptr do
+			if old_block.address == ptr then
+				break
+			end
+			old_block = old_block.next
+		end
+
+		if old_block ~= nilptr then
+			local copy_size: uint32 = size
+			if size > old_block.size then
+				copy_size = old_block.size
+			end
+
+			memory.copy(&self.heap[new_ptr], &self.heap[old_block.address], copy_size)
+			self:heapFree(ptr)
+		end
+
+		return new_ptr
+	end
+end
+
+function EVM:printHeapBlocks(): void
+	local current: *HeapBlock = self.heap_head
+	local i: integer = 0
+	while current ~= nilptr do
+		io.printf("block %d: next: %p, addr: 0x%08X, size: %d, used: %s\n", i, current.next, current.address, current.size, current.used and "true" or "false")
+		current = current.next
+		i = i + 1
+	end
+end
+
 function EVM:__gc(): void
 	self.soundchip:cleanup()
 	self.gpu:cleanup()
@@ -2950,6 +3091,8 @@ global function newVM(): *EVM
 	
 	vm.gpu:init(&vm.sysmem, &vm.cart.texbank, &vm.cart.objbank, &vm.cart.ompbank)
 	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank, &vm.cart.wmpbank)
+
+	vm.heap_head = new(@HeapBlock)
 
 	vm:resetVM(false)
 

@@ -712,9 +712,11 @@ global rl.blendMode: type <cimport'BlendMode', cinclude'<raylib.h>',nodecl,using
     ALPHA = 0,
     ADDITIVE = 1,
     MULTIPLIED = 2,
-    ADD_colorS = 3,
-    SUBTRACT_colorS = 4,
-    CUSTOM = 5
+    ADD_COLORS = 3,
+    SUBTRACT_COLORS = 4,
+    ALPHA_PREMULTIPLY = 5,
+    CUSTOM = 6,
+    CUSTOM_SEPARATE = 7
 }
 
 -- Gesture
