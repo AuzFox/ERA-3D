@@ -264,28 +264,6 @@ local collision_functions: [ColType.COUNT][ColType.COUNT]CollisionFunction = {
 	{checkTrianglePoint, checkTriangleAABB, checkTriangleSphere, checkTriangleCylinder, checkTriangleTriangle}, -- triangle
 }
 
---[[
-	API FUNCTIONS TO IMPLEMENT:
-	
-	// math
-	bool feq(float a, float b);
-	// ... ?
-	
-	// basic graphics
-	void print3d(vec3 pos, string fmt, ...);
-	
-	// memory
-	void* alloc(int size);
-	void* realloc(void* ptr, int size);
-	void free(void* ptr);
-	string strdup(string str);
-	string strcat(string a, string b);
-	string strfmt(string fmt, ...);
-	
-	// i/o
-	swapCart()?
-]]
-
 -- API HELPER FUNCTIONS:
 
 -- getMem8() helper function for apiPrint2D()
@@ -598,50 +576,6 @@ local function apiCeil(vm: *EVM): boolean
 	return true
 end
 
-local function apiCheckCollision(vm: *EVM): boolean
-	-- signature:
-	-- int checkCollision(void* a, void* b);
-
-	local a_addr: uint32 = vm:getArgU(0)
-	local b_addr: uint32 = vm:getArgU(1)
-	local a_type: uint32
-	local b_type: uint32
-
-	if not getMem32(vm, a_addr, &a_type) then
-		return false
-	end
-
-	if not getMem32(vm, b_addr, &b_type) then
-		return false
-	end
-
-	if a_type >= ColType.COUNT or b_type >= ColType.COUNT then
-		vm.error = "attempt to call checkCollision() on invalid collision shape type(s)"
-		return false
-	end
-
-	local cfunc: CollisionFunction = collision_functions[a_type][b_type]
-	if cfunc == nilptr then
-		vm.error = string.format(
-			"no collision function for types `%s` and `%s`",
-			collision_type_names[a_type],
-			collision_type_names[b_type]
-		)
-		return false
-	end
-
-	local success: boolean
-	local collision: int32
-	success, collision = cfunc(vm, a_addr, b_addr)
-
-	if success then
-		vm:pushI(collision)
-		return true
-	else
-		return false
-	end
-end
-
 local function apiClear(vm: *EVM): boolean
 	-- signature:
 	-- void clear(int flags);
@@ -690,6 +624,50 @@ local function apiClearStencil(vm: *EVM): boolean
 	vm.gpu.render_state.clear_stencil = (@uint8)(stencil & 0xFF)
 
 	return true
+end
+
+local function apiCollide(vm: *EVM): boolean
+	-- signature:
+	-- int collide(void* a, void* b);
+
+	local a_addr: uint32 = vm:getArgU(0)
+	local b_addr: uint32 = vm:getArgU(1)
+	local a_type: uint32
+	local b_type: uint32
+
+	if not getMem32(vm, a_addr, &a_type) then
+		return false
+	end
+
+	if not getMem32(vm, b_addr, &b_type) then
+		return false
+	end
+
+	if a_type >= ColType.COUNT or b_type >= ColType.COUNT then
+		vm.error = "attempt to call collide() on invalid collision shape type(s)"
+		return false
+	end
+
+	local cfunc: CollisionFunction = collision_functions[a_type][b_type]
+	if cfunc == nilptr then
+		vm.error = string.format(
+			"no collision function for types `%s` and `%s`",
+			collision_type_names[a_type],
+			collision_type_names[b_type]
+		)
+		return false
+	end
+
+	local success: boolean
+	local collision: int32
+	success, collision = cfunc(vm, a_addr, b_addr)
+
+	if success then
+		vm:pushI(collision)
+		return true
+	else
+		return false
+	end
 end
 
 local function apiColorMask(vm: *EVM): boolean
@@ -1185,13 +1163,8 @@ local function apiLightingMode(vm: *EVM): boolean
 
 	local mode: uint32 = vm:getArgU(0)
 
-	if mode ~= 0 then
-		vm.gpu:lightingMode(true)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_LIGHTING_BIT
-	else
-		vm.gpu:lightingMode(false)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl & ~GPU_LIGHTING_BIT
-	end
+	-- note: lightingMode() updates the GPU render state
+	vm.gpu:lightingMode(mode ~= 0)
 
 	return true
 end
@@ -2548,6 +2521,11 @@ local function apiScissor(vm: *EVM): boolean
 	local h: int32 = vm:getArgI(3)
 	
 	vm.gpu:scissor(x, y, w, h)
+
+	util.pokeI(&vm.gpu.render_state.scissor_x0, x)
+	util.pokeI(&vm.gpu.render_state.scissor_y0, y)
+	util.pokeI(&vm.gpu.render_state.scissor_width0, w)
+	util.pokeI(&vm.gpu.render_state.scissor_height0, h)
 	
 	return true
 end
@@ -2884,6 +2862,94 @@ local function apiStopTracks(vm: *EVM): boolean
 			vm.soundchip:stopTrack(i)
 		end
 	end
+
+	return true
+end
+
+local function apiStrcat(vm: *EVM): boolean
+	-- signature:
+	-- string strcat(string a, string b);
+
+	local a: EVMString = vm:getArgStr(0)
+	local b: EVMString = vm:getArgStr(2)
+
+	-- verify strings
+	if (a.len == 0) or (a.data > MEMORY_MAX_ADDR) or
+		(b.len == 0) or (b.data > MEMORY_MAX_ADDR) then
+		vm.error = "attempt to concatenate invalid string(s)"
+		return false
+	end
+
+	local new_len: uint32 = a.len + b.len
+	local new_block: uint32 = vm:heapAlloc(new_len)
+	if new_block == MEMORY_NULL then
+		return MEMORY_NULL
+	end
+
+	-- copy a to new block
+	for i = 0, < a.len do
+		local byte: uint8 = vm:getMem8(a.data + i)
+		if not vm:setMem8(new_block + i, byte) then
+			vm.error = string.format("invalid byte write address 0x%08X", i)
+			return false
+		end
+	end
+
+	-- copy b to new block
+	for i = 0, < b.len do
+		local byte: uint8 = vm:getMem8(b.data + i)
+		if not vm:setMem8(new_block + a.len + i, byte) then
+			vm.error = string.format("invalid byte write address 0x%08X", i)
+			return false
+		end
+	end
+
+	vm:pushStr({new_len, new_block})
+
+	return true
+end
+
+local function apiStrdup(vm: *EVM): boolean
+	-- signature:
+	-- string strdup(string s);
+
+	local s: EVMString = vm:getArgStr(0)
+
+	-- verify string
+	if (s.len == 0) or (s.data > MEMORY_MAX_ADDR) then
+		vm.error = "attempt to duplicate invalid string"
+		return false
+	end
+
+	-- alloc() new block
+	local new_block: uint32 = vm:heapAlloc(s.len)
+	if new_block == MEMORY_NULL then
+		return MEMORY_NULL
+	end
+
+	-- copy string to new block
+	for i = 0, < s.len do
+		local byte: uint8 = vm:getMem8(s.data + i)
+		if not vm:setMem8(new_block + i, byte) then
+			vm.error = string.format("invalid byte write address 0x%08X", i)
+			return false
+		end
+	end
+
+	vm:pushStr({s.len, new_block})
+
+	return true
+end
+
+local function apiStrfmt(vm: *EVM): boolean
+	-- signature:
+	-- string strfmt(string fmt, ...);
+
+	local fmt: EVMString = vm:getArgStr(0)
+
+	-- ...
+
+	vm:pushStr({0, MEMORY_NULL})
 
 	return true
 end
@@ -3468,12 +3534,7 @@ local function apiViewport(vm: *EVM): boolean
 	local w: cint = (@cint)(vm:getArgI(2))
 	local h: cint = (@cint)(vm:getArgI(3))
 
-	w = math.clamp(w, 1, GPU_VSCREEN_W)
-	h = math.clamp(h, 1, GPU_VSCREEN_H)
-	x = math.clamp(x, 0, GPU_VSCREEN_W - w)
-	y = math.clamp(y, 0, GPU_VSCREEN_H - h)
-
-	vm.gpu:viewport(x, y, w, h)
+	vm.gpu:viewport(x, y, w, h, false)
 
 	util.pokeI(&vm.gpu.render_state.viewport_x0, x)
 	util.pokeI(&vm.gpu.render_state.viewport_y0, y)
@@ -4086,15 +4147,6 @@ function EVM:registerAPI(): void
 			func=apiCeil
 		},
         {
-			name="checkCollision",
-			type_info={EVMType.INT},
-			argdata={
-				{EVMType.VOID + EVMType.POINTER},
-				{EVMType.VOID + EVMType.POINTER}
-			},
-			func=apiCheckCollision
-		},
-        {
 			name="clear",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
@@ -4117,6 +4169,15 @@ function EVM:registerAPI(): void
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiClearStencil
+		},
+		{
+			name="collide",
+			type_info={EVMType.INT},
+			argdata={
+				{EVMType.VOID + EVMType.POINTER},
+				{EVMType.VOID + EVMType.POINTER}
+			},
+			func=apiCollide
 		},
         {
 			name="colorMask",
@@ -5048,6 +5109,21 @@ function EVM:registerAPI(): void
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiStopTracks
+		},
+		{
+			name="strcat",
+			type_info={EVMType.STRING, self.struct_string},
+			argdata={
+				{EVMType.STRING, self.struct_string},
+				{EVMType.STRING, self.struct_string}
+			},
+			func=apiStrcat
+		},
+		{
+			name="strdup",
+			type_info={EVMType.STRING, self.struct_string},
+			argdata={{EVMType.STRING, self.struct_string}},
+			func=apiStrdup
 		},
 		{
 			name="texture",

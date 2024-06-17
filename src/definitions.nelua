@@ -1126,6 +1126,8 @@ global GPU = @record {
 	prev_screen_y: cint,
 	prev_screen_w: cint,
 	prev_screen_h: cint,
+	system_viewport_w: cint,
+	system_viewport_h: cint,
 	is_fullscreen: boolean,
 	enable_flush: boolean -- when true, uploads matrices to shader and flushes render batch upon rlgl/raylib state change
 }

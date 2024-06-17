@@ -822,7 +822,7 @@ local function match(vm: *EVM, tk: uinteger): void
 	end
 end
 
-local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: uinteger): *FuncPointerInfo
+local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: uinteger, skip_id_lookup: boolean): *FuncPointerInfo
 	local result: *FuncPointerInfo = new(@FuncPointerInfo)
 
 	-- add argument types
@@ -882,7 +882,7 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
 			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, arg_type)
+			fptr_info = functionPointerType(vm, structref, arg_type, false)
 			structref = nilptr
 			arg_type = EVMType.FUNC_POINTER
 		end
@@ -911,6 +911,10 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		if vm.token == ','_u8 then
 			match(vm, ','_u8)
 		end
+	end
+
+	if skip_id_lookup then
+		vm.skip_next_id_lookup = true
 	end
 
 	match(vm, ')'_u8)
@@ -1140,20 +1144,54 @@ local function expression(vm: *EVM, level: integer): void
 		match(vm, '('_u8)
 
 		local target_struct: *Struct = target_info.structref
+		local colobj_id: uint8 = 0xFF -- value not mapped to any collision object type
+
+		if target_struct.name == "colpoint" then
+			colobj_id = 0
+		elseif target_struct.name == "colaabb" then
+			colobj_id = 1
+		elseif target_struct.name == "colsphere" then
+			colobj_id = 2
+		elseif target_struct.name == "colcylinder" then
+			colobj_id = 3
+		elseif target_struct.name == "coltriangle" then
+			colobj_id = 4
+		end
 
 		if vm.token == ')'_u8 then
 			match(vm, ')'_u8)
-			
-			vm:emitOp(Opcode.PUSH_ZERO_N)
-			vm:emit16(target_struct.size)
+
+			if colobj_id == 0xFF then
+				vm:emitOp(Opcode.PUSH_ZERO_N)
+				vm:emit16(target_struct.size)
+			else
+				vm:emitOp(Opcode.PUSH_CHAR)
+				vm:emit8(colobj_id)
+				vm:emitOp(Opcode.PUSH_ZERO_N)
+				vm:emit16(target_struct.size - 1)
+			end
 		else
 			local target_memberc: isize = #target_struct.members
 			local target_member_info: TypeInfo
 			local memberc: isize = 0
+			local target_offset: integer = 0
+
+			if colobj_id ~= 0xFF then
+				memberc = 1
+				target_offset = 1
+
+				vm:emitOp(Opcode.PUSH_CHAR)
+				vm:emit8(colobj_id)
+			end
 			
 			while vm.token ~= ')'_u8 do
 				if memberc + 1 > target_memberc then
-					vm.error = string.format("line %d:\ntoo many member values in initializer for struct type `%s`. expected %d", vm.line, target_struct.name, target_memberc)
+					vm.error = string.format(
+						"line %d:\ntoo many member values in initializer for struct type `%s`. expected %d",
+						vm.line,
+						target_struct.name,
+						target_memberc - target_offset
+					)
 					vm.compile_err = true
 					coroutine.yield()
 				else
@@ -1192,7 +1230,7 @@ local function expression(vm: *EVM, level: integer): void
 						vm.error = string.format(
 							"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
 							vm.line,
-							memberc + 1,
+							(memberc + 1) - target_offset,
 							target_struct.name,
 							getTypeName(target_member_info),
 							getTypeName(vm.expr_type)
@@ -1211,7 +1249,7 @@ local function expression(vm: *EVM, level: integer): void
 						vm.error = string.format(
 							"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
 							vm.line,
-							memberc + 1,
+							(memberc + 1) - target_offset,
 							target_struct.name,
 							getTypeName(target_member_info),
 							getTypeName(vm.expr_type)
@@ -1228,7 +1266,13 @@ local function expression(vm: *EVM, level: integer): void
 			end
 
 			if memberc < target_memberc then
-				vm.error = string.format("line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d", vm.line, target_struct.name, target_memberc, memberc)
+				vm.error = string.format(
+					"line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d",
+					vm.line,
+					target_struct.name,
+					target_memberc - target_offset,
+					memberc - target_offset
+				)
 				vm.compile_err = true
 				coroutine.yield()
 			end
@@ -1287,7 +1331,7 @@ local function expression(vm: *EVM, level: integer): void
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
 			match(vm, '('_u8)
-			target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id)
+			target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id, false)
 			target_info.structref = nilptr
 			target_info.type_id = EVMType.FUNC_POINTER
 		end
@@ -1808,7 +1852,7 @@ local function expression(vm: *EVM, level: integer): void
 			-- check for function pointer syntax
 			if vm.token == '('_u8 then
 				match(vm, '('_u8)
-				target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id)
+				target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id, false)
 				target_info.structref = nilptr
 				target_info.type_id = EVMType.FUNC_POINTER
 			end
@@ -1827,20 +1871,54 @@ local function expression(vm: *EVM, level: integer): void
 					match(vm, '{'_u8)
 
 					local target_struct: *Struct = target_info.structref
+					local colobj_id: uint8 = 0xFF -- value not mapped to any collision object type
+
+					if target_struct.name == "colpoint" then
+						colobj_id = 0
+					elseif target_struct.name == "colaabb" then
+						colobj_id = 1
+					elseif target_struct.name == "colsphere" then
+						colobj_id = 2
+					elseif target_struct.name == "colcylinder" then
+						colobj_id = 3
+					elseif target_struct.name == "coltriangle" then
+						colobj_id = 4
+					end
 
 					if vm.token == '}'_u8 then
 						match(vm, '}'_u8)
 						
-						vm:emitOp(Opcode.PUSH_ZERO_N)
-						vm:emit16(target_struct.size)
+						if colobj_id == 0xFF then
+							vm:emitOp(Opcode.PUSH_ZERO_N)
+							vm:emit16(target_struct.size)
+						else
+							vm:emitOp(Opcode.PUSH_CHAR)
+							vm:emit8(colobj_id)
+							vm:emitOp(Opcode.PUSH_ZERO_N)
+							vm:emit16(target_struct.size - 1)
+						end
 					else
 						local target_memberc: isize = #target_struct.members
 						local target_member_info: TypeInfo
 						local memberc: isize = 0
+						local target_offset: integer = 0
+
+						if colobj_id ~= 0xFF then
+							memberc = 1
+							target_offset = 1
+
+							vm:emitOp(Opcode.PUSH_CHAR)
+							vm:emit8(colobj_id)
+						end
 						
 						while vm.token ~= '}'_u8 do
 							if memberc + 1 > target_memberc then
-								vm.error = string.format("line %d:\ntoo many member values in initializer for struct type `%s`. expected %d", vm.line, target_struct.name, target_memberc)
+								vm.error = string.format(
+									"line %d:\ntoo many member values in initializer for struct type `%s`. expected %d",
+									vm.line,
+									target_struct.name,
+									target_memberc - target_offset
+								)
 								vm.compile_err = true
 								coroutine.yield()
 							else
@@ -1879,7 +1957,7 @@ local function expression(vm: *EVM, level: integer): void
 									vm.error = string.format(
 										"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
 										vm.line,
-										memberc + 1,
+										(memberc + 1) - target_offset,
 										target_struct.name,
 										getTypeName(target_member_info),
 										getTypeName(vm.expr_type)
@@ -1898,7 +1976,7 @@ local function expression(vm: *EVM, level: integer): void
 									vm.error = string.format(
 										"line %d:\ninvalid type for memeber value %d in initializer for struct type `%s`. expected `%s`, got `%s`",
 										vm.line,
-										memberc + 1,
+										(memberc + 1) - target_offset,
 										target_struct.name,
 										getTypeName(target_member_info),
 										getTypeName(vm.expr_type)
@@ -1915,7 +1993,13 @@ local function expression(vm: *EVM, level: integer): void
 						end
 		
 						if memberc < target_memberc then
-							vm.error = string.format("line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d", vm.line, target_struct.name, target_memberc, memberc)
+							vm.error = string.format(
+								"line %d:\ntoo few member values in initializer for struct type `%s`. expected %d, got %d",
+								vm.line,
+								target_struct.name,
+								(target_memberc) - target_offset,
+								(memberc) - target_offset
+							)
 							vm.compile_err = true
 							coroutine.yield()
 						end
@@ -3178,12 +3262,14 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emit16(vm.current_id.index)
 			end
 
+			id = vm.current_id
+
 			if vm.token == '('_u8 then
-				-- function pointer value call (pointer from array fetch)
+				-- function pointer value call (pointer from struct member dereference)
 				match(vm, '('_u8)
 
-				if vm.current_id.type_info.type_id ~= EVMType.FUNC_POINTER then
-					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(vm.current_id.type_info))
+				if id.type_info.type_id ~= EVMType.FUNC_POINTER then
+					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(id.type_info))
 					vm.compile_err = true
 					coroutine.yield()
 				end
@@ -3192,9 +3278,9 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emitOp(Opcode.SAVE_FPTR)
 
 				-- info needed for function call
-				local argdata: sequence(TypeInfo) = vm.current_id.type_info.fptr_info.argdata
-				local is_varargs: boolean = vm.current_id.type_info.fptr_info.is_varargs
-				local result_type: TypeInfo = vm.current_id.type_info.fptr_info.return_type
+				local argdata: sequence(TypeInfo) = id.type_info.fptr_info.argdata
+				local is_varargs: boolean = id.type_info.fptr_info.is_varargs
+				local result_type: TypeInfo = id.type_info.fptr_info.return_type
 				local target_argc: isize = #argdata
 				local target_info: TypeInfo
 				local argc: isize = 0
@@ -3420,12 +3506,14 @@ local function expression(vm: *EVM, level: integer): void
 				end
 			end
 
+			id = vm.current_id
+
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from struct member)
 				match(vm, '('_u8)
 
-				if vm.current_id.type_info.type_id ~= EVMType.FUNC_POINTER then
-					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(vm.current_id.type_info))
+				if id.type_info.type_id ~= EVMType.FUNC_POINTER then
+					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(id.type_info))
 					vm.compile_err = true
 					coroutine.yield()
 				end
@@ -3434,9 +3522,9 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emitOp(Opcode.SAVE_FPTR)
 
 				-- info needed for function call
-				local argdata: sequence(TypeInfo) = vm.current_id.type_info.fptr_info.argdata
-				local is_varargs: boolean = vm.current_id.type_info.fptr_info.is_varargs
-				local result_type: TypeInfo = vm.current_id.type_info.fptr_info.return_type
+				local argdata: sequence(TypeInfo) = id.type_info.fptr_info.argdata
+				local is_varargs: boolean = id.type_info.fptr_info.is_varargs
+				local result_type: TypeInfo = id.type_info.fptr_info.return_type
 				local target_argc: isize = #argdata
 				local target_info: TypeInfo
 				local argc: isize = 0
@@ -3820,7 +3908,7 @@ local function statement(vm: *EVM): void
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
 			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, var_type)
+			fptr_info = functionPointerType(vm, structref, var_type, false)
 			structref = nilptr
 			var_type = EVMType.FUNC_POINTER
 		end
@@ -4152,7 +4240,7 @@ local function statement(vm: *EVM): void
 				-- check for function pointer syntax
 				if vm.token == '('_u8 then
 					match(vm, '('_u8)
-					fptr_info = functionPointerType(vm, structref, var_type)
+					fptr_info = functionPointerType(vm, structref, var_type, false)
 					structref = nilptr
 					var_type = EVMType.FUNC_POINTER
 				end
@@ -4824,7 +4912,7 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
 			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, arg_type)
+			fptr_info = functionPointerType(vm, structref, arg_type, false)
 			structref = nilptr
 			arg_type = EVMType.FUNC_POINTER
 		end
@@ -4987,34 +5075,27 @@ local function structDeclaration(vm: *EVM): void
 		base_type = EVMType.INT
 		
 		if vm.token == Token.VOID then
-			vm.skip_next_id_lookup = true
 			match(vm, Token.VOID)
 			base_type = EVMType.VOID
 		elseif vm.token == Token.INT then
-			vm.skip_next_id_lookup = true
 			match(vm, Token.INT)
 		elseif vm.token == Token.FLOAT then
-			vm.skip_next_id_lookup = true
 			match(vm, Token.FLOAT)
 			base_type = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			member_structref = vm.struct_vec2
-			vm.skip_next_id_lookup = true
 			match(vm, Token.VEC2)
 			base_type = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			member_structref = vm.struct_vec3
-			vm.skip_next_id_lookup = true
 			match(vm, Token.VEC3)
 			base_type = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			member_structref = vm.current_id.type_info.structref
-			vm.skip_next_id_lookup = true
 			match(vm, Token.STRUCT_ID)
 			base_type = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			member_structref = vm.struct_string
-			vm.skip_next_id_lookup = true
 			match(vm, Token.STRING)
 			base_type = EVMType.STRING
 		else
@@ -5037,7 +5118,7 @@ local function structDeclaration(vm: *EVM): void
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
 			match(vm, '('_u8)
-			member_fptr_info = functionPointerType(vm, member_structref, member_type)
+			member_fptr_info = functionPointerType(vm, member_structref, member_type, true)
 			member_structref = nilptr
 			member_type = EVMType.FUNC_POINTER
 		end
@@ -5161,7 +5242,7 @@ local function globalDeclaration(vm: *EVM): void
 	-- check for function pointer syntax
 	if vm.token == '('_u8 then
 		match(vm, '('_u8)
-		fptr_info = functionPointerType(vm, structref, var_type)
+		fptr_info = functionPointerType(vm, structref, var_type, false)
 		structref = nilptr
 		var_type = EVMType.FUNC_POINTER
 	end

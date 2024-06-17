@@ -434,13 +434,15 @@ function GPU:camera2D(id: integer): void
 		}
 		raycam.rotation = util.peekF(&cam2d.rotation0)
 		raycam.zoom = util.peekF(&cam2d.zoom0)
+
+		viewport_w = math.clamp(util.peekI(&self.render_state.viewport_width0), 1, GPU_VSCREEN_W)
+		viewport_h = math.clamp(util.peekI(&self.render_state.viewport_height0), 1, GPU_VSCREEN_H)
 	else
 		raycam = self.system_cam2d
-	end
 
-	-- get viewport w+h
-	viewport_w = GPU_VSCREEN_W --util.peekI(&self.render_state.viewport_width0)
-	viewport_h = GPU_VSCREEN_H --util.peekI(&self.render_state.viewport_height0)
+		viewport_w = self.system_viewport_w
+		viewport_h = self.system_viewport_h
+	end
 
 	-- this takes parts of raylib's beginTextureMode() and beginMode2D().
 	-- we want a 2D orthographic projection, with a modelview configured to the 2D camera
@@ -491,16 +493,19 @@ function GPU:camera3D(id: int32): void
 		}
 		fov = util.peekF(&cam3d.fov0)
 		projection = util.peekI(&cam3d.projection0)
+
+		viewport_w = math.clamp(util.peekI(&self.render_state.viewport_width0), 1, GPU_VSCREEN_W)
+		viewport_h = math.clamp(util.peekI(&self.render_state.viewport_height0), 1, GPU_VSCREEN_H)
 	else
 		position = self.system_cam3d.position
 		target = self.system_cam3d.target
 		up = self.system_cam3d.up
 		fov = self.system_cam3d.fovy
 		projection = self.system_cam3d.projection
-	end
 
-	viewport_w = GPU_VSCREEN_W --util.peekI(&self.render_state.viewport_width0)
-	viewport_h = GPU_VSCREEN_H --util.peekI(&self.render_state.viewport_height0)
+		viewport_w = self.system_viewport_w
+		viewport_h = self.system_viewport_h
+	end
 
 	-- copy Raylib's BeginMode3D(),
 	-- but we don't need to push a new projection matrix
@@ -610,6 +615,11 @@ function GPU:vertex2D(v: rl.vector2): void
 end
 
 function GPU:vertNormal(v: rl.vector3): void
+	-- only set vertex "normal" if lighting is enabled
+	if self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT == 0 then
+		return
+	end
+
 	rlgl.color3f(v.x, v.y, v.z)
 end
 
@@ -618,6 +628,11 @@ function GPU:vertUV(v: rl.vector2): void
 end
 
 function GPU:vertColor(col: uint32): void
+	-- only set vertex color if lighting is disabled
+	if self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT ~= 0 then
+		return
+	end
+
 	local r: cuchar = (@cuchar)(col >> 24)
 	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
 	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
@@ -973,6 +988,10 @@ function GPU:drawObj(id: uint32): void
 	-- get mode
 	local mode: uint32 = ((@uint32)(entry_ptr[0]) << 24) | ((@uint32)(entry_ptr[1]) << 16) | ((@uint32)(entry_ptr[2]) << 8) | (@uint32)(entry_ptr[3])
 
+	if mode > GPU_QUADS then -- don't try to render collision data
+		return
+	end
+
 	-- get start
 	local start: uint32 = ((@uint32)(entry_ptr[4]) << 24) | ((@uint32)(entry_ptr[5]) << 16) | ((@uint32)(entry_ptr[6]) << 8) | (@uint32)(entry_ptr[7])
 
@@ -1013,29 +1032,32 @@ function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
 	rl.setShaderValue(self.gfx_shader, self.tex_h_loc, &ch, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
-function GPU:viewport(x: cint, y: cint, w: cint, h: cint): void
+function GPU:viewport(x: cint, y: cint, w: cint, h: cint, set_system: boolean): void
 	--self:flush()?
 
+	w = math.clamp(w, 1, GPU_VSCREEN_W)
+	h = math.clamp(h, 1, GPU_VSCREEN_H)
+	x = math.clamp(x, 0, GPU_VSCREEN_W - w)
+	y = math.clamp(y, 0, GPU_VSCREEN_H - h)
+
 	y = GPU_VSCREEN_H - (y + h) -- flip y
-
-	util.pokeI(&self.render_state.viewport_x0, x)
-	util.pokeI(&self.render_state.viewport_y0, y)
-	util.pokeI(&self.render_state.viewport_width0, w)
-	util.pokeI(&self.render_state.viewport_height0, h)
-
 	rlgl.viewport(x, y, w, h)
+
+	if set_system then
+		self.system_viewport_w = w
+		self.system_viewport_h = h
+	end
 end
 
 function GPU:scissor(x: cint, y: cint, w: cint, h: cint): void
 	--self:flush()?
 
+	w = math.clamp(w, 1, GPU_VSCREEN_W)
+	h = math.clamp(h, 1, GPU_VSCREEN_H)
+	x = math.clamp(x, 0, GPU_VSCREEN_W - w)
+	y = math.clamp(y, 0, GPU_VSCREEN_H - h)
+	
 	y = GPU_VSCREEN_H - (y + h) -- flip y
-
-	util.pokeI(&self.render_state.scissor_x0, x)
-	util.pokeI(&self.render_state.scissor_y0, y)
-	util.pokeI(&self.render_state.scissor_width0, w)
-	util.pokeI(&self.render_state.scissor_height0, h)
-
 	rlgl.scissor(x, y, w, h)
 end
 
@@ -1180,9 +1202,14 @@ end
 function GPU:lightingMode(enabled: boolean): void
 	--self:flush()
 
-	--self.lighting_mode = mode
 	local cmode: cint = enabled and 1 or 0
 	rl.setShaderValue(self.gfx_shader, self.lighting_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
+
+	if enabled then
+		self.render_state.flags_tmccs0fl = self.render_state.flags_tmccs0fl | GPU_LIGHTING_BIT
+	else
+		self.render_state.flags_tmccs0fl = self.render_state.flags_tmccs0fl & ~GPU_LIGHTING_BIT
+	end
 end
 
 function GPU:ambientFactor(factor: float32): void
@@ -1640,7 +1667,8 @@ function GPU:enableRenderState(): void
 		util.peekI(&self.render_state.viewport_x0),
 		util.peekI(&self.render_state.viewport_y0),
 		util.peekI(&self.render_state.viewport_width0),
-		util.peekI(&self.render_state.viewport_height0)
+		util.peekI(&self.render_state.viewport_height0),
+		false
 	)
 	self:scissorMode(self.render_state.flags_00sttbbb & GPU_SCISSOR_BIT ~= 0)
 	self:scissor(
@@ -1690,7 +1718,7 @@ function GPU:disableRenderState(): void
 
 	self:textureMode(2)
 	self:texture(0, 0, 64, 64)
-	self:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
+	self:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H, true)
 	self:scissorMode(false)
 
 	self.enable_flush = true
@@ -1930,6 +1958,9 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 		fovy=45,
 		projection=rl.cameraProjection.PERSPECTIVE
 	}
+
+	self.system_viewport_w = GPU_VSCREEN_W
+	self.system_viewport_h = GPU_VSCREEN_H
 
 	self:setBankPointers(
 		GPUBank.TEXBANK0,

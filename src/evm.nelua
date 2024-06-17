@@ -2431,8 +2431,6 @@ function EVM:callHook(hook: integer): boolean
 		self:popCallframe()
 
 		if self.current_hook == Hook.DRAW then
-			self.gpu:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
-			self.gpu:scissor(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H)
 			rlgl.drawRenderBatchActive()
 		end
 

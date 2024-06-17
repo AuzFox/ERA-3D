@@ -33,11 +33,11 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "camera2D",
     "camera3D",
     "ceil",
-    "checkCollision",
     "clear",
     "clearColor",
     "clearDepth",
     "clearStencil",
+    "collide",
     "colorMask",
     "cos",
     "cullMode",
@@ -165,6 +165,9 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "stencilOp",
     "stopTrack",
     "stopTracks",
+    "strcat",
+    "strdup",
+    "strfmt",
     "texture",
     "textureMode",
     "time",
@@ -408,7 +411,7 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "unmuteTracks"
   },
   { -- PHYSICS
-    "checkCollision",
+    "collide",
     "getRaycastNormal",
     "getRaycastPoint",
     "raycast"
@@ -427,7 +430,10 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "peek32",
     "poke8",
     "poke32",
-    "realloc"
+    "realloc",
+    "strcat",
+    "strdup",
+    "strfmt"
   },
   { -- MISC
     "time",
@@ -586,7 +592,6 @@ docs.doc_strings["ceil"] =
     returns x rounded upward to the nearest whole number.
     this function always rounds toward positive infinity.
 ]]
-docs.doc_strings["checkCollision"] = [[]]
 docs.doc_strings["clear"] =
 [[
   void clear(int flags)
@@ -604,6 +609,7 @@ docs.doc_strings["clear"] =
 docs.doc_strings["clearColor"] = [[]]
 docs.doc_strings["clearDepth"] = [[]]
 docs.doc_strings["clearStencil"] = [[]]
+docs.doc_strings["collide"] = [[]]
 docs.doc_strings["colorMask"] = [[]]
 docs.doc_strings["cos"] =
 [[
@@ -1493,6 +1499,9 @@ docs.doc_strings["stencilMode"] = [[]]
 docs.doc_strings["stencilOp"] = [[]]
 docs.doc_strings["stopTrack"] = [[]]
 docs.doc_strings["stopTracks"] = [[]]
+docs.doc_strings["strcat"] = [[]]
+docs.doc_strings["strdup"] = [[]]
+docs.doc_strings["strfmt"] = [[]]
 docs.doc_strings["texture"] =
 [[
   void texture(int x, int y, int width, int height)
