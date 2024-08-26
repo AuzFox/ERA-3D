@@ -102,7 +102,7 @@ function input.refresh(screen_x: int32, screen_y: int32, screen_w: int32, screen
     input.middle_click_held = rl.isMouseButtonDown(2)
     input.middle_click_released = rl.isMouseButtonReleased(2)
 
-    local scale: int32 = screen_w /// 480
+    local scale: int32 = screen_w /// 640
     local prev_mouse_x: int32 = input.mouse_x
     local prev_mouse_y: int32 = input.mouse_y
     input.mouse_x = (rl.getMouseX() - screen_x) /// scale

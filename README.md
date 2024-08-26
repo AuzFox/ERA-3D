@@ -7,7 +7,7 @@ ERA-3D is a 3D fantasy console inspired by 5th generation video game consoles su
 
 ## Specifications
 ```
-Display:   480x360
+Display:   640x360
 Memory:    8MiB general purpose RAM, memory-mapped assets (textures, audio, models)
 Textures:  1024x1024 RGBA32 texture atlas, maximum individual texture size of 256x256
 Rendering: Maximum of ~16k triangles per frame*, OpenGL 1.1 fixed-function style graphics API
@@ -23,21 +23,7 @@ Check out the [ERA-3D Docs](https://auzfox.github.io/ERA-3D-Docs/)!
 
 ## Building
 
-To build ERA-3D, you must first [install Nelua](https://nelua.io/installing/).
-Follow the installation instructions on the Nelua website.
-
-Once Nelua is installed, install the following C libraries:
-- [raylib v5.0](https://github.com/raysan5/raylib)
-- [BlipKit](https://github.com/detomon/BlipKit)
-- [zip](https://github.com/kuba--/zip)
-
-Once all dependencies are installed, clone this repository and run the following commands:
-```
-cd .../ERA-3D/
-nelua --release src/main.nelua -o era-3d
-```
-You should now have the `era-3d` executable.
-move `era-3d` and the `assets` directory to the desired install location.
+For building instructions, see the [Building](https://auzfox.github.io/ERA-3D-Docs/building/) page of the documentation.
 
 ## Libraries Used
 - [raylib v5.0](https://github.com/raysan5/raylib)

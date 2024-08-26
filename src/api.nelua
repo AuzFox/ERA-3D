@@ -2658,7 +2658,7 @@ end
 
 local function apiSprite2D(vm: *EVM): boolean
 	-- signature:
-	-- void sprite2D(int srcx, int srcy, int srcw, int srch, int destx, int desy);
+	-- void sprite2D(int srcx, int srcy, int srcw, int srch, int destx, int desty);
 
 	local srcx: int32 = vm:getArgI(0)
 	local srcy: int32 = vm:getArgI(1)
@@ -3601,62 +3601,66 @@ function EVM:registerBuiltins(): void
 	self.struct_vec3 = sid
 
 	--[[ define matrix struct, translatable to raylib's matrix type
-		matrix:
-			m0: float32, m4: float32, m8: float32, m12: float32,  first row
-			m1: float32, m5: float32, m9: float32, m13: float32,  second row
-			m2: float32, m6: float32, m10: float32, m14: float32, third row
-			m3: float32, m7: float32, m11: float32, m15: float32  fourth row
+		matrix basics: https://www.opengl-tutorial.org/beginners-tutorials/tutorial-3-matrices/
+		matrix faq: https://www.opengl-tutorial.org/assets/faq_quaternions/index.html
+
+		struct matrix {
+			float scale_x;  float shear_yx; float shear_zx; float translate_x;
+			float shear_xy; float scale_y;  float shear_zy; float translate_y;
+			float shear_xz; float shear_yz; float scale_z;  float translate_z;
+			float wx;       float wy;       float wz;       float ww;
+		};
 	]]
 	local matrix_struct: *Struct = new(@Struct)
-	local matrix_m0: *Identifier = new(@Identifier)
-	local matrix_m4: *Identifier = new(@Identifier)
-	local matrix_m8: *Identifier = new(@Identifier)
-	local matrix_m12: *Identifier = new(@Identifier)
-	local matrix_m1: *Identifier = new(@Identifier)
-	local matrix_m5: *Identifier = new(@Identifier)
-	local matrix_m9: *Identifier = new(@Identifier)
-	local matrix_m13: *Identifier = new(@Identifier)
-	local matrix_m2: *Identifier = new(@Identifier)
-	local matrix_m6: *Identifier = new(@Identifier)
-	local matrix_m10: *Identifier = new(@Identifier)
-	local matrix_m14: *Identifier = new(@Identifier)
-	local matrix_m3: *Identifier = new(@Identifier)
-	local matrix_m7: *Identifier = new(@Identifier)
-	local matrix_m11: *Identifier = new(@Identifier)
-	local matrix_m15: *Identifier = new(@Identifier)
+	local matrix_scale_x: *Identifier = new(@Identifier)
+	local matrix_shear_yx: *Identifier = new(@Identifier)
+	local matrix_shear_zx: *Identifier = new(@Identifier)
+	local matrix_translate_x: *Identifier = new(@Identifier)
+	local matrix_shear_xy: *Identifier = new(@Identifier)
+	local matrix_scale_y: *Identifier = new(@Identifier)
+	local matrix_shear_zy: *Identifier = new(@Identifier)
+	local matrix_translate_y: *Identifier = new(@Identifier)
+	local matrix_shear_xz: *Identifier = new(@Identifier)
+	local matrix_shear_yz: *Identifier = new(@Identifier)
+	local matrix_scale_z: *Identifier = new(@Identifier)
+	local matrix_translate_z: *Identifier = new(@Identifier)
+	local matrix_wx: *Identifier = new(@Identifier)
+	local matrix_wy: *Identifier = new(@Identifier)
+	local matrix_wz: *Identifier = new(@Identifier)
+	local matrix_ww: *Identifier = new(@Identifier)
 	matrix_struct.name = "matrix"
-	$matrix_m0  = {name="m0" , index=0 , type_info={EVMType.FLOAT}}
-	$matrix_m4  = {name="m4" , index=1 , type_info={EVMType.FLOAT}}
-	$matrix_m8  = {name="m8" , index=2 , type_info={EVMType.FLOAT}}
-	$matrix_m12 = {name="m12", index=3 , type_info={EVMType.FLOAT}}
-	$matrix_m1  = {name="m1" , index=4 , type_info={EVMType.FLOAT}}
-	$matrix_m5  = {name="m5" , index=5 , type_info={EVMType.FLOAT}}
-	$matrix_m9  = {name="m9" , index=6 , type_info={EVMType.FLOAT}}
-	$matrix_m13 = {name="m13", index=7 , type_info={EVMType.FLOAT}}
-	$matrix_m2  = {name="m2" , index=8 , type_info={EVMType.FLOAT}}
-	$matrix_m6  = {name="m6" , index=9 , type_info={EVMType.FLOAT}}
-	$matrix_m10 = {name="m10", index=10, type_info={EVMType.FLOAT}}
-	$matrix_m14 = {name="m14", index=11, type_info={EVMType.FLOAT}}
-	$matrix_m3  = {name="m3" , index=12, type_info={EVMType.FLOAT}}
-	$matrix_m7  = {name="m7" , index=13, type_info={EVMType.FLOAT}}
-	$matrix_m11 = {name="m11", index=14, type_info={EVMType.FLOAT}}
-	$matrix_m15 = {name="m15", index=16, type_info={EVMType.FLOAT}}
-	matrix_struct:addMember(matrix_m0)
-	matrix_struct:addMember(matrix_m4)
-	matrix_struct:addMember(matrix_m8)
-	matrix_struct:addMember(matrix_m12)
-	matrix_struct:addMember(matrix_m1)
-	matrix_struct:addMember(matrix_m5)
-	matrix_struct:addMember(matrix_m9)
-	matrix_struct:addMember(matrix_m13)
-	matrix_struct:addMember(matrix_m2)
-	matrix_struct:addMember(matrix_m6)
-	matrix_struct:addMember(matrix_m10)
-	matrix_struct:addMember(matrix_m14)
-	matrix_struct:addMember(matrix_m3)
-	matrix_struct:addMember(matrix_m7)
-	matrix_struct:addMember(matrix_m11)
-	matrix_struct:addMember(matrix_m15)
+	$matrix_scale_x     = {name="scale_x"    , index=0 , type_info={EVMType.FLOAT}}
+	$matrix_shear_yx    = {name="shear_yx"   , index=1 , type_info={EVMType.FLOAT}}
+	$matrix_shear_zx    = {name="shear_zx"   , index=2 , type_info={EVMType.FLOAT}}
+	$matrix_translate_x = {name="translate_x", index=3 , type_info={EVMType.FLOAT}}
+	$matrix_shear_xy    = {name="shear_xy"   , index=4 , type_info={EVMType.FLOAT}}
+	$matrix_scale_y     = {name="scale_y"    , index=5 , type_info={EVMType.FLOAT}}
+	$matrix_shear_zy    = {name="shear_zy"   , index=6 , type_info={EVMType.FLOAT}}
+	$matrix_translate_y = {name="translate_y", index=7 , type_info={EVMType.FLOAT}}
+	$matrix_shear_xz    = {name="shear_xz"   , index=8 , type_info={EVMType.FLOAT}}
+	$matrix_shear_yz    = {name="shear_yz"   , index=9 , type_info={EVMType.FLOAT}}
+	$matrix_scale_z     = {name="scale_z"    , index=10, type_info={EVMType.FLOAT}}
+	$matrix_translate_z = {name="translate_z", index=11, type_info={EVMType.FLOAT}}
+	$matrix_wx          = {name="wx"         , index=12, type_info={EVMType.FLOAT}}
+	$matrix_wy          = {name="wy"         , index=13, type_info={EVMType.FLOAT}}
+	$matrix_wz          = {name="wz"         , index=14, type_info={EVMType.FLOAT}}
+	$matrix_ww          = {name="ww"         , index=15, type_info={EVMType.FLOAT}}
+	matrix_struct:addMember(matrix_scale_x)
+	matrix_struct:addMember(matrix_shear_yx)
+	matrix_struct:addMember(matrix_shear_zx)
+	matrix_struct:addMember(matrix_translate_x)
+	matrix_struct:addMember(matrix_shear_xy)
+	matrix_struct:addMember(matrix_scale_y)
+	matrix_struct:addMember(matrix_shear_zy)
+	matrix_struct:addMember(matrix_translate_y)
+	matrix_struct:addMember(matrix_shear_xz)
+	matrix_struct:addMember(matrix_shear_yz)
+	matrix_struct:addMember(matrix_scale_z)
+	matrix_struct:addMember(matrix_translate_z)
+	matrix_struct:addMember(matrix_wx)
+	matrix_struct:addMember(matrix_wy)
+	matrix_struct:addMember(matrix_wz)
+	matrix_struct:addMember(matrix_ww)
 	matrix_struct.is_complete = true
 
 	-- define string struct

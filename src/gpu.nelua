@@ -244,6 +244,69 @@ void main()
 }
 ]]
 
+local GPU_CRT_FRAG_SRC <const> = [[
+#version 330
+
+// built-in values:
+in vec2 fragTexCoord; // uv
+in vec4 fragColor;    // vertex color
+
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// custom uniforms:
+uniform float time;
+uniform float brightness;
+uniform float blur;
+uniform float noise;
+uniform int scanlines;
+
+float makeScanlines(float x, float repeat, float modValue)
+{
+	x = floor(x * repeat);
+	return mod(x, modValue);
+}
+
+// black magic pseudorandom function
+float random(vec2 uv) {
+	return fract(sin(dot(uv, vec2(12.9898f, 78.233f))) * 43758.5453f);
+}
+
+void main()
+{
+	// get pixel and apply brightness
+	vec2 screenUV = fragTexCoord;
+	vec3 color = texture(texture0, screenUV).rgb * (1.0f - brightness * 0.5);
+
+	// apply blur (ghosting)
+	vec2 pixelSize = vec2(1.0f / 640.0f, 1.0f / 360.0f);
+	color += texture(texture0, screenUV - vec2(pixelSize.x * blur, 0.0f)).rgb; // left pixel
+	color += texture(texture0, screenUV + vec2(pixelSize.x * blur, 0.0f)).rgb; // right pixel
+	color *= brightness * 0.5f; // prevent over-exposure
+
+	// apply white noise
+	vec2 noisePixel = vec2(floor((screenUV.x / pixelSize.x) / 3.0f) * 3.0f, screenUV.y) - sin(fragTexCoord.yx * 3.14159f);
+	float whiteNoise = random(
+		noisePixel + vec2(
+			sin(time * 3.14159f / 4.0f),
+			cos(time * 3.14159f / 8.0f)
+		)
+	);
+	color = mix(color, vec3(whiteNoise), noise);
+
+	// apply scanlines
+	if (scanlines == 1) {
+		float lines = makeScanlines(fragTexCoord.y, 360.0f, 2.0f);
+		color *= 0.8f + (lines * 0.2f); // if on a scanline, set the color to 80%
+	}
+
+	// return final color
+	finalColor = vec4(color, 1.0f);
+}
+]]
+
 local face_types: []cuint = {
 	GL_FRONT,
 	GL_BACK,
@@ -1476,27 +1539,6 @@ function GPU:resetMatrixStack(): void
 	end
 end
 
-function GPU:toggleFullscreen(): void
-	-- "fullscreen" in this context just means a borderless window that matches the size of the monitor
-	if not self.is_fullscreen then
-		local pos: rl.vector2 = rl.getWindowPosition()
-		self.prev_screen_x = (@cint)(pos.x)
-		self.prev_screen_y = (@cint)(pos.y)
-		self.prev_screen_w = rl.getScreenWidth()
-		self.prev_screen_h = rl.getScreenHeight()
-
-		local monitor: cint = rl.getCurrentMonitor()
-		rl.setWindowPosition(0, 0)
-		rl.setWindowSize(rl.getMonitorWidth(monitor), rl.getMonitorHeight(monitor))
-	else
-		rl.setWindowSize(self.prev_screen_w, self.prev_screen_h)
-		rl.setWindowPosition(self.prev_screen_x, self.prev_screen_y)
-	end
-
-	rl.toggleBorderlessWindowed()
-	self.is_fullscreen = not self.is_fullscreen
-end
-
 function GPU:refreshScreenSize(): void
 	local render_w: int32 = (@int32)(rl.getRenderWidth())
 	local render_h: int32 = (@int32)(rl.getRenderHeight())
@@ -1586,6 +1628,18 @@ function GPU:updateConfigFlags(): void
 	end
 
 	rl.setWindowState(flags)--| rl.configFlags.WINDOW_RESIZABLE)
+end
+
+function GPU:updateCRTShader(): void
+	local crt_brightness: float32 = 1.0
+	local crt_blur: float32 = core.config.crt_blur and 0.265 or 0.0
+	local crt_noise: float32 = core.config.crt_noise and 0.1 or 0.0
+	local crt_scanlines: cint = core.config.crt_scanlines and 1 or 0
+
+	rl.setShaderValue(self.crt_shader, self.crt_brightness_loc, &crt_brightness, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.crt_shader, self.crt_blur_loc, &crt_blur, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.crt_shader, self.crt_noise_loc, &crt_noise, rl.shaderUniformDataType.UNIFORM_FLOAT)
+	rl.setShaderValue(self.crt_shader, self.crt_scanlines_loc, &crt_scanlines, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
 function GPU:enableRenderState(): void
@@ -1918,6 +1972,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.gfx_ui_texture = rl.loadTexture("assets/ui.png")
 	
 	self.gfx_shader = rl.loadShaderFromMemory(GPU_VERT_SRC, GPU_FRAG_SRC)
+	self.crt_shader = rl.loadShaderFromMemory(nilptr, GPU_CRT_FRAG_SRC)
 	
 	self.mat_model_loc = rl.getShaderLocation(self.gfx_shader, "matModel")
 	self.mat_normal_loc = rl.getShaderLocation(self.gfx_shader, "matNormal")
@@ -1933,6 +1988,13 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.lighting_mode_loc = rl.getShaderLocation(self.gfx_shader, "lightingMode")
 	self.ambient_factor_loc = rl.getShaderLocation(self.gfx_shader, "ambientFactor")
 	self.ambient_color_loc = rl.getShaderLocation(self.gfx_shader, "ambientColor")
+	self.crt_time_loc = rl.getShaderLocation(self.crt_shader, "time")
+	self.crt_brightness_loc = rl.getShaderLocation(self.crt_shader, "brightness")
+	self.crt_blur_loc = rl.getShaderLocation(self.crt_shader, "blur")
+	self.crt_noise_loc = rl.getShaderLocation(self.crt_shader, "noise")
+	self.crt_scanlines_loc = rl.getShaderLocation(self.crt_shader, "scanlines")
+
+	self:updateCRTShader()
 
 	-- get light attribute locs
 	for i = 0, < GPU_LIGHTS_COUNT do
@@ -1978,6 +2040,7 @@ end
 
 function GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
+	rl.unloadShader(self.crt_shader)
 	rl.unloadTexture(self.gfx_ui_texture)
 	rl.unloadTexture(self.gfx_texture)
 

@@ -163,10 +163,10 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:colorMask(0b0001)
+    vm.gpu:colorMask(GPU_COLOR_MASK_A)
 	vm.gpu:clearColor(0)
 	vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(0b1111)
+	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
     vm.gpu:camera2D(-1)
 
     --vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((32 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT TEXTURE")

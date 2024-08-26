@@ -525,7 +525,7 @@ function SoundChip:init(sysmem_ptr: *[0]uint8, wavbank_ptr: *[0]BKFrame, seqbank
 	BKContextInit(&self.bk_context, 2, SOUNDCHIP_SAMPLE_RATE)
 
 	BKDataInit(&self.bk_data)
-	self.bk_data_flags = BK_16_BIT_SIGNED
+	self.bk_data_flags = BK_16_BIT_SIGNED -- TODO: remove bk_data_flags as it is never actually used
 	if isLittleEndian() then
 		self.bk_data_flags = self.bk_data_flags | BK_LITTLE_ENDIAN
 	else

@@ -2507,7 +2507,7 @@ end
 function EVM:saveCart(filename: string): boolean
 	local close_entry: boolean = false
 	local err: cint
-	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'w'_u8, &err)
+	local zip: *zip_t = zip_openwitherror(filename, 3, 'w'_u8, &err)
 	if zip == nilptr then
 		self.error = string.format("failed to save cart: (error code %d)", err)
 		return false
@@ -2705,7 +2705,7 @@ end
 function EVM:loadCart(filename: string): boolean
 	local close_entry: boolean = false
 	local err: cint
-	local zip: *zip_t = zip_openwitherror(filename, ZIP_DEFAULT_COMPRESSION_LEVEL, 'r'_u8, &err)
+	local zip: *zip_t = zip_openwitherror(filename, 0, 'r'_u8, &err)
 	if zip == nilptr then
 		self.error = string.format("failed to load cart: (error code %d)", err)
 		return false

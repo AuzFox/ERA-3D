@@ -40,10 +40,10 @@ function StateMachine:updateDialog(): void
 end
 
 function StateMachine:drawDialog(): void
-    self.vm_ptr.gpu:colorMask(0b0001)
+    self.vm_ptr.gpu:colorMask(GPU_COLOR_MASK_A)
 	self.vm_ptr.gpu:clearColor(0)
 	self.vm_ptr.gpu:clear(GPU_CLEAR_ALL)
-	self.vm_ptr.gpu:colorMask(0b1111)
+	self.vm_ptr.gpu:colorMask(GPU_COLOR_MASK_ALL)
 	self.vm_ptr.gpu:camera2D(-1)
 
     if core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then

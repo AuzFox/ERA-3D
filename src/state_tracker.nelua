@@ -164,10 +164,10 @@ local function getNoteText(note: uint8): string
 end
 
 local function drawPatterns(sm: *StateMachine, vm: *EVM): void
-    local start_track: int32 = util.midI(0, data.track - 1, 4)
+    local start_track: int32 = 0
     local start_pattern_y: int32 = 126
 
-    for i = 0, < 4 do
+    for i = 0, < 8 do
         local start_pattern_x: int32 = 6 + (i * 13 * 6)
 
         local selcol: uint32 = (data.current_editor == Editor.PATTERN and data.track == start_track + i) and core.cursor_color or GPU_GRAY
@@ -809,10 +809,10 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
 end
 
 global function stateTrackerDraw(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:colorMask(0b0001)
+    vm.gpu:colorMask(GPU_COLOR_MASK_A)
 	vm.gpu:clearColor(0)
 	vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(0b1111)
+	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
     vm.gpu:camera2D(-1)
 
     -- TODO: disable editing when in empty phrase/instrument
