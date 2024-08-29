@@ -450,7 +450,7 @@ function EVM:setMem8(addr: uint32, val: uint8): boolean
 		return false
 	elseif addr <= MEMORY_MEMCARD_MAX_ADDR then
 		if self.memcard_initialized then
-			self.soundchip.seqmem[addr - MEMORY_SEQMEM_START_ADDR] = val
+			self.memcard[addr - MEMORY_MEMCARD_START_ADDR] = val
 		else
 			return false
 		end
@@ -1488,9 +1488,9 @@ function EVM:run(max_cycles: uint64): boolean
 			case Opcode.PUSH_VEC3_RIGHT then
 				self:pushV3({1.0, 0.0, 0.0})
 			case Opcode.PUSH_VEC3_FORWARD then
-				self:pushV3({0.0, -1.0, 0.0})
+				self:pushV3({0.0, 0.0, -1.0})
 			case Opcode.PUSH_VEC3_BACK then
-				self:pushV3({0.0, 1.0, 0.0})
+				self:pushV3({0.0, 0.0, 1.0})
 			case Opcode.PUSH_STRING then
 				index = self:next16()
 				local addr: uint32 = self:next32()
