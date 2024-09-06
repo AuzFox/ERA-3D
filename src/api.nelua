@@ -2263,6 +2263,28 @@ local function apiPrint2D(vm: *EVM): boolean
 							vm.error = string.format("invalid format specifier `%%v%c`", c)
 							return false
 					end
+				case 's'_u8 then
+					if vm.cf.vargc < 2 then
+						vm.error = "insufficient vararg bytes for format specifier `%s`"
+						return false
+					end
+
+					arg_addr = vargv(vm, 2)
+					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
+
+					for j = 0, < arg_val0.u do
+						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
+							return true
+						end
+
+						local sc: uint8
+						if not getMem8(vm, arg_val1.u + j, &sc) then return false end
+
+						vm.gpu:drawChar2D(sc, &cur_x, y, ray_col)
+					end
+
+					i = i + 1
 				case '%'_u8 then
 					vm.gpu:drawChar2D(c, &cur_x, y, ray_col)
 				else

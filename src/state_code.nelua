@@ -254,6 +254,8 @@ local function nextToken(vm: *EVM): void
 								sh_token_val = '\\'_u8
 							case 'n'_u8 then -- \n
 								sh_token_val = '\n'_u8
+							case '"'_u8 then -- \"
+								sh_token_val = '\"'_u8
 							else
 								-- invalid escape sequence
 								sh_token_val = '\\'_u8

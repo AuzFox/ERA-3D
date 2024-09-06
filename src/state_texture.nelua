@@ -1,18 +1,18 @@
 require("statemachine")
 
-local CANVAS_X <comptime> = 6 + 128 + 6
-local CANVAS_Y <comptime> = 18
-local CANVAS_W <comptime> = 320
-local CANVAS_H <comptime> = 320
-local TEXBANK_LIST_Y <comptime> = 146
+local CANVAS_X <comptime> = 192
+local CANVAS_Y <comptime> = 9
+local CANVAS_W <comptime> = GPU_VSCREEN_W - CANVAS_X
+local CANVAS_H <comptime> = GPU_VSCREEN_H - CANVAS_Y
+local TEXBANK_LIST_Y <comptime> = 18
+local COORDS_X <comptime> = 6
+local COORDS_Y <comptime> = 45
 local TOOL_LIST_Y <comptime> = 182
 local PALETTE_Y <comptime> = 218
 
-local PanType = @enum {
-    NONE = 0,
-    CANVAS,
-    MINIMAP
-}
+local MAX_ZOOM <comptime> = 12
+local MAX_TEX_X <comptime> = CANVAS_X + (CANVAS_W /// 2)
+local MAX_TEX_Y <comptime> = CANVAS_Y + (CANVAS_H /// 2)
 
 local ToolType = @enum {
     PENCIL = 0,
@@ -23,26 +23,110 @@ local ToolType = @enum {
     SELECT,
 }
 
-local primary_color: uint32 = GPU_LBLUE
+local zoom_table: []int32 = {
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+}
+
+local primary_color: uint32 = GPU_BLACK
 local secondary_color: uint32 = 0
-local edit_window_x: uint32 = 0
-local edit_window_y: uint32 = 0
-local edit_window_size: uint32 = 64
-local pixel_size_x: int32
-local pixel_size_y: int32
+
+local tex_x: int32 = CANVAS_X
+local tex_y: int32 = CANVAS_Y
+local zoom_level: int32
+local pixel_size: int32
 local edit_pixel_x: int32
 local edit_pixel_y: int32
-local pan_window_start_x: int32
-local pan_window_start_y: int32
-local pan_type: uint8 = PanType.NONE
-local mouse_in_canvas: boolean = false
-local mouse_in_minimap: boolean = false
-local mouse_in_texbank_list: boolean = false
-local mouse_in_tool_list: boolean = false
-local mouse_in_color_palette: boolean = false
+local prev_edit_pixel_x: int32
+local prev_edit_pixel_y: int32
+local pan_start_x: int32
+local pan_start_y: int32
+
+local panning: boolean
+local mouse_in_canvas: boolean
+local mouse_in_texbank_list: boolean
+local mouse_in_tool_list: boolean
+local mouse_in_color_palette: boolean
 local current_tool: integer = ToolType.PENCIL
 
+local function drawCanvas(vm: *EVM): void
+    -- border
+    vm.gpu:drawRect2D(CANVAS_X - 1, CANVAS_Y, 1, CANVAS_H, GPU_GRAY)
+
+    -- checkered background
+    vm.gpu:scissorMode(true)
+    vm.gpu:scissor(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H)
+
+    local checker_dest_x: float32 = (@float32)(tex_x)
+    local checker_dest_y: float32 = (@float32)(tex_y)
+    local checker_dest_size: float32 = (@float32)(1024 * pixel_size)
+    local checker_tex_scale: float32 = (@float32)(1024 /// 32)
+    
+    vm.gpu:beginMeshWithTexture(GPU_QUADS, vm.gpu.gfx_checker_texture.id)
+        vm.gpu:vertColor(0xFFFFFFFF)
+        vm.gpu:vertUV({0.0, 0.0})
+        vm.gpu:vertex2D({checker_dest_x, checker_dest_y})
+        vm.gpu:vertUV({0.0, checker_tex_scale})
+        vm.gpu:vertex2D({checker_dest_x, checker_dest_y + checker_dest_size})
+        vm.gpu:vertUV({checker_tex_scale, checker_tex_scale})
+        vm.gpu:vertex2D({checker_dest_x + checker_dest_size, checker_dest_y + checker_dest_size})
+        vm.gpu:vertUV({checker_tex_scale, 0.0})
+        vm.gpu:vertex2D({checker_dest_x + checker_dest_size, checker_dest_y})
+    vm.gpu:endMeshWithTexture()
+    
+    -- texture
+    vm.gpu:drawGFXTexture(
+        0, 0,
+        1024, 1024,
+        tex_x,
+        tex_y,
+        1024 * pixel_size,
+        1024 * pixel_size
+    )
+    
+    -- grid
+    if pixel_size > 2 then
+        local grid_step: int32 = 16 * pixel_size
+        local tile_start_x: int32 = math.max(
+            tex_x,
+            (CANVAS_X /// grid_step) * grid_step + util.wrapI(tex_x, 0, grid_step)
+        )
+        local tile_start_y: int32 = math.max(
+            tex_y,
+            (CANVAS_Y /// grid_step) * grid_step + util.wrapI(tex_y, 0, grid_step)
+        )
+        local max_x: int32 = math.min(tex_x + 1024 * pixel_size, GPU_VSCREEN_W)
+        local max_y: int32 = math.min(tex_y + 1024 * pixel_size, GPU_VSCREEN_H)
+
+        for x = tile_start_x, <= max_x, grid_step do
+            vm.gpu:drawRect2D(x, tex_y, 1, 1024 * pixel_size, 0x0000FFFF)
+        end
+
+        for y = tile_start_y, <= max_y, grid_step do
+            vm.gpu:drawRect2D(tex_x, y, 1024 * pixel_size, 1, 0x0000FFFF)
+        end
+    end
+
+    vm.gpu:scissorMode(false)
+end
+
+local function drawCoords(vm: *EVM): void
+    vm.gpu:printCString2D(COORDS_X, COORDS_Y, GPU_WHITE, rl.textFormat("X:%-4d Y:%-4d", (@cint)(edit_pixel_x), (@cint)(edit_pixel_y)))
+end
+
 global function stateTextureInit(sm: *StateMachine, vm: *EVM): void
+    pixel_size = zoom_table[0]
 end
 
 global function stateTextureEnter(sm: *StateMachine, vm: *EVM): void
@@ -60,38 +144,51 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
     end
 
     mouse_in_canvas = input.isMouseInRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H)
-    mouse_in_minimap = input.isMouseInRect(6, CANVAS_Y, 128, 128)
     mouse_in_texbank_list = input.isMouseInRect(60, TEXBANK_LIST_Y, 48, 9)
     mouse_in_tool_list = input.isMouseInRect(6, TOOL_LIST_Y, 48, 36)
     mouse_in_color_palette = input.isMouseInRect(6, PALETTE_Y, 96, 18)
     
-    if pan_type == PanType.NONE and input.mouse_wheel_y > 0 and edit_window_size > 8 then
-        -- when zooming in/out, the 4 pixels in the middle of the edit window should remain in the middle of the new edit window
-        local middle_pixel_x: int32 = edit_window_x + (edit_window_size /// 2)
-        local middle_pixel_y: int32 = edit_window_y + (edit_window_size /// 2)
+    if mouse_in_canvas and not panning then
+        -- when zooming in/out, try to keep the mouse on the same texture pixel
+        if (input.mouse_wheel_y > 0) and (zoom_level < MAX_ZOOM) then
+            -- zoom in
+            zoom_level = zoom_level + 1
+            
+            local new_pixel_size: int32 = zoom_table[zoom_level]
+            local new_edit_pixel_x: int32 = (input.mouse_x - tex_x) // pixel_size
+            local new_edit_pixel_y: int32 = (input.mouse_y - tex_y) // pixel_size
+            local new_tex_x: int32 = (-(new_edit_pixel_x * new_pixel_size)) + input.mouse_x
+            local new_tex_y: int32 = (-(new_edit_pixel_y * new_pixel_size)) + input.mouse_y
 
-        edit_window_size = edit_window_size /// 2
-        edit_window_x = util.midI(0, middle_pixel_x - (edit_window_size /// 2), 1024 - edit_window_size)
-        edit_window_y = util.midI(0, middle_pixel_y - (edit_window_size /// 2), 1024 - edit_window_size)
-    elseif pan_type == PanType.NONE and input.mouse_wheel_y < 0 and edit_window_size < 64 then
-        local middle_pixel_x: int32 = edit_window_x + (edit_window_size /// 2)
-        local middle_pixel_y: int32 = edit_window_y + (edit_window_size /// 2)
+            tex_x = util.midI(CANVAS_X - (1024 * new_pixel_size) + (CANVAS_W /// 2), new_tex_x, MAX_TEX_X)
+            tex_y = util.midI(CANVAS_Y - (1024 * new_pixel_size) + (CANVAS_H /// 2), new_tex_y, MAX_TEX_Y)
+            pixel_size = new_pixel_size
+        elseif (input.mouse_wheel_y < 0) and (zoom_level > 0) then
+            -- zoom out
+            zoom_level = zoom_level - 1
 
-        edit_window_size = edit_window_size * 2
-        edit_window_x = util.midI(0, middle_pixel_x - (edit_window_size /// 2), 1024 - edit_window_size)
-        edit_window_y = util.midI(0, middle_pixel_y - (edit_window_size /// 2), 1024 - edit_window_size)
+            local new_pixel_size: int32 = zoom_table[zoom_level]
+            local new_edit_pixel_x: int32 = (input.mouse_x - tex_x) // pixel_size
+            local new_edit_pixel_y: int32 = (input.mouse_y - tex_y) // pixel_size
+            local new_tex_x: int32 = (-(new_edit_pixel_x * new_pixel_size)) + input.mouse_x
+            local new_tex_y: int32 = (-(new_edit_pixel_y * new_pixel_size)) + input.mouse_y
+            
+            tex_x = util.midI(CANVAS_X - (1024 * new_pixel_size) + (CANVAS_W /// 2), new_tex_x, MAX_TEX_X)
+            tex_y = util.midI(CANVAS_Y - (1024 * new_pixel_size) + (CANVAS_H /// 2), new_tex_y, MAX_TEX_Y)
+            pixel_size = new_pixel_size
+        end
     end
 
-    pixel_size_x = CANVAS_W /// edit_window_size
-    pixel_size_y = CANVAS_H /// edit_window_size
-    edit_pixel_x = edit_window_x + ((input.mouse_x - CANVAS_X) /// pixel_size_x)
-    edit_pixel_y = edit_window_y + ((input.mouse_y - CANVAS_Y) /// pixel_size_y)
+    prev_edit_pixel_x = edit_pixel_x
+    prev_edit_pixel_y = edit_pixel_y
+    edit_pixel_x = (input.mouse_x - tex_x) // pixel_size
+    edit_pixel_y = (input.mouse_y - tex_y) // pixel_size
 
     if rl.isKeyPressed(rl.keyboardKey.X) then
         primary_color, secondary_color = secondary_color, primary_color
     end
 
-    if mouse_in_texbank_list and pan_type == PanType.NONE and input.left_clicked then
+    if mouse_in_texbank_list and (not panning) and input.left_clicked then
         vm.gpu:setBankPointers(
             GPUBank.TEXBANK0 + ((input.mouse_x - 60) /// 12),
             vm.gpu.current_objbank
@@ -99,32 +196,37 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
         vm.gpu.update_tex = true
     end
 
-    -- click in canvas
-    if mouse_in_canvas and pan_type == PanType.NONE then
+    if mouse_in_canvas and not panning then
         if input.middle_clicked then
-            pan_window_start_x = edit_window_x
-            pan_window_start_y = edit_window_y
-            pan_type = PanType.CANVAS
+            pan_start_x = tex_x
+            pan_start_y = tex_y
+            panning = true
         end
 
         if input.left_click_held then
             if input.is_alt_down then
                 primary_color = vm.gpu:getPixel(edit_pixel_x, edit_pixel_y)
             else
-                vm.gpu:setPixel(edit_pixel_x, edit_pixel_y, primary_color)
+                vm.gpu:pixelLine(
+                    prev_edit_pixel_x,
+                    prev_edit_pixel_y,
+                    edit_pixel_x,
+                    edit_pixel_y,
+                    primary_color
+                )
             end
         elseif input.right_click_held then
             if input.is_alt_down then
                 secondary_color = vm.gpu:getPixel(edit_pixel_x, edit_pixel_y)
             else
-                vm.gpu:setPixel(edit_pixel_x, edit_pixel_y, secondary_color)
+                vm.gpu:pixelLine(
+                    prev_edit_pixel_x,
+                    prev_edit_pixel_y,
+                    edit_pixel_x,
+                    edit_pixel_y,
+                    secondary_color
+                )
             end
-        end
-    elseif mouse_in_minimap and pan_type == PanType.NONE then
-        if input.left_clicked or input.middle_clicked then
-            pan_window_start_x = edit_window_x
-            pan_window_start_y = edit_window_y
-            pan_type = PanType.MINIMAP
         end
     elseif mouse_in_color_palette then
         -- copy color from palette
@@ -141,24 +243,13 @@ global function stateTextureUpdate(sm: *StateMachine, vm: *EVM): void
         end
     end
 
-    switch pan_type do
-        case PanType.CANVAS then
-            if input.middle_click_released then
-                pan_type = PanType.NONE
-            elseif input.middle_dragging then
-                edit_window_x = util.midI(0, pan_window_start_x - (input.middle_drag_x /// pixel_size_x), 1024 - edit_window_size)
-                edit_window_y = util.midI(0, pan_window_start_y - (input.middle_drag_y /// pixel_size_y), 1024 - edit_window_size)
-            end
-        case PanType.MINIMAP then
-            if input.left_click_released or input.middle_click_released then
-                pan_type = PanType.NONE
-            elseif input.left_dragging then
-                edit_window_x = util.midI(0, pan_window_start_x - input.left_drag_x, 1024 - edit_window_size)
-                edit_window_y = util.midI(0, pan_window_start_y - input.left_drag_y, 1024 - edit_window_size)
-            elseif input.middle_dragging then
-                edit_window_x = util.midI(0, pan_window_start_x - input.middle_drag_x, 1024 - edit_window_size)
-                edit_window_y = util.midI(0, pan_window_start_y - input.middle_drag_y, 1024 - edit_window_size)
-            end
+    if panning then
+        if input.middle_click_released then
+            panning = false
+        elseif input.middle_dragging then
+            tex_x = util.midI(CANVAS_X - (1024 * pixel_size) + (CANVAS_W /// 2), pan_start_x + input.middle_drag_x, MAX_TEX_X)
+            tex_y = util.midI(CANVAS_Y - (1024 * pixel_size) + (CANVAS_H /// 2), pan_start_y + input.middle_drag_y, MAX_TEX_Y)
+        end
     end
 end
 
@@ -169,35 +260,10 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
 	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
     vm.gpu:camera2D(-1)
 
-    --vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((32 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT TEXTURE")
+    drawCanvas(vm)
 
-    -- minimap
-    local minimap_x: int32 = util.midI(0, edit_window_x - ((128 - edit_window_size) /// 2), 1024 - 128)
-    local minimap_y: int32 = util.midI(0, edit_window_y - ((128 - edit_window_size) /// 2), 1024 - 128)
-    local minimap_window_x: int32 = (6 + (edit_window_x - minimap_x)) - 1
-    local minimap_window_y: int32 = (CANVAS_Y + (edit_window_y - minimap_y)) - 1
-    vm.gpu:drawGFXTexture(minimap_x, minimap_y, 128, 128, 6, CANVAS_Y, 128, 128)
-    vm.gpu:drawRectLines2D(minimap_window_x, minimap_window_y, edit_window_size + 2, edit_window_size + 2, core.cursor_color)
-
-    -- canvas
-    local i: uint32 = 0
-    for y = 0, < 8 do
-        for x = 0, < 8 do
-            vm.gpu:drawRect2D(CANVAS_X + (x * 40), CANVAS_Y + (y * 40), 40, 40, (i & 1 == 0) and GPU_GRAY or GPU_LGRAY)
-            i = i + 1
-        end
-        i = i + 1
-    end
-    
-    vm.gpu:drawGFXTexture(edit_window_x, edit_window_y, edit_window_size, edit_window_size, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H)
-    
-    --for i = 0, < 8 do
-    --    vm.gpu:drawRect2D(CANVAS_X + (i * 40), CANVAS_Y, 1, CANVAS_H, GPU_BLUE)
-    --    vm.gpu:drawRect2D(CANVAS_X, CANVAS_Y + (i * 40), CANVAS_W, 1, GPU_BLUE)
-    --end
-
-    -- status
-    local text_y: int32 = 9 + 128 + 9
+    -- TEXBANK
+    local text_y: int32 = TEXBANK_LIST_Y
     vm.gpu:print2D(6, text_y, GPU_WHITE, "TEXBANK:")
     local bank_x: int32 = 60
     for i = 0, <= 3 do
@@ -212,7 +278,7 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     text_y = text_y + 9
     
     -- primary color
-    vm.gpu:print2D( 6, text_y, GPU_WHITE, "COLOR 1:")
+    vm.gpu:print2D(6, text_y, GPU_WHITE, "COLOR 1:")
     vm.gpu:printHexByte2D((9 * 6) +  6, text_y, GPU_RED, (@uint8)(primary_color >> 24))
     vm.gpu:printHexByte2D((9 * 6) + 18, text_y, GPU_GREEN, (@uint8)((primary_color >> 16) & 0xFF))
     vm.gpu:printHexByte2D((9 * 6) + 30, text_y, GPU_BLUE, (@uint8)((primary_color >> 8) & 0xFF))
@@ -229,12 +295,8 @@ global function stateTextureDraw(sm: *StateMachine, vm: *EVM): void
     vm.gpu:drawRect2D(    (9 * 6) + 60, text_y, 18, 7, secondary_color)
     text_y = text_y + 9
     
-    -- x/y
     if mouse_in_canvas then
-        vm.gpu:print2D(6, text_y, GPU_WHITE, "X:")
-        vm.gpu:printInt2D(18, text_y, GPU_WHITE, edit_pixel_x, nilptr)
-        vm.gpu:print2D(48, text_y, GPU_WHITE, "Y:")
-        vm.gpu:printInt2D(60, text_y, GPU_WHITE, edit_pixel_y, nilptr)
+        drawCoords(vm)
     end
 
     -- tool list

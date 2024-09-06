@@ -577,6 +577,8 @@ local function next(vm: *EVM): void
 								vm.token_val = '\\'_u8
 							case 'n'_u8 then -- \n
 								vm.token_val = '\n'_u8
+							case '"'_u8 then -- \""
+								vm.token_val = '\"'_u8
 							else
 								vm.error = string.format(
 									"line %d:\ninvalid escape sequence '\\%c' in string",

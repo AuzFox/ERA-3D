@@ -122,6 +122,7 @@ global MEMORY_NULL <comptime> = 0xFFFFFFFF
 global GPU_ALPHA_BLACK <comptime> = 0x00000000
 global GPU_ALPHA_WHITE <comptime> = 0xFFFFFF00
 global GPU_ALPHA_GRAY  <comptime> = 0x808080C0
+global GPU_ALPHA_DGRAY <comptime> = 0x484848C0
 global GPU_BLACK       <comptime> = 0x000000FF
 global GPU_LGRAY       <comptime> = 0xC3C3C3FF
 global GPU_GRAY        <comptime> = 0x808080FF
@@ -1076,6 +1077,7 @@ global GPU = @record {
 	gfx_shader: rl.shader,
 	crt_shader: rl.shader,
 	gfx_ui_texture: rl.texture, -- texture containing the default font and some UI icons
+	gfx_checker_texture: rl.texture, -- texture containing a 32x32 checkerboard pattern
 	gfx_rendertexture_index: uinteger,
 	texbank_ptr: *[0]rl.color,
 	objbank_ptr: *[0]IntFloat,

@@ -628,10 +628,35 @@ function GPU:beginMesh(mode: uint32): void
 	rlgl.begin(mode)
 end
 
+function GPU:beginMeshWithTexture(mode: uint32, tex_id: cint): void
+	switch mode do
+		case GPU_LINES then
+			self.triangle_mode = false
+			mode = rlgl.LINES
+		case GPU_TRIANGLES then
+			self.triangle_mode = true
+			self.triangle_vert_index = 0
+			mode = rlgl.QUADS
+		case GPU_QUADS then
+			self.triangle_mode = false
+			mode = rlgl.QUADS
+	end
+
+	rlgl.setTexture(tex_id)
+	
+	rlgl.begin(mode)
+end
+
 function GPU:endMesh(): void
 	rlgl.ending()
 
 	rl.endShaderMode()
+end
+
+function GPU:endMeshWithTexture(): void
+	rlgl.ending()
+
+	rlgl.setTexture(0)
 end
 
 function GPU:matrixMode(mode: uint32): void
@@ -1390,6 +1415,62 @@ function GPU:getPixel(x: int32, y: int32): uint32
 	return (r << 24) | (g << 16) | (b << 8) | a
 end
 
+function GPU:pixelLine(x: int32, y: int32, x2: int32, y2: int32, color: uint32): void
+	local w: int32 = x2 - x
+	local h: int32 = y2 - y
+	local dx1: int32 = 0
+	local dy1: int32 = 0
+	local dx2: int32 = 0
+	local dy2: int32 = 0
+
+	if w < 0 then
+		dx1 = -1
+	elseif w > 0 then
+		dx1 = 1
+	end
+	if h < 0 then
+		dy1 = -1
+	elseif h > 0 then
+		dy1 = 1
+	end
+	if w < 0 then
+		dx2 = -1
+	elseif w > 0 then
+		dx2 = 1
+	end
+	
+	local longest: int32 = math.abs(w)
+	local shortest: int32 = math.abs(h)
+	if not (longest > shortest) then
+		longest = math.abs(h)
+		shortest = math.abs(w)
+
+		if h < 0 then
+			dy2 = -1
+		elseif h > 0 then
+			dy2 = 1
+		end
+
+		dx2 = 0
+	end
+
+	local numerator: int32 = longest >> 1
+	for i = 0, <= longest do
+		self:setPixel(x, y, color)
+
+		numerator = numerator + shortest
+
+		if not (numerator < longest) then
+			numerator = numerator - longest
+			x = x + dx1
+			y = y + dy1
+		else
+			x = x + dx2
+			y = y + dy2
+		end
+	end
+end
+
 function GPU:loadTexBank(bank: uint8): void
 	local src: *[0]rl.color = &self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank]
 	memory.copy(&self.texmem, src, MEMORY_TEXMEM_SIZE_BYTES)
@@ -1970,6 +2051,10 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	rl.unloadImage(img)
 
 	self.gfx_ui_texture = rl.loadTexture("assets/ui.png")
+
+	self.gfx_checker_texture = rl.loadTexture("assets/checker.png")
+	rlgl.textureParameters(self.gfx_checker_texture.id, rlgl.TEXTURE_WRAP_S, rlgl.TEXTURE_WRAP_REPEAT)
+    rlgl.textureParameters(self.gfx_checker_texture.id, rlgl.TEXTURE_WRAP_T, rlgl.TEXTURE_WRAP_REPEAT)
 	
 	self.gfx_shader = rl.loadShaderFromMemory(GPU_VERT_SRC, GPU_FRAG_SRC)
 	self.crt_shader = rl.loadShaderFromMemory(nilptr, GPU_CRT_FRAG_SRC)
@@ -2036,12 +2121,15 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self:fogMode(false)
 	self:lightingMode(false)
 	self:ambientFactor(0.0)
+
+	self.enable_flush = true
 end
 
 function GPU:cleanup(): void
 	rl.unloadShader(self.gfx_shader)
 	rl.unloadShader(self.crt_shader)
 	rl.unloadTexture(self.gfx_ui_texture)
+	rl.unloadTexture(self.gfx_checker_texture)
 	rl.unloadTexture(self.gfx_texture)
 
 	for i = 0, < RenderTexture.COUNT do
