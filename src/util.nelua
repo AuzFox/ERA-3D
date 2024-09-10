@@ -151,3 +151,40 @@ function util.pokeI(ptr: *[0]uint8, x: int32): void
 	ptr[2] = (@uint8)((intf.u & 0x0000FF00) >> 8)
 	ptr[3] = (@uint8)(intf.u & 0x000000FF)
 end
+
+-- create a wrapper for mkdir() on linux and _mkdir() on windows
+-- taken from fs.nelua from nelua batteries (https://github.com/edubart/nelua-batteries)
+
+## if ccinfo.is_windows then
+	local function win_mkdir(path: cstring): cint <cimport'_mkdir',cinclude'<direct.h>'> end
+## else
+	local S_IRUSR: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IWUSR: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IXUSR: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IRGRP: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IWGRP: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IXGRP: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IROTH: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IWOTH: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local S_IXOTH: cuint <cimport,cinclude'<sys/stat.h>',const>
+	local function linux_mkdir(path: cstring, mode: cuint): cint <cimport 'mkdir',cinclude'<sys/stat.h>'> end
+## end
+
+local function strerror(errnum: cint): cstring <cimport,cinclude'<string.h>'> end
+local errno: cint <cimport,cinclude'<errno.h>'>
+
+local function result_from_errno(ok: boolean): (boolean, string, integer)
+	if not ok then
+	  return false, strerror(errno), errno
+	end
+	return true, (@string){}, 0
+  end
+
+function util.mkdir(path: string): (boolean, string, integer)
+	## if ccinfo.is_windows then
+		return result_from_errno(win_mkdir(path) == 0)
+	## else
+		local mode: cuint = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IXOTH
+		return result_from_errno(linux_mkdir(path, mode) == 0)
+	## end
+end

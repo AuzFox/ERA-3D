@@ -1,27 +1,52 @@
-require("definitions")
+require("gui")
 
 function StateMachine:initState(): void
-    self.state_ptr.init(self, self.vm_ptr)
+    self.state_ptr.init()
 end
 
 function StateMachine:updateState(): void
-    self.state_ptr.update(self, self.vm_ptr)
+    self.state_ptr.update()
 end
 
 function StateMachine:drawState(): void
-    self.state_ptr.draw(self, self.vm_ptr)
+    self.state_ptr.draw()
 end
 
 function StateMachine:back(): void
     self.queued_state = self.prev_state
 end
 
-function StateMachine:init(vm: *EVM): void
-    self.vm_ptr = vm
+function StateMachine:updateDialog(): void
+    self.dialog_ptr.update()
+end
 
+function StateMachine:drawDialog(): void
+    gpu:colorMask(GPU_COLOR_MASK_A)
+	gpu:clearColor(0)
+	gpu:clear(GPU_CLEAR_ALL)
+	gpu:colorMask(GPU_COLOR_MASK_ALL)
+	gpu:camera2D(-1)
+
+    if core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
+        local final_size_w: float32 = (@float32)(GPU_VSCREEN_W)
+        local final_size_h: float32 = (@float32)(GPU_VSCREEN_H - 9)
+
+        gpu:drawRectLines2D(
+            GPU_VSCREEN_HALF_W - (@int32)((final_size_w * core.dialog_size) / 2),
+            GPU_VSCREEN_HALF_H + 9 - (@int32)((final_size_h * core.dialog_size) / 2),
+            (@int32)(final_size_w * core.dialog_size),
+            (@int32)(final_size_h * core.dialog_size),
+            GPU_GRAY
+        )
+    else
+        self.dialog_ptr.draw()
+    end
+end
+
+function StateMachine:init(): void
     for i = 0, < StateID.COUNT do
         local st: *State = &self.states[i]
-        st.init(self, vm)
+        st.init()
     end
     
     self.state_id = StateID.CODE -- start with code state
@@ -29,41 +54,10 @@ function StateMachine:init(vm: *EVM): void
     self.queued_state = StateID.STATE_SAME
     self.prev_state = self.state_id
 
-    self.state_ptr.enter(self, vm)
+    self.state_ptr.enter()
 
     self.dialog_id = DialogID.NONE
     self.queued_dialog = -1
-end
-
-function StateMachine:updateDialog(): void
-    self.dialog_ptr.update(self, self.vm_ptr)
-end
-
-function StateMachine:drawDialog(): void
-    self.vm_ptr.gpu:colorMask(GPU_COLOR_MASK_A)
-	self.vm_ptr.gpu:clearColor(0)
-	self.vm_ptr.gpu:clear(GPU_CLEAR_ALL)
-	self.vm_ptr.gpu:colorMask(GPU_COLOR_MASK_ALL)
-	self.vm_ptr.gpu:camera2D(-1)
-
-    if core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
-        local final_size_w: float32 = (@float32)(GPU_VSCREEN_W - 8)
-        local final_size_h: float32 = (@float32)(GPU_VSCREEN_H - 34)
-
-        self.vm_ptr.gpu:drawRectLines2D(
-            GPU_VSCREEN_HALF_W - (@int32)((final_size_w * core.dialog_size) / 2),
-            GPU_VSCREEN_HALF_H - (@int32)((final_size_h * core.dialog_size) / 2),
-            (@int32)(final_size_w * core.dialog_size),
-            (@int32)(final_size_h * core.dialog_size),
-            GPU_GRAY
-        )
-    else
-        if self.dialog_id ~= DialogID.SAVE_CART then
-            self.vm_ptr.gpu:drawRectLines2D(4, 16, GPU_VSCREEN_W - 8, GPU_VSCREEN_H - 32, core.cursor_color)
-        end
-
-        self.dialog_ptr.draw(self, self.vm_ptr)
-    end
 end
 
 function StateMachine:update(): void
@@ -83,10 +77,11 @@ function StateMachine:update(): void
         self.dialog_id = self.queued_dialog
         if self.dialog_id ~= DialogID.NONE then
             self.dialog_ptr = &self.dialogs[self.dialog_id]
+            self.dialog_ptr.reset()
         end
         self.queued_dialog = -1
     elseif self.queued_state ~= StateID.STATE_SAME then
-        self.state_ptr.exit(self, self.vm_ptr)
+        self.state_ptr.exit()
         
         self.prev_state = self.state_id
 
@@ -120,46 +115,16 @@ function StateMachine:update(): void
         
         self.state_ptr = &self.states[self.state_id]
 
-        self.state_ptr.enter(self, self.vm_ptr)
+        self.state_ptr.enter()
         
         self.queued_state = StateID.STATE_SAME
     end
 end
 
-function StateMachine:resetFileBrowser(start_path: string, mode: integer): void
-    core.dialog_step = DialogStep.FILE_BROWSER
-    core.browser_mode = mode
-    if mode == FileBrowserMode.SAVE then
-        for i = 0, < 65 do
-            core.file_name[i] = '\0'_u8
-        end
-        core.dialog_val0 = 0 -- filename cursor position
-        core.browser_input_mode = FileBrowserInputMode.SET_FILENAME
-    else
-        core.browser_input_mode = FileBrowserInputMode.SELECT_FILE_OR_DIR
-    end
-
-    if core.has_loaded_paths then
-        rl.unloadDirectoryFiles(core.file_paths)
-        core.has_loaded_paths = false
-    end
-
-    core.current_browser_path = start_path
-	core.file_paths = rl.loadDirectoryFiles(start_path)
-	core.has_loaded_paths = true
-    core.browser_index = 0
-    core.browser_last_clicked_index = -1
-    core.browser_double_click_timer = 0.0
-end
-
 function StateMachine:cleanup(): void
     for i = 0, < StateID.COUNT do
         local st: *State = &self.states[i]
-        st.cleanup(self, self.vm_ptr)
-    end
-
-    if core.has_loaded_paths then
-        rl.unloadDirectoryFiles(core.file_paths)
+        st.cleanup()
     end
 
     if core.has_loaded_image then

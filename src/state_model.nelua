@@ -1,33 +1,74 @@
 require("statemachine")
 
-global function stateModelInit(sm: *StateMachine, vm: *EVM): void
+local load_model_filters: []cstring = {
+    "*.obj",
+    "*.gltf",
+    "*.glb"
+}
+
+global function stateModelInit(): void
 end
 
-global function stateModelEnter(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setRenderTexture(RenderTexture.MODEL)
+global function stateModelEnter(): void
+    gpu:setRenderTexture(RenderTexture.MODEL)
 end
 
-global function stateModelExit(sm: *StateMachine, vm: *EVM): void
+global function stateModelExit(): void
 end
 
-global function stateModelUpdate(sm: *StateMachine, vm: *EVM): void
+global function stateModelUpdate(): void
     if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
-        sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
-        sm.queued_dialog = DialogID.IMPORT_MODEL
+        local model_load_path: cstring = tinyfd.openFileDialog(
+			"Load Model",
+			core.user_directory,
+			#load_model_filters,
+			&load_model_filters,
+			nilptr,
+			false
+		)
+
+		if model_load_path ~= nilptr then
+			local file_path: string = (@string)(model_load_path)
+			
+			core.model_to_import = rl.loadModel(model_load_path)
+
+            if not rl.isModelReady(core.model_to_import) then
+                core:log(LogEntryType.HOST_ERROR, "failed to open model file", true)
+                core.has_loaded_model = false
+                return
+            end
+            
+            core.model_vertex_count = 0
+            for i = 0, < core.model_to_import.meshCount do
+                local mesh: rl.mesh = (@*[0]rl.mesh)(core.model_to_import.meshes)[i]
+                core.model_vertex_count = core.model_vertex_count + (@uint32)(mesh.vertexCount)
+            end
+
+            if core.model_vertex_count > (65536 /// 2) * 3 then
+                core:log(LogEntryType.HOST_ERROR, "failed to load model: file is too large", true)
+                rl.unloadModel(core.model_to_import)
+                core.has_loaded_model = false
+                return
+            end
+
+            core.has_loaded_model = true
+            statemachine.queued_dialog = DialogID.MODEL_CONFIG
+		end
+
         return
     end
 end
 
-global function stateModelDraw(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:colorMask(GPU_COLOR_MASK_A)
-	vm.gpu:clearColor(0)
-	vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
-	vm.gpu:camera2D(-1)
+global function stateModelDraw(): void
+    gpu:colorMask(GPU_COLOR_MASK_A)
+	gpu:clearColor(0)
+	gpu:clear(GPU_CLEAR_ALL)
+	gpu:colorMask(GPU_COLOR_MASK_ALL)
+	gpu:camera2D(-1)
 
-    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((35 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 9, GPU_WHITE, "// TODO: MODEL EDITOR STUFF HERE...")
-    vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((30 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT MODEL")
+    gpu:print2D((GPU_VSCREEN_W /// 2) - ((35 * 6) /// 2), (GPU_VSCREEN_H /// 2) - 9, GPU_WHITE, "// TODO: MODEL EDITOR STUFF HERE...")
+    gpu:print2D((GPU_VSCREEN_W /// 2) - ((30 * 6) /// 2), GPU_VSCREEN_H /// 2, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT MODEL")
 end
 
-global function stateModelCleanup(sm: *StateMachine, vm: *EVM): void
+global function stateModelCleanup(): void
 end

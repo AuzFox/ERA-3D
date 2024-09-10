@@ -1,0 +1,362 @@
+require("statemachine")
+
+local MODEL_VIEW_X <comptime> = 0
+local MODEL_VIEW_Y <comptime> = 9
+local MODEL_VIEW_W <comptime> = GPU_VSCREEN_W - 218
+local MODEL_VIEW_H <comptime> = GPU_VSCREEN_H
+local UI_PANEL_X <comptime> = MODEL_VIEW_X + MODEL_VIEW_W + 1
+local UI_PANEL_Y <comptime> = 9
+local UI_PANEL_W <comptime> = GPU_VSCREEN_W - UI_PANEL_X
+local UI_PANEL_H <comptime> = GPU_VSCREEN_H
+
+local system_cam_temp: rl.camera3D
+local model_cam: rl.camera3D
+local model_bounding_box: rl.boundingBox
+local cam_radius: float32
+local unload_model: boolean
+
+local create_entry_checkbox: gui.CheckBox
+local ok_button: gui.Button
+local cancel_button: gui.Button
+local start_index_vb: gui.ValueBox
+local end_index_vb: gui.ValueBox
+local entry_index_vb: gui.ValueBox
+
+local function getPrimitiveName(mode: uint32): string
+    switch mode do
+        case GPU_LINES then
+            return "LINES"
+        case GPU_TRIANGLES then
+            return "TRIANGLES"
+        case GPU_QUADS then
+            return "QUADS"
+    end
+
+    return "COLLISION"
+end
+
+global function dialogModelConfigReset(): void
+    start_index_vb = {
+        x = UI_PANEL_X + 6 + 13 * 6,
+        y = UI_PANEL_Y + 67,
+        width = 7 * 6 + 4,
+        height = 16,
+        text_color = GPU_WHITE,
+        format_string = "0x%05X",
+        min = 0,
+        max = ((65536 /// 2) * 3) - core.model_vertex_count - 1,
+        shift_step = 0x100
+    }
+
+    end_index_vb = {
+        x = start_index_vb.x,
+        y = start_index_vb.y + start_index_vb.height + 2,
+        width = start_index_vb.width,
+        height = start_index_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "0x%05X",
+        min = 0,
+        max = ((65536 /// 2) * 3) - 1,
+        value = core.model_vertex_count,
+        shift_step = 0x100
+    }
+
+    create_entry_checkbox = {
+        x = UI_PANEL_X + 6,
+        y = end_index_vb.y + end_index_vb.height + 18,
+        text = "CREATE OMPBANK ENTRY"
+    }
+
+    entry_index_vb = {
+        x = UI_PANEL_X + 18 + 9 * 6,
+        y = create_entry_checkbox.y + 20,
+        width = 3 * 6 + 4,
+        height = start_index_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-3d",
+        min = 0,
+        max = 511,
+        shift_step = 10
+    }
+
+    ok_button = {
+        x = GPU_VSCREEN_W - 6 - 48 - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_GREEN,
+        text = "OK"
+    }
+
+    cancel_button = {
+        x = GPU_VSCREEN_W - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_RED,
+        text = "CANCEL"
+    }
+
+    model_bounding_box = rl.getModelBoundingBox(core.model_to_import)
+
+    cam_radius = math.max(
+        model_bounding_box.max.x - model_bounding_box.min.x * 2,
+        model_bounding_box.max.z - model_bounding_box.min.z * 2
+    )
+
+    model_cam = {
+		position = {
+            0,
+            model_bounding_box.max.y - model_bounding_box.min.y * 2,
+            0
+        },
+		target = {0, 0, 0},
+		up = {0, 1, 0},
+		fovy = 45,
+		projection = rl.cameraProjection.PERSPECTIVE
+	}
+
+    unload_model = false
+end
+
+global function dialogModelConfigUpdate(): void
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        unload_model = true
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    if gui.updateButton(&ok_button) then
+        -- load model data
+        gpu:loadModelData(gpu.current_objbank - GPUBank.OBJBANK0, start_index_vb.value)
+
+        if create_entry_checkbox.enabled then
+            -- create OMPBANK entry
+            gpu:setObjMapEntryValues(
+                entry_index_vb.value,
+                GPU_TRIANGLES,
+                start_index_vb.value,
+                core.model_vertex_count /// 3
+            )
+        end
+        
+        core:log(LogEntryType.INFO, "model data loaded", true)
+        
+        unload_model = true
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    if gui.updateButton(&cancel_button) then
+        unload_model = true
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    gui.updateValueBox(&start_index_vb)
+
+    end_index_vb:setValue(start_index_vb.value + core.model_vertex_count)
+
+    gui.locked = true
+    gui.updateValueBox(&end_index_vb)
+    gui.locked = false
+
+    gui.updateCheckBox(&create_entry_checkbox)
+    gui.locked = not create_entry_checkbox.enabled
+
+    gui.updateValueBox(&entry_index_vb)
+    gui.locked = false
+
+    -- update model camera
+    local radians: float32 = math.rad(util.wrapF(22.5 * rl.getTime(), 0.0, 360.0))
+    model_cam.position.x = math.cos(radians) * cam_radius
+    model_cam.position.z = math.sin(radians) * cam_radius
+end
+
+global function dialogModelConfigDraw(): void
+    -- save system 3D camera
+    system_cam_temp = gpu.system_cam3d
+
+    -- set model camera
+    gpu.system_cam3d = model_cam
+
+    gpu:scissorMode(true)
+    gpu:viewport(MODEL_VIEW_X, MODEL_VIEW_Y, MODEL_VIEW_W, MODEL_VIEW_H, true)
+    gpu:scissor(MODEL_VIEW_X, MODEL_VIEW_Y, MODEL_VIEW_W, MODEL_VIEW_H)
+    gpu:camera3D(-1)
+
+    rl.drawModelWires(
+        core.model_to_import,
+        {0, 0, 0}, -- pos
+        1, -- scale
+        rl.WHITE -- tint
+    )
+
+    -- restore system 3D camera
+    gpu.system_cam3d = system_cam_temp
+
+    gpu:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H, true)
+    gpu:scissorMode(false)
+
+    gpu:camera2D(-1)
+
+    gpu:drawRect2D(UI_PANEL_X - 1, UI_PANEL_Y, 1, UI_PANEL_H, GPU_GRAY)
+    gpu:drawRect2D(UI_PANEL_X, UI_PANEL_Y, UI_PANEL_W, UI_PANEL_H, GPU_ALPHA_DGRAY)
+
+    gpu:print2D(
+        UI_PANEL_X + 6,
+        UI_PANEL_Y + 9,
+        GPU_WHITE,
+        rl.textFormat(
+            "LOADING MODEL INTO OBJBANK %d",
+            (@cint)(gpu.current_objbank - GPUBank.OBJBANK0)
+        )
+    )
+    gpu:print2D(
+        UI_PANEL_X + 6,
+        UI_PANEL_Y + 36,
+        GPU_GREEN,
+        rl.textFormat(
+            "VERTEX COUNT: %d",
+            (@cint)(core.model_vertex_count)
+        )
+    )
+    gpu:print2D(
+        UI_PANEL_X + 6,
+        UI_PANEL_Y + 49,
+        GPU_GREEN,
+        rl.textFormat(
+            "TRIANGLE COUNT: %d",
+            (@cint)(core.model_vertex_count /// 3)
+        )
+    )
+
+    gpu:print2D(UI_PANEL_X + 6, start_index_vb.y + 4, GPU_WHITE, "VERTEX START:")
+    gui.drawValueBox(&start_index_vb)
+    gpu:print2D(
+        start_index_vb.x + start_index_vb.width + 6,
+        start_index_vb.y + 4,
+        GPU_GRAY,
+        rl.textFormat(
+            "(%d)",
+            (@cint)(start_index_vb.value)
+        )
+    )
+
+    gpu:print2D(UI_PANEL_X + 6, end_index_vb.y + 4, GPU_GRAY, "VERTEX END:")
+    gui.drawValueBox(&end_index_vb)
+    gpu:print2D(
+        end_index_vb.x + end_index_vb.width + 6,
+        end_index_vb.y + 4,
+        GPU_GRAY,
+        rl.textFormat(
+            "(%d)",
+            (@cint)(end_index_vb.value)
+        )
+    )
+
+    gui.drawCheckBox(&create_entry_checkbox)
+
+    if create_entry_checkbox.enabled then
+        gpu:print2D(UI_PANEL_X + 18, entry_index_vb.y + 4, GPU_WHITE, "ENTRY ID:")
+        gui.drawValueBox(&entry_index_vb)
+
+        -- get OMPBANK entry values
+        local mode: uint32
+        local start: uint32
+        local n: uint32
+        mode, start, n = gpu:getObjMapEntryValues(entry_index_vb.value)
+
+        local prev_end: uint32 = 0
+        switch mode do
+            case GPU_LINES then
+                prev_end = start + n * 2
+            case GPU_TRIANGLES then
+                prev_end = start + n * 3
+            case GPU_QUADS then
+                prev_end = start + n * 4
+        end
+
+        local text_y: int32 = entry_index_vb.y + entry_index_vb.height + 11
+        local prev_x: int32 = UI_PANEL_X + 30 + (7 * 6)
+        local arrow_x: int32 = UI_PANEL_X + 30 + (17 * 6)
+        local new_x: int32 = UI_PANEL_X + 30 + (20 * 6)
+        gpu:print2D(UI_PANEL_X + 18, text_y, GPU_WHITE, "ENTRY PREVIEW:")
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 18, GPU_WHITE, "TYPE :")
+        gpu:print2D(prev_x, text_y + 18, GPU_RED, getPrimitiveName(mode))
+        gpu:print2D(arrow_x, text_y + 18, GPU_WHITE, "->")
+        gpu:print2D(new_x, text_y + 18, GPU_GREEN, "TRIANGLES")
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 36, GPU_WHITE, "START:")
+        gpu:print2D(
+            prev_x,
+            text_y + 36,
+            GPU_RED,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(start)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 36, GPU_WHITE, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 36,
+            GPU_GREEN,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(start_index_vb.value)
+            )
+        )
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 54, GPU_GRAY, "END  :")
+        gpu:print2D(
+            prev_x,
+            text_y + 54,
+            0x803434FF,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(prev_end)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 54, GPU_GRAY, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 54,
+            0x47803CFF,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(end_index_vb.value)
+            )
+        )
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 72, GPU_WHITE, "COUNT:")
+        gpu:print2D(
+            prev_x,
+            text_y + 72,
+            GPU_RED,
+            rl.textFormat(
+                "%-5d",
+                (@cint)(n)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 72, GPU_WHITE, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 72,
+            GPU_GREEN,
+            rl.textFormat(
+                "%-5d",
+                (@cint)(core.model_vertex_count /// 3)
+            )
+        )
+    end
+
+    gui.drawButton(&ok_button)
+    gui.drawButton(&cancel_button)
+
+    if unload_model then
+        rl.unloadModel(core.model_to_import)
+        core.has_loaded_model = false
+    end
+end

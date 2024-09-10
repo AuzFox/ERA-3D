@@ -1150,7 +1150,7 @@ function GPU:scissor(x: cint, y: cint, w: cint, h: cint): void
 end
 
 function GPU:colorMask(mask: uint8): void
-	--self:flush()
+	self:flush()
 
 	--self.color_mask = mask
 	local r: cint = mask & 0b1000 ~= 0 and 1 or 0
@@ -1471,6 +1471,22 @@ function GPU:pixelLine(x: int32, y: int32, x2: int32, y2: int32, color: uint32):
 	end
 end
 
+function GPU:getObjMapEntryValues(id: uint32): (uint32, uint32, uint32)
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.objmap_data[id * 12])
+	local mode: uint32 = util.peekU(&entry_ptr[0])
+	local start: uint32 = util.peekU(&entry_ptr[4])
+	local n: uint32 = util.peekU(&entry_ptr[8])
+
+	return mode, start, n
+end
+
+function GPU:setObjMapEntryValues(id: uint32, mode: uint32, start: uint32, n: uint32): void
+	local entry_ptr: *[0]uint8 = (@*[0]uint8)(&self.objmap_data[id * 12])
+	util.pokeU(&entry_ptr[0], mode)
+	util.pokeU(&entry_ptr[4], start)
+	util.pokeU(&entry_ptr[8], n)
+end
+
 function GPU:loadTexBank(bank: uint8): void
 	local src: *[0]rl.color = &self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank]
 	memory.copy(&self.texmem, src, MEMORY_TEXMEM_SIZE_BYTES)
@@ -1490,17 +1506,24 @@ function GPU:loadObjBank(bank: uint8): void
 	self.update_tex = true
 end
 
-function GPU:loadTextureData(bank_index: integer, src_x: int32, src_y: int32, dest_x: int32, dest_y: int32, w: int32, h: int32): void
+function GPU:loadTextureData(
+	bank_index: integer,
+	src_x: int32,
+	src_y: int32,
+	src_w: int32,
+	src_h: int32,
+	dest_x: int32,
+	dest_y: int32): void
 	local bank_ptr: *[0]rl.color = (@*[0]rl.color)(&self.texbank_ptr[MEMORY_TEXMEM_SIZE_ELEMENTS * bank_index])
 	local data: *[0]rl.color = (@*[0]rl.color)(core.image_to_import.data)
 
-	for y = 0, < h do
+	for y = 0, < src_h do
 		local read_y: int32 = src_y + y
 		local write_y: int32 = dest_y + y
-		for x = 0, < w do
+		for x = 0, < src_w do
 			local read_x: int32 = src_x + x
 			local write_x: int32 = dest_x + x
-			bank_ptr[w * write_y + write_x] = data[w * read_y + read_x]
+			bank_ptr[1024 * write_y + write_x] = data[core.image_to_import.width * read_y + read_x]
 		end
 	end
 end

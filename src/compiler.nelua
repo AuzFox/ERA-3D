@@ -359,7 +359,7 @@ function EVM:emitF(val: float32): void
 	self:emit32(v.u)
 end
 
-local function getChar(vm: *EVM): byte
+local function getChar(): byte
 	if vm.line > #core.src_lines then
 		vm.token = 0
 		return vm.token
@@ -379,11 +379,11 @@ local function getChar(vm: *EVM): byte
 	return vm.token
 end
 
-local function next(vm: *EVM): void
+local function next(): void
 	vm.prev_src_index = vm.src_index
 	vm.prev_token = vm.token
 
-	while getChar(vm) ~= 0 do
+	while getChar() ~= 0 do
 		vm.src_index = vm.src_index + 1
 
 		if vm.token == '\n'_u8 then
@@ -395,7 +395,7 @@ local function next(vm: *EVM): void
 			vm.sb:writebyte(vm.token)
 
 			while true do
-				getChar(vm)
+				getChar()
 				if (vm.token >= 'a'_u8 and vm.token <= 'z'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'Z'_u8) or (vm.token >= '0'_u8 and vm.token <= '9'_u8) or (vm.token == '_'_u8) then
 					vm.src_index = vm.src_index + 1
 					vm.sb:writebyte(vm.token)
@@ -429,11 +429,11 @@ local function next(vm: *EVM): void
 			local isfloat: boolean = false
 			-- number
 			vm.token_val = vm.token - '0'_u8
-			if vm.token_val == 0 and getChar(vm) == 'x'_u8 then
+			if vm.token_val == 0 and getChar() == 'x'_u8 then
 				-- hex
 				vm.src_index = vm.src_index + 1
 				while true do
-					getChar(vm)
+					getChar()
 					if (vm.token >= '0'_u8 and vm.token <= '9'_u8) or (vm.token >= 'a'_u8 and vm.token <= 'f'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'F'_u8) then
 						vm.token_val = vm.token_val * 16 + (vm.token & 15)
 						if vm.token >= 'A'_u8 then
@@ -446,11 +446,11 @@ local function next(vm: *EVM): void
 						break
 					end
 				end
-			elseif vm.token_val == 0 and getChar(vm) == 'b'_u8 then
+			elseif vm.token_val == 0 and getChar() == 'b'_u8 then
 				-- binary
 				vm.src_index = vm.src_index + 1
 				while true do
-					getChar(vm)
+					getChar()
 					if vm.token == '0'_u8 or vm.token == '1'_u8 then
 						vm.token_val = (vm.token_val * 2) + (vm.token - '0'_u8)
 						vm.src_index = vm.src_index + 1
@@ -460,14 +460,14 @@ local function next(vm: *EVM): void
 						break
 					end
 				end
-			elseif vm.token_val == 0 and getChar(vm) == 'n'_u8 then
+			elseif vm.token_val == 0 and getChar() == 'n'_u8 then
 				-- soundchip note
 				local note: int32 = 0xFF
 				local octave: int32 = 0xFF
 				vm.src_index = vm.src_index + 1
 
 				-- get note name
-				getChar(vm)
+				getChar()
 				if (vm.token >= 'a'_u8 and vm.token <= 'g'_u8) or (vm.token >= 'A'_u8 and vm.token <= 'G'_u8) then
 					switch vm.token do
 						case 'a'_u8, 'A'_u8 then
@@ -493,7 +493,7 @@ local function next(vm: *EVM): void
 				end
 
 				-- get sharp symbol (if present)
-				getChar(vm)
+				getChar()
 				if vm.token == '#'_u8 then
 					if note == 4 or note == 11 then
 						vm.error = string.format("line %d:\nnote in note literal cannot be made sharp", vm.line)
@@ -502,7 +502,7 @@ local function next(vm: *EVM): void
 					else
 						note = note + 1
 						vm.src_index = vm.src_index + 1
-						getChar(vm)
+						getChar()
 					end
 				end
 
@@ -521,7 +521,7 @@ local function next(vm: *EVM): void
 				-- decimal
 				local fract: float32 = 1.0
 				while true do
-					getChar(vm)
+					getChar()
 					if vm.token >= '0'_u8 and vm.token <= '9'_u8 then
 						if isfloat then
 							fract = fract / 10.0
@@ -565,12 +565,12 @@ local function next(vm: *EVM): void
 			-- TODO: reuse strings instead of repeating them in ROM
 
 			while true do
-				getChar(vm)
+				getChar()
 				if vm.token ~= 0 and vm.token ~= start then
 					vm.token_val = vm.token
 					vm.src_index = vm.src_index + 1
 					if vm.token == '\\'_u8 then -- escape code
-						getChar(vm)
+						getChar()
 						vm.src_index = vm.src_index + 1
 						switch vm.token do
 							case '\\'_u8 then -- \\
@@ -634,12 +634,12 @@ local function next(vm: *EVM): void
 
 			return
 		elseif vm.token == '/'_u8 then
-			local nxt: uinteger = getChar(vm)
+			local nxt: uinteger = getChar()
 			switch nxt do
 				case '/'_u8 then -- single line comment
 					vm.src_index = vm.src_index + 1
 					while true do
-						getChar(vm)
+						getChar()
 						if vm.token ~= 0 and vm.token ~= '\n'_u8 then
 							vm.src_index = vm.src_index + 1
 						else
@@ -650,12 +650,12 @@ local function next(vm: *EVM): void
 					vm.mlcomment_level = 1
 					vm.src_index = vm.src_index + 1
 					while true do
-						getChar(vm)
+						getChar()
 						if vm.token == 0 then
 							break
 						elseif vm.token == '*'_u8 then
 							vm.src_index = vm.src_index + 1
-							getChar(vm)
+							getChar()
 							if vm.token == '/'_u8 then
 								vm.src_index = vm.src_index + 1
 								vm.mlcomment_level = vm.mlcomment_level - 1
@@ -668,7 +668,7 @@ local function next(vm: *EVM): void
 							end
 						elseif vm.token == '/'_u8 then
 							vm.src_index = vm.src_index + 1
-							getChar(vm)
+							getChar()
 							if vm.token == '*'_u8 then
 								vm.src_index = vm.src_index + 1
 								vm.mlcomment_level = vm.mlcomment_level + 1
@@ -689,7 +689,7 @@ local function next(vm: *EVM): void
 					return
 			end
 		elseif vm.token == '='_u8 then
-			if getChar(vm) == '='_u8 then
+			if getChar() == '='_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = Token.EQ
 			else
@@ -701,7 +701,7 @@ local function next(vm: *EVM): void
 			vm.token = Token.ADD
 			return
 		elseif vm.token == '-'_u8 then
-			if getChar(vm) == '>'_u8 then
+			if getChar() == '>'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = Token.ARROW
 			else
@@ -713,7 +713,7 @@ local function next(vm: *EVM): void
 			vm.token = Token.MUL
 			return
 		elseif vm.token == '!'_u8 then
-			if getChar(vm) == '='_u8 then
+			if getChar() == '='_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = Token.NE
 			else
@@ -722,7 +722,7 @@ local function next(vm: *EVM): void
 			
 			return
 		elseif vm.token == '<'_u8 then
-			local nxt: uinteger = getChar(vm)
+			local nxt: uinteger = getChar()
 			switch nxt do
 				case '='_u8 then
 					vm.src_index = vm.src_index + 1
@@ -736,14 +736,14 @@ local function next(vm: *EVM): void
 			
 			return
 		elseif vm.token == '>'_u8 then
-			local nxt: uinteger = getChar(vm)
+			local nxt: uinteger = getChar()
 			switch nxt do
 				case '='_u8 then
 					vm.src_index = vm.src_index + 1
 					vm.token = Token.GE
 				case '>'_u8 then
 					vm.src_index = vm.src_index + 1
-					if getChar(vm) == '>'_u8 then
+					if getChar() == '>'_u8 then
 						vm.src_index = vm.src_index + 1
 						vm.token = Token.ARSHIFT
 					else
@@ -755,7 +755,7 @@ local function next(vm: *EVM): void
 			
 			return
 		elseif vm.token == '|'_u8 then
-			if getChar(vm) == '|'_u8 then
+			if getChar() == '|'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = Token.LOR
 			else
@@ -764,7 +764,7 @@ local function next(vm: *EVM): void
 			
 			return
 		elseif vm.token == '&'_u8 then
-			if getChar(vm) == '&'_u8 then
+			if getChar() == '&'_u8 then
 				vm.src_index = vm.src_index + 1
 				vm.token = Token.LAND
 			else
@@ -788,9 +788,9 @@ local function next(vm: *EVM): void
 			vm.token = Token.COND
 			return
 		elseif vm.token == '.'_u8 then
-			if getChar(vm) == '.'_u8 then
+			if getChar() == '.'_u8 then
 				vm.src_index = vm.src_index + 1
-				if getChar(vm) == '.'_u8 then
+				if getChar() == '.'_u8 then
 					vm.src_index = vm.src_index + 1
 					vm.token = Token.VARARGS
 				else
@@ -809,9 +809,9 @@ local function next(vm: *EVM): void
 	end
 end
 
-local function match(vm: *EVM, tk: uinteger): void
+local function match(tk: uinteger): void
 	if vm.token == tk then
-		next(vm)
+		next()
 	else
 		vm.error = string.format(
 			"line %d:\nexpected token `%s`, got `%s`",
@@ -824,7 +824,7 @@ local function match(vm: *EVM, tk: uinteger): void
 	end
 end
 
-local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: uinteger, skip_id_lookup: boolean): *FuncPointerInfo
+local function functionPointerType(base_structref: *Struct, var_type: uinteger, skip_id_lookup: boolean): *FuncPointerInfo
 	local result: *FuncPointerInfo = new(@FuncPointerInfo)
 
 	-- add argument types
@@ -838,32 +838,32 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		arg_type = EVMType.INT
 		
 		if vm.token == Token.VOID then
-			match(vm, Token.VOID)
+			match(Token.VOID)
 			arg_type = EVMType.VOID
 		elseif vm.token == Token.INT then
-			match(vm, Token.INT)
+			match(Token.INT)
 			arg_type = EVMType.INT
 		elseif vm.token == Token.FLOAT then
-			match(vm, Token.FLOAT)
+			match(Token.FLOAT)
 			arg_type = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			structref = vm.struct_vec2
-			match(vm, Token.VEC2)
+			match(Token.VEC2)
 			arg_type = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			structref = vm.struct_vec3
-			match(vm, Token.VEC3)
+			match(Token.VEC3)
 			arg_type = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			structref = vm.current_id.type_info.structref
-			match(vm, Token.STRUCT_ID)
+			match(Token.STRUCT_ID)
 			arg_type = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			structref = vm.struct_string
-			match(vm, Token.STRING)
+			match(Token.STRING)
 			arg_type = EVMType.STRING
 		elseif vm.token == Token.VARARGS then
-			match(vm, Token.VARARGS)
+			match(Token.VARARGS)
 			result.is_varargs = true
 			break
 		else
@@ -877,20 +877,20 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			arg_type = arg_type + EVMType.POINTER
 		end
 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
-			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, arg_type, false)
+			match('('_u8)
+			fptr_info = functionPointerType(structref, arg_type, false)
 			structref = nilptr
 			arg_type = EVMType.FUNC_POINTER
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			arg_type = arg_type + EVMType.POINTER
 		end
 
@@ -911,7 +911,7 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		result.argdata:push(type_info)
 
 		if vm.token == ','_u8 then
-			match(vm, ','_u8)
+			match(','_u8)
 		end
 	end
 
@@ -919,7 +919,7 @@ local function functionPointerType(vm: *EVM, base_structref: *Struct, var_type: 
 		vm.skip_next_id_lookup = true
 	end
 
-	match(vm, ')'_u8)
+	match(')'_u8)
 
 	result.return_type = {var_type, base_structref}
 	return result
@@ -971,7 +971,7 @@ local function matchFuncPointerTypes(fa: *FuncPointerInfo, fb: *FuncPointerInfo)
 	return true
 end
 
-local function operatorTypeCheck(vm: *EVM, operator: uinteger, target_info: TypeInfo, allow_ptrs: boolean): void
+local function operatorTypeCheck(operator: uinteger, target_info: TypeInfo, allow_ptrs: boolean): void
 	local target_type: uinteger = target_info.type_id
 
 	if vm.expr_type.type_id == EVMType.VOID then
@@ -1070,7 +1070,7 @@ local function operatorTypeCheck(vm: *EVM, operator: uinteger, target_info: Type
 	end
 end
 
-local function expression(vm: *EVM, level: integer): void
+local function expression(level: integer): void
 	local id: *Identifier
 	local temp: TypeInfo
 	local addr: uinteger
@@ -1083,7 +1083,7 @@ local function expression(vm: *EVM, level: integer): void
 
 	-- literals, struct initializers, and unary operators
 	if vm.token == Token.INT_LITERAL then
-		match(vm, Token.INT_LITERAL)
+		match(Token.INT_LITERAL)
 
 		if vm.token_val == 0 then
 			vm:emitOp(Opcode.PUSH_ZERO)
@@ -1099,7 +1099,7 @@ local function expression(vm: *EVM, level: integer): void
 		
 		vm.expr_type = {EVMType.INT}
 	elseif vm.token == Token.FLOAT_LITERAL then
-		match(vm, Token.FLOAT_LITERAL)
+		match(Token.FLOAT_LITERAL)
 
 		if vm.token_valf == 0.0 then
 			vm:emitOp(Opcode.PUSH_ZEROF)
@@ -1112,7 +1112,7 @@ local function expression(vm: *EVM, level: integer): void
 		
 		vm.expr_type = {EVMType.FLOAT}
 	elseif vm.token == Token.STRING_LITERAL then
-		match(vm, Token.STRING_LITERAL)
+		match(Token.STRING_LITERAL)
 
 		vm:emitOp(Opcode.PUSH_STRING)
 		vm:emit16(vm.string_len)
@@ -1127,23 +1127,23 @@ local function expression(vm: *EVM, level: integer): void
 		switch vm.token do
 			case Token.VEC2 then
 				target_info.structref = vm.struct_vec2
-				match(vm, Token.VEC2)
+				match(Token.VEC2)
 				target_info.type_id = EVMType.VEC2
 			case Token.VEC3 then
 				target_info.structref = vm.struct_vec3
-				match(vm, Token.VEC3)
+				match(Token.VEC3)
 				target_info.type_id = EVMType.VEC3
 			case Token.STRUCT_ID then
 				target_info.structref = vm.current_id.type_info.structref
-				match(vm, Token.STRUCT_ID)
+				match(Token.STRUCT_ID)
 				target_info.type_id = EVMType.STRUCT
 			case Token.STRING then
 				target_info.structref = vm.struct_string
-				match(vm, Token.STRING)
+				match(Token.STRING)
 				target_info.type_id = EVMType.STRING
 		end
 
-		match(vm, '('_u8)
+		match('('_u8)
 
 		local target_struct: *Struct = target_info.structref
 		local colobj_id: uint8 = 0xFF -- value not mapped to any collision object type
@@ -1161,7 +1161,7 @@ local function expression(vm: *EVM, level: integer): void
 		end
 
 		if vm.token == ')'_u8 then
-			match(vm, ')'_u8)
+			match(')'_u8)
 
 			if colobj_id == 0xFF then
 				vm:emitOp(Opcode.PUSH_ZERO_N)
@@ -1200,7 +1200,7 @@ local function expression(vm: *EVM, level: integer): void
 					target_member_info = target_struct.members[memberc + 1].type_info
 				end
 				
-				expression(vm, Token.ASSIGN)
+				expression(Token.ASSIGN)
 
 				if vm.expr_type.type_id == EVMType.VOID then
 					vm.error = string.format("line %d:\ncannot pass expression of type `void` to struct initializer", vm.line)
@@ -1263,7 +1263,7 @@ local function expression(vm: *EVM, level: integer): void
 
 				memberc = memberc + 1
 				if vm.token == ','_u8 then
-					match(vm, ','_u8)
+					match(','_u8)
 				end
 			end
 
@@ -1279,41 +1279,41 @@ local function expression(vm: *EVM, level: integer): void
 				coroutine.yield()
 			end
 			
-			match(vm, ')'_u8)
+			match(')'_u8)
 		end
 
 		vm.expr_type = target_info
 	elseif vm.token == Token.SIZEOF then
-		match(vm, Token.SIZEOF)
+		match(Token.SIZEOF)
 
-		match(vm, '('_u8)
+		match('('_u8)
 
 		local target_info: TypeInfo = {EVMType.INT, nilptr}
 	
 		if vm.token == Token.VOID then
-			match(vm, Token.VOID)
+			match(Token.VOID)
 			target_info.type_id = EVMType.VOID
 		elseif vm.token == Token.INT then
-			match(vm, Token.INT)
+			match(Token.INT)
 			target_info.type_id = EVMType.INT
 		elseif vm.token == Token.FLOAT then
-			match(vm, Token.FLOAT)
+			match(Token.FLOAT)
 			target_info.type_id = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			target_info.structref = vm.struct_vec2
-			match(vm, Token.VEC2)
+			match(Token.VEC2)
 			target_info.type_id = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			target_info.structref = vm.struct_vec3
-			match(vm, Token.VEC3)
+			match(Token.VEC3)
 			target_info.type_id = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			target_info.structref = vm.current_id.type_info.structref
-			match(vm, Token.STRUCT_ID)
+			match(Token.STRUCT_ID)
 			target_info.type_id = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			target_info.structref = vm.struct_string
-			match(vm, Token.STRING)
+			match(Token.STRING)
 			target_info.type_id = EVMType.STRING
 		else
 			vm.error = string.format(
@@ -1326,20 +1326,20 @@ local function expression(vm: *EVM, level: integer): void
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			target_info.type_id = target_info.type_id + EVMType.POINTER
 		end
 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
-			match(vm, '('_u8)
-			target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id, false)
+			match('('_u8)
+			target_info.fptr_info = functionPointerType(target_info.structref, target_info.type_id, false)
 			target_info.structref = nilptr
 			target_info.type_id = EVMType.FUNC_POINTER
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			target_info.type_id = target_info.type_id + EVMType.POINTER
 		end
 
@@ -1349,7 +1349,7 @@ local function expression(vm: *EVM, level: integer): void
 			coroutine.yield()
 		end
 
-		match(vm, ')'_u8)
+		match(')'_u8)
 
 		local size: uinteger = sizeOfType(target_info) * 4
 
@@ -1363,7 +1363,7 @@ local function expression(vm: *EVM, level: integer): void
 		
 		vm.expr_type = {EVMType.INT}
 	elseif vm.token == Token.ID then
-		match(vm, Token.ID)
+		match(Token.ID)
 		
 		id = vm.current_id
 
@@ -1375,7 +1375,7 @@ local function expression(vm: *EVM, level: integer): void
 
 		if vm.token == '('_u8 then
 			-- function call
-			match(vm, '('_u8)
+			match('('_u8)
 
 			local can_call: boolean = false
 			local calling_ptr: boolean = false
@@ -1442,7 +1442,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 					
-					expression(vm, Token.ASSIGN)
+					expression(Token.ASSIGN)
 
 					if vm.expr_type.type_id == EVMType.VOID then
 						vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -1517,7 +1517,7 @@ local function expression(vm: *EVM, level: integer): void
 
 					argc = argc + 1
 					if vm.token == ','_u8 then
-						match(vm, ','_u8)
+						match(','_u8)
 					end
 				end
 
@@ -1533,7 +1533,7 @@ local function expression(vm: *EVM, level: integer): void
 					end
 				end
 			end
-			match(vm, ')'_u8)
+			match(')'_u8)
 
 			-- emit code
 			if calling_ptr then
@@ -1569,7 +1569,7 @@ local function expression(vm: *EVM, level: integer): void
 
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from function call)
-				match(vm, '('_u8)
+				match('('_u8)
 
 				if result_type.type_id ~= EVMType.FUNC_POINTER then
 					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(result_type))
@@ -1614,7 +1614,7 @@ local function expression(vm: *EVM, level: integer): void
 							end
 						end
 						
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -1685,7 +1685,7 @@ local function expression(vm: *EVM, level: integer): void
 
 						argc = argc + 1
 						if vm.token == ','_u8 then
-							match(vm, ','_u8)
+							match(','_u8)
 						end
 					end
 
@@ -1701,7 +1701,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 				end
-				match(vm, ')'_u8)
+				match(')'_u8)
 
 				vm:emitOp(Opcode.CALL_SAVED_FPTR)
 				vm:emit16(size)
@@ -1814,63 +1814,63 @@ local function expression(vm: *EVM, level: integer): void
 	elseif vm.token == '('_u8 then
 		temp = vm.expr_type
 
-		match(vm, '('_u8)
+		match('('_u8)
 		if vm.token >= Token.VOID and vm.token <= Token.STRING then
 			-- cast or struct initializer
 			local target_info: TypeInfo = {EVMType.INT}
 	
 			if vm.token == Token.VOID then
-				match(vm, Token.VOID)
+				match(Token.VOID)
 				target_info.type_id = EVMType.VOID
 			elseif vm.token == Token.INT then
-				match(vm, Token.INT)
+				match(Token.INT)
 				target_info.type_id = EVMType.INT
 			elseif vm.token == Token.FLOAT then
-				match(vm, Token.FLOAT)
+				match(Token.FLOAT)
 				target_info.type_id = EVMType.FLOAT
 			elseif vm.token == Token.VEC2 then
 				target_info.structref = vm.struct_vec2
-				match(vm, Token.VEC2)
+				match(Token.VEC2)
 				target_info.type_id = EVMType.VEC2
 			elseif vm.token == Token.VEC3 then
 				target_info.structref = vm.struct_vec3
-				match(vm, Token.VEC3)
+				match(Token.VEC3)
 				target_info.type_id = EVMType.VEC3
 			elseif vm.token == Token.STRUCT_ID then
 				target_info.structref = vm.current_id.type_info.structref
-				match(vm, Token.STRUCT_ID)
+				match(Token.STRUCT_ID)
 				target_info.type_id = EVMType.STRUCT
 			elseif vm.token == Token.STRING then
 				target_info.structref = vm.struct_string
-				match(vm, Token.STRING)
+				match(Token.STRING)
 				target_info.type_id = EVMType.STRING
 			end
 	
 			while vm.token == Token.MUL do
-				match(vm, Token.MUL)
+				match(Token.MUL)
 				target_info.type_id = target_info.type_id + EVMType.POINTER
 			end
 
 			-- check for function pointer syntax
 			if vm.token == '('_u8 then
-				match(vm, '('_u8)
-				target_info.fptr_info = functionPointerType(vm, target_info.structref, target_info.type_id, false)
+				match('('_u8)
+				target_info.fptr_info = functionPointerType(target_info.structref, target_info.type_id, false)
 				target_info.structref = nilptr
 				target_info.type_id = EVMType.FUNC_POINTER
 			end
 
 			while vm.token == Token.MUL do
-				match(vm, Token.MUL)
+				match(Token.MUL)
 				target_info.type_id = target_info.type_id + EVMType.POINTER
 			end
 
-			match(vm, ')'_u8)
+			match(')'_u8)
 
 			if vm.token == '{'_u8 then
 				-- C-style struct initializer
 
 				if target_info.type_id >= EVMType.VEC2 and target_info.type_id <= EVMType.STRING then
-					match(vm, '{'_u8)
+					match('{'_u8)
 
 					local target_struct: *Struct = target_info.structref
 					local colobj_id: uint8 = 0xFF -- value not mapped to any collision object type
@@ -1888,7 +1888,7 @@ local function expression(vm: *EVM, level: integer): void
 					end
 
 					if vm.token == '}'_u8 then
-						match(vm, '}'_u8)
+						match('}'_u8)
 						
 						if colobj_id == 0xFF then
 							vm:emitOp(Opcode.PUSH_ZERO_N)
@@ -1927,7 +1927,7 @@ local function expression(vm: *EVM, level: integer): void
 								target_member_info = target_struct.members[memberc + 1].type_info
 							end
 							
-							expression(vm, Token.ASSIGN)
+							expression(Token.ASSIGN)
 		
 							if vm.expr_type.type_id == EVMType.VOID then
 								vm.error = string.format("line %d:\ncannot pass expression of type `void` to struct initializer", vm.line)
@@ -1990,7 +1990,7 @@ local function expression(vm: *EVM, level: integer): void
 		
 							memberc = memberc + 1
 							if vm.token == ','_u8 then
-								match(vm, ','_u8)
+								match(','_u8)
 							end
 						end
 		
@@ -2006,7 +2006,7 @@ local function expression(vm: *EVM, level: integer): void
 							coroutine.yield()
 						end
 						
-						match(vm, '}'_u8)
+						match('}'_u8)
 					end
 				else
 					vm.error = string.format(
@@ -2019,7 +2019,7 @@ local function expression(vm: *EVM, level: integer): void
 				end
 			else
 				-- cast
-				expression(vm, Token.ARROW)
+				expression(Token.ARROW)
 
 				if target_info.type_id == EVMType.VOID then
 					vm.error = string.format("line %d:\ncannot cast to type `void`", vm.line)
@@ -2088,12 +2088,12 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = target_info
 		else
-			expression(vm, Token.ASSIGN)
-			match(vm, ')'_u8)
+			expression(Token.ASSIGN)
+			match(')'_u8)
 
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from array fetch)
-				match(vm, '('_u8)
+				match('('_u8)
 
 				if vm.expr_type.type_id ~= EVMType.FUNC_POINTER then
 					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(vm.expr_type))
@@ -2139,7 +2139,7 @@ local function expression(vm: *EVM, level: integer): void
 							end
 						end
 						
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -2210,7 +2210,7 @@ local function expression(vm: *EVM, level: integer): void
 
 						argc = argc + 1
 						if vm.token == ','_u8 then
-							match(vm, ','_u8)
+							match(','_u8)
 						end
 					end
 
@@ -2226,7 +2226,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 				end
-				match(vm, ')'_u8)
+				match(')'_u8)
 
 				vm:emitOp(Opcode.CALL_SAVED_FPTR)
 				vm:emit16(size)
@@ -2235,9 +2235,9 @@ local function expression(vm: *EVM, level: integer): void
 			end
 		end
 	elseif vm.token == Token.MUL then
-		match(vm, Token.MUL)
+		match(Token.MUL)
 	    
-		expression(vm, Token.ARROW)
+		expression(Token.ARROW)
 
 		if vm.expr_type.type_id > EVMType.POINTER then
 			vm.expr_type.type_id = vm.expr_type.type_id - EVMType.POINTER
@@ -2260,9 +2260,9 @@ local function expression(vm: *EVM, level: integer): void
 			vm:emit16(0)
 		end
 	elseif vm.token == Token.AND then
-		match(vm, Token.AND)
+		match(Token.AND)
 		
-		expression(vm, Token.ARROW)
+		expression(Token.ARROW)
 
 		--[[
 			we've already emitted code for fetching the variable/value:
@@ -2335,9 +2335,9 @@ local function expression(vm: *EVM, level: integer): void
 
 		vm.expr_type.type_id = vm.expr_type.type_id + EVMType.POINTER
 	elseif vm.token == Token.LNOT then
-		match(vm, Token.LNOT)
+		match(Token.LNOT)
 
-		expression(vm, Token.ARROW)
+		expression(Token.ARROW)
 
 		if vm.expr_type.type_id == EVMType.VOID then
 			vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -2363,9 +2363,9 @@ local function expression(vm: *EVM, level: integer): void
 
 		vm.expr_type = {EVMType.INT}
 	elseif vm.token == Token.NOT then
-		match(vm, Token.NOT)
+		match(Token.NOT)
 		
-		expression(vm, Token.ARROW)
+		expression(Token.ARROW)
 		
 		if vm.expr_type.type_id == EVMType.VOID then
 			vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -2386,7 +2386,7 @@ local function expression(vm: *EVM, level: integer): void
 
 		vm.expr_type = {EVMType.INT}
 	elseif vm.token == Token.SUB then
-		match(vm, Token.SUB)
+		match(Token.SUB)
 
 		if vm.token == Token.INT_LITERAL then
 			if vm.token_val == 0 then
@@ -2403,7 +2403,7 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emit32(-(@int32)(vm.token_val))
 			end
 			
-			match(vm, Token.INT_LITERAL)
+			match(Token.INT_LITERAL)
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.FLOAT_LITERAL then
 			if vm.token_valf == 0.0 then
@@ -2417,10 +2417,10 @@ local function expression(vm: *EVM, level: integer): void
 				vm:emitF(-vm.token_valf)
 			end
 
-			match(vm, Token.FLOAT_LITERAL)
+			match(Token.FLOAT_LITERAL)
 			vm.expr_type = {EVMType.FLOAT}
 		else
-			expression(vm, Token.ARROW)
+			expression(Token.ARROW)
 
 			switch vm.expr_type.type_id do
 				case EVMType.VOID then
@@ -2459,7 +2459,7 @@ local function expression(vm: *EVM, level: integer): void
 		if vm.token == Token.ASSIGN then
 			id = vm.current_id
 			
-			match(vm, Token.ASSIGN)
+			match(Token.ASSIGN)
 
 			--[[
 				we've already emitted code for fetching the variable/value:
@@ -2517,7 +2517,7 @@ local function expression(vm: *EVM, level: integer): void
 					class = Class.STRING
 			end
 
-			expression(vm, Token.ASSIGN)
+			expression(Token.ASSIGN)
 
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format(
@@ -2681,7 +2681,7 @@ local function expression(vm: *EVM, level: integer): void
 				b:
 			]]
 
-			match(vm, Token.LOR)
+			match(Token.LOR)
 
 			if vm.expr_type.type_id == EVMType.INT then
 				-- short circuit evaluation
@@ -2714,7 +2714,7 @@ local function expression(vm: *EVM, level: integer): void
 				coroutine.yield()
 			end
 			
-			expression(vm, Token.LAND)
+			expression(Token.LAND)
 			
 			if vm.expr_type.type_id == EVMType.INT then
 				vm:emitOp(Opcode.ITOB)
@@ -2748,7 +2748,7 @@ local function expression(vm: *EVM, level: integer): void
 				b:
 			]]
 
-			match(vm, Token.LAND)
+			match(Token.LAND)
 
 			if vm.expr_type.type_id == EVMType.INT then
 				-- short circuit evaluation
@@ -2781,7 +2781,7 @@ local function expression(vm: *EVM, level: integer): void
 				coroutine.yield()
 			end
 
-			expression(vm, Token.OR)
+			expression(Token.OR)
 			
 			if vm.expr_type.type_id == EVMType.INT then
 				vm:emitOp(Opcode.ITOB)
@@ -2805,9 +2805,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.OR then
-			match(vm, Token.OR)
+			match(Token.OR)
 
-			expression(vm, Token.XOR)
+			expression(Token.XOR)
 			
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -2830,9 +2830,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.XOR then
-			match(vm, Token.XOR)
+			match(Token.XOR)
 
-			expression(vm, Token.AND)
+			expression(Token.AND)
 			
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -2855,9 +2855,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.AND then
-			match(vm, Token.AND)
+			match(Token.AND)
 			
-			expression(vm, Token.EQ)
+			expression(Token.EQ)
 			
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -2880,11 +2880,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.EQ then
-			match(vm, Token.EQ)
+			match(Token.EQ)
 
-			expression(vm, Token.NE)
+			expression(Token.NE)
 
-			operatorTypeCheck(vm, Token.EQ, temp, true)
+			operatorTypeCheck(Token.EQ, temp, true)
 			
 			switch temp.type_id do
 				case EVMType.FLOAT then
@@ -2900,11 +2900,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.NE then
-			match(vm, Token.NE)
+			match(Token.NE)
 
-			expression(vm, Token.LT)
+			expression(Token.LT)
 
-			operatorTypeCheck(vm, Token.NE, temp, true)
+			operatorTypeCheck(Token.NE, temp, true)
 			
 			switch temp.type_id do
 				case EVMType.FLOAT then
@@ -2920,11 +2920,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.LT then
-			match(vm, Token.LT)
+			match(Token.LT)
 
-			expression(vm, Token.LSHIFT)
+			expression(Token.LSHIFT)
 
-			operatorTypeCheck(vm, Token.LT, temp, false)
+			operatorTypeCheck(Token.LT, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -2938,11 +2938,11 @@ local function expression(vm: *EVM, level: integer): void
 
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.GT then
-			match(vm, Token.GT)
+			match(Token.GT)
 
-			expression(vm, Token.LSHIFT)
+			expression(Token.LSHIFT)
 
-			operatorTypeCheck(vm, Token.GT, temp, false)
+			operatorTypeCheck(Token.GT, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -2956,11 +2956,11 @@ local function expression(vm: *EVM, level: integer): void
 
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.LE then
-			match(vm, Token.LE)
+			match(Token.LE)
 
-			expression(vm, Token.LSHIFT)
+			expression(Token.LSHIFT)
 
-			operatorTypeCheck(vm, Token.LE, temp, false)
+			operatorTypeCheck(Token.LE, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -2974,11 +2974,11 @@ local function expression(vm: *EVM, level: integer): void
 
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.GE then
-			match(vm, Token.GE)
+			match(Token.GE)
 
-			expression(vm, Token.LSHIFT)
+			expression(Token.LSHIFT)
 
-			operatorTypeCheck(vm, Token.GE, temp, false)
+			operatorTypeCheck(Token.GE, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -2992,9 +2992,9 @@ local function expression(vm: *EVM, level: integer): void
 
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.LSHIFT then
-			match(vm, Token.LSHIFT)
+			match(Token.LSHIFT)
 
-			expression(vm, Token.ADD)
+			expression(Token.ADD)
 
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -3017,9 +3017,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.RSHIFT then
-			match(vm, Token.RSHIFT)
+			match(Token.RSHIFT)
 
-			expression(vm, Token.ADD)
+			expression(Token.ADD)
 			
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -3042,9 +3042,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.ARSHIFT then
-			match(vm, Token.ARSHIFT)
+			match(Token.ARSHIFT)
 
-			expression(vm, Token.ADD)
+			expression(Token.ADD)
 
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -3067,11 +3067,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.ADD then
-			match(vm, Token.ADD)
+			match(Token.ADD)
 
-			expression(vm, Token.MUL)
+			expression(Token.MUL)
 			
-			operatorTypeCheck(vm, Token.ADD, temp, true)
+			operatorTypeCheck(Token.ADD, temp, true)
 
 			switch temp.type_id do
 				case EVMType.INT then
@@ -3090,11 +3090,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = temp
 		elseif vm.token == Token.SUB then
-			match(vm, Token.SUB)
+			match(Token.SUB)
 			
-			expression(vm, Token.MUL)
+			expression(Token.MUL)
 
-			operatorTypeCheck(vm, Token.SUB, temp, true)
+			operatorTypeCheck(Token.SUB, temp, true)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -3113,11 +3113,11 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = temp
 		elseif vm.token == Token.MUL then
-			match(vm, Token.MUL)
+			match(Token.MUL)
 
-			expression(vm, Token.BRAK)
+			expression(Token.BRAK)
 
-			operatorTypeCheck(vm, Token.MUL, temp, false)
+			operatorTypeCheck(Token.MUL, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -3168,11 +3168,11 @@ local function expression(vm: *EVM, level: integer): void
 					vm.expr_type = temp
 			end
 		elseif vm.token == Token.DIV then
-			match(vm, Token.DIV)
+			match(Token.DIV)
 			
-			expression(vm, Token.BRAK)
+			expression(Token.BRAK)
 
-			operatorTypeCheck(vm, Token.DIV, temp, false)
+			operatorTypeCheck(Token.DIV, temp, false)
 			
 			switch temp.type_id do
 				case EVMType.INT then
@@ -3203,9 +3203,9 @@ local function expression(vm: *EVM, level: integer): void
 			
 			vm.expr_type = temp
 		elseif vm.token == Token.MOD then
-			match(vm, Token.MOD)
+			match(Token.MOD)
 
-			expression(vm, Token.BRAK)
+			expression(Token.BRAK)
 			
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as rvalue", vm.line)
@@ -3244,8 +3244,8 @@ local function expression(vm: *EVM, level: integer): void
 			end
 			
 			vm.skip_next_id_lookup = true -- we need to look up member ids manually
-			match(vm, Token.ARROW)
-			match(vm, Token.ID)
+			match(Token.ARROW)
+			match(Token.ID)
 	
 			-- lookup member
 			vm.has_id, vm.current_id = vm.expr_type.structref:getMember(vm.current_id_name)
@@ -3268,7 +3268,7 @@ local function expression(vm: *EVM, level: integer): void
 
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from struct member dereference)
-				match(vm, '('_u8)
+				match('('_u8)
 
 				if id.type_info.type_id ~= EVMType.FUNC_POINTER then
 					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(id.type_info))
@@ -3314,7 +3314,7 @@ local function expression(vm: *EVM, level: integer): void
 							end
 						end
 						
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -3385,7 +3385,7 @@ local function expression(vm: *EVM, level: integer): void
 
 						argc = argc + 1
 						if vm.token == ','_u8 then
-							match(vm, ','_u8)
+							match(','_u8)
 						end
 					end
 
@@ -3401,7 +3401,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 				end
-				match(vm, ')'_u8)
+				match(')'_u8)
 
 				vm:emitOp(Opcode.CALL_SAVED_FPTR)
 				vm:emit16(size)
@@ -3459,8 +3459,8 @@ local function expression(vm: *EVM, level: integer): void
 			end
 			
 			vm.skip_next_id_lookup = true -- we need to look up member ids manually
-			match(vm, Token.DOT)
-			match(vm, Token.ID)
+			match(Token.DOT)
+			match(Token.ID)
 	
 			-- lookup member
 			vm.has_id, vm.current_id = temp.structref:getMember(vm.current_id_name)
@@ -3512,7 +3512,7 @@ local function expression(vm: *EVM, level: integer): void
 
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from struct member)
-				match(vm, '('_u8)
+				match('('_u8)
 
 				if id.type_info.type_id ~= EVMType.FUNC_POINTER then
 					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(id.type_info))
@@ -3558,7 +3558,7 @@ local function expression(vm: *EVM, level: integer): void
 							end
 						end
 						
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -3629,7 +3629,7 @@ local function expression(vm: *EVM, level: integer): void
 
 						argc = argc + 1
 						if vm.token == ','_u8 then
-							match(vm, ','_u8)
+							match(','_u8)
 						end
 					end
 
@@ -3645,7 +3645,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 				end
-				match(vm, ')'_u8)
+				match(')'_u8)
 
 				vm:emitOp(Opcode.CALL_SAVED_FPTR)
 				vm:emit16(size)
@@ -3655,7 +3655,7 @@ local function expression(vm: *EVM, level: integer): void
 				vm.expr_type = vm.current_id.type_info
 			end
 		elseif vm.token == Token.BRAK then
-			match(vm, Token.BRAK)
+			match(Token.BRAK)
 			
 			local is_string: boolean = false
 			local size: uint16
@@ -3677,9 +3677,9 @@ local function expression(vm: *EVM, level: integer): void
 				coroutine.yield()
 			end
 			
-			expression(vm, Token.ASSIGN)
+			expression(Token.ASSIGN)
 
-			match(vm, ']'_u8)
+			match(']'_u8)
 
 			if (vm.expr_type.type_id < EVMType.INT) or (vm.expr_type.type_id > EVMType.FLOAT) then
 				vm.error = string.format(
@@ -3711,7 +3711,7 @@ local function expression(vm: *EVM, level: integer): void
 
 			if vm.token == '('_u8 then
 				-- function pointer value call (pointer from array fetch)
-				match(vm, '('_u8)
+				match('('_u8)
 
 				if temp.type_id ~= EVMType.FUNC_POINTER then
 					vm.error = string.format("line %d:\ncannot call non-function type `%s`", vm.line, getTypeName(temp))
@@ -3757,7 +3757,7 @@ local function expression(vm: *EVM, level: integer): void
 							end
 						end
 						
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format("line %d:\ncannot pass expression of type `void` as a function argument", vm.line)
@@ -3828,7 +3828,7 @@ local function expression(vm: *EVM, level: integer): void
 
 						argc = argc + 1
 						if vm.token == ','_u8 then
-							match(vm, ','_u8)
+							match(','_u8)
 						end
 					end
 
@@ -3844,7 +3844,7 @@ local function expression(vm: *EVM, level: integer): void
 						end
 					end
 				end
-				match(vm, ')'_u8)
+				match(')'_u8)
 
 				vm:emitOp(Opcode.CALL_SAVED_FPTR)
 				vm:emit16(size)
@@ -3865,7 +3865,7 @@ local function expression(vm: *EVM, level: integer): void
 	end
 end
 
-local function statement(vm: *EVM): void
+local function statement(): void
 	local a: uinteger
 	local b: uinteger
 	
@@ -3876,47 +3876,47 @@ local function statement(vm: *EVM): void
 		local fptr_info: *FuncPointerInfo = nilptr
 
 		if vm.token == Token.VOID then
-			match(vm, Token.VOID)
+			match(Token.VOID)
 			var_type = EVMType.VOID
 		elseif vm.token == Token.INT then
-			match(vm, Token.INT)
+			match(Token.INT)
 			var_type = EVMType.INT
 		elseif vm.token == Token.FLOAT then
-			match(vm, Token.FLOAT)
+			match(Token.FLOAT)
 			var_type = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			structref = vm.struct_vec2
-			match(vm, Token.VEC2)
+			match(Token.VEC2)
 			var_type = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			structref = vm.struct_vec3
-			match(vm, Token.VEC3)
+			match(Token.VEC3)
 			var_type = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			structref = vm.current_id.type_info.structref
-			match(vm, Token.STRUCT_ID)
+			match(Token.STRUCT_ID)
 			var_type = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			structref = vm.struct_string
-			match(vm, Token.STRING)
+			match(Token.STRING)
 			var_type = EVMType.STRING
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			var_type = var_type + EVMType.POINTER
 		end
 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
-			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, var_type, false)
+			match('('_u8)
+			fptr_info = functionPointerType(structref, var_type, false)
 			structref = nilptr
 			var_type = EVMType.FUNC_POINTER
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			var_type = var_type + EVMType.POINTER
 		end
 
@@ -3946,7 +3946,7 @@ local function statement(vm: *EVM): void
 			coroutine.yield()
 		end
 
-		match(vm, Token.ID)
+		match(Token.ID)
 
 		vm.current_id.class = Class.LOCAL
 		vm.current_id.type_info = {var_type, structref, fptr_info}
@@ -3959,13 +3959,13 @@ local function statement(vm: *EVM): void
 			vm.current_id.is_array = true
 			vm.current_id.type_info.type_id = vm.current_id.type_info.type_id + EVMType.POINTER
 
-			match(vm, Token.BRAK)
+			match(Token.BRAK)
 			
 			local array_size: uinteger
 
 			if vm.token == Token.INT_LITERAL then
 				array_size = vm.token_val
-				match(vm, Token.INT_LITERAL)
+				match(Token.INT_LITERAL)
 			elseif vm.token == Token.ID then
 				if not vm.has_id then
 					vm.error = string.format("line %d:\nundefined identifier `%s`", vm.line, vm.current_id.name)
@@ -3979,7 +3979,7 @@ local function statement(vm: *EVM): void
 
 				array_size = vm.current_id.const_val
 				
-				match(vm, Token.ID)
+				match(Token.ID)
 			else
 				vm.error = string.format(
 					"line %d:\nexpected tokens `int literal` or `constant identifier`, got `%s`",
@@ -4001,7 +4001,7 @@ local function statement(vm: *EVM): void
 			vm.local_index = vm.local_index + array_size
 			vm:incScopeLocalsSize(array_size)
 
-			match(vm, ']'_u8)
+			match(']'_u8)
 		else			
 			vm.local_index = vm.local_index + type_size
 			vm:incScopeLocalsSize(type_size)
@@ -4009,9 +4009,9 @@ local function statement(vm: *EVM): void
 			if vm.token == Token.ASSIGN then
 				local id: *Identifier = vm.current_id
 	
-				match(vm, Token.ASSIGN)
+				match(Token.ASSIGN)
 	
-				expression(vm, Token.ASSIGN)
+				expression(Token.ASSIGN)
 	
 				if vm.expr_type.type_id == EVMType.VOID then
 					vm.error = string.format(
@@ -4098,7 +4098,7 @@ local function statement(vm: *EVM): void
 			coroutine.yield()
 		end
 
-		match(vm, ';'_u8)
+		match(';'_u8)
 	elseif vm.token == Token.IF then
 		--[[
 			ERA-C:         | BYTECODE:
@@ -4113,10 +4113,10 @@ local function statement(vm: *EVM): void
 			-----------------------------
 		]]
 		
-		match(vm, Token.IF)
-		match(vm, '('_u8)
+		match(Token.IF)
+		match('('_u8)
 
-		expression(vm, Token.ASSIGN)
+		expression(Token.ASSIGN)
 
 		if vm.expr_type.type_id == EVMType.VOID then
 			vm.error = string.format("line %d:\ncannot use expression of type `void` as if statement condition", vm.line)
@@ -4152,12 +4152,12 @@ local function statement(vm: *EVM): void
 			coroutine.yield()
 		end
 
-		match(vm, ')'_u8)
+		match(')'_u8)
 
-		statement(vm)
+		statement()
 		
 		if vm.token == Token.ELSE then
-			match(vm, Token.ELSE)
+			match(Token.ELSE)
 
 			-- write jump_z address
 			vm.bytecode[b] = ((vm.bytecode_len + 3) >> 8)
@@ -4168,7 +4168,7 @@ local function statement(vm: *EVM): void
 			b = vm.bytecode_len
 			vm:emit16(0)
 
-			statement(vm)
+			statement()
 		end
 		
 		vm.bytecode[b] = ((vm.bytecode_len) >> 8)
@@ -4189,7 +4189,7 @@ local function statement(vm: *EVM): void
 
 		local for_line: uinteger = vm.line
 
-		match(vm, Token.FOR)
+		match(Token.FOR)
 		
 		vm:pushScope()
 		
@@ -4197,7 +4197,7 @@ local function statement(vm: *EVM): void
 		local new_l_index: uinteger = vm.bytecode_len
 		vm:emit16(0)
 		
-		match(vm, '('_u8)
+		match('('_u8)
 
 		-- init
 		while vm.token ~= ';'_u8 do
@@ -4208,47 +4208,47 @@ local function statement(vm: *EVM): void
 				local fptr_info: *FuncPointerInfo
 
 				if vm.token == Token.VOID then
-					match(vm, Token.VOID)
+					match(Token.VOID)
 					var_type = EVMType.VOID
 				elseif vm.token == Token.INT then
-					match(vm, Token.INT)
+					match(Token.INT)
 					var_type = EVMType.INT
 				elseif vm.token == Token.FLOAT then
-					match(vm, Token.FLOAT)
+					match(Token.FLOAT)
 					var_type = EVMType.FLOAT
 				elseif vm.token == Token.VEC2 then
 					structref = vm.struct_vec2
-					match(vm, Token.VEC2)
+					match(Token.VEC2)
 					var_type = EVMType.VEC2
 				elseif vm.token == Token.VEC3 then
 					structref = vm.struct_vec3
-					match(vm, Token.VEC3)
+					match(Token.VEC3)
 					var_type = EVMType.VEC3
 				elseif vm.token == Token.STRUCT_ID then
 					structref = vm.current_id.type_info.structref
-					match(vm, Token.STRUCT_ID)
+					match(Token.STRUCT_ID)
 					var_type = EVMType.STRUCT
 				elseif vm.token == Token.STRING then
 					structref = vm.struct_string
-					match(vm, Token.STRING)
+					match(Token.STRING)
 					var_type = EVMType.STRING
 				end
 
 				while vm.token == Token.MUL do
-					match(vm, Token.MUL)
+					match(Token.MUL)
 					var_type = var_type + EVMType.POINTER
 				end
 
 				-- check for function pointer syntax
 				if vm.token == '('_u8 then
-					match(vm, '('_u8)
-					fptr_info = functionPointerType(vm, structref, var_type, false)
+					match('('_u8)
+					fptr_info = functionPointerType(structref, var_type, false)
 					structref = nilptr
 					var_type = EVMType.FUNC_POINTER
 				end
 
 				while vm.token == Token.MUL do
-					match(vm, Token.MUL)
+					match(Token.MUL)
 					var_type = var_type + EVMType.POINTER
 				end
 
@@ -4278,7 +4278,7 @@ local function statement(vm: *EVM): void
 					coroutine.yield()
 				end
 
-				match(vm, Token.ID)
+				match(Token.ID)
 
 				vm.current_id.class = Class.LOCAL
 				vm.current_id.type_info = {var_type, structref, fptr_info}
@@ -4291,13 +4291,13 @@ local function statement(vm: *EVM): void
 					vm.current_id.is_array = true
 					vm.current_id.type_info.type_id = vm.current_id.type_info.type_id + EVMType.POINTER
 
-					match(vm, Token.BRAK)
+					match(Token.BRAK)
 					
 					local array_size: uinteger
 
 					if vm.token == Token.INT_LITERAL then
 						array_size = vm.token_val
-						match(vm, Token.INT_LITERAL)
+						match(Token.INT_LITERAL)
 					elseif vm.token == Token.ID then
 						if not vm.has_id then
 							vm.error = string.format("line %d:\nundefined identifier `%s`", vm.line, vm.current_id.name)
@@ -4311,7 +4311,7 @@ local function statement(vm: *EVM): void
 
 						array_size = vm.current_id.const_val
 						
-						match(vm, Token.ID)
+						match(Token.ID)
 					else
 						vm.error = string.format(
 							"line %d:\nexpected tokens `int literal` or `constant identifier`, got `%s`",
@@ -4333,7 +4333,7 @@ local function statement(vm: *EVM): void
 					vm.local_index = vm.local_index + array_size
 					vm:incScopeLocalsSize(array_size)
 
-					match(vm, ']'_u8)
+					match(']'_u8)
 				else
 					vm.local_index = vm.local_index + type_size
 					vm:incScopeLocalsSize(type_size)
@@ -4341,9 +4341,9 @@ local function statement(vm: *EVM): void
 					if vm.token == Token.ASSIGN then
 						local id: *Identifier = vm.current_id
 			
-						match(vm, Token.ASSIGN)
+						match(Token.ASSIGN)
 			
-						expression(vm, Token.ASSIGN)
+						expression(Token.ASSIGN)
 			
 						if vm.expr_type.type_id == EVMType.VOID then
 							vm.error = string.format(
@@ -4430,15 +4430,15 @@ local function statement(vm: *EVM): void
 					coroutine.yield()
 				end
 			else
-				expression(vm, Token.ASSIGN)
+				expression(Token.ASSIGN)
 			end
 
 			if vm.token == ','_u8 then
-				match(vm, ','_u8)
+				match(','_u8)
 			end
 		end
 
-		match(vm, ';'_u8)
+		match(';'_u8)
 		
 		-- cond
 		a = vm.bytecode_len
@@ -4449,7 +4449,7 @@ local function statement(vm: *EVM): void
 		if vm.token ~= ';'_u8 then
 			has_condition = true
 
-			expression(vm, Token.ASSIGN)
+			expression(Token.ASSIGN)
 
 			if vm.expr_type.type_id == EVMType.VOID then
 				vm.error = string.format("line %d:\ncannot use expression of type `void` as loop condition", vm.line)
@@ -4488,7 +4488,7 @@ local function statement(vm: *EVM): void
 		
 		local step_line: uinteger = vm.line
 
-		match(vm, ';'_u8)
+		match(';'_u8)
 		
 		-- save our spot
 		-- we're skipping over the step expressions for now,
@@ -4500,13 +4500,13 @@ local function statement(vm: *EVM): void
 			vm:setLoopHasStep()
 		end
 		while vm.token ~= ')'_u8 and vm.token ~= 0 do
-			next(vm)
+			next()
 		end
 		
-		match(vm, ')'_u8)
+		match(')'_u8)
 		
 		-- loop body
-		statement(vm)
+		statement()
 		
 		-- save our spot again
 		-- we'll return to the step expressions now,
@@ -4524,19 +4524,19 @@ local function statement(vm: *EVM): void
 		-- we need to generate the step expressions now
 		local has_step: boolean
 
-		next(vm)
+		next()
 		if vm.token ~= ')'_u8 then
 			vm:setLoopStep(vm.bytecode_len)
 		end
 		while vm.token ~= ')'_u8 do
-			expression(vm, Token.ASSIGN)
+			expression(Token.ASSIGN)
 			
 			if vm.token == ','_u8 then
-				match(vm, ','_u8)
+				match(','_u8)
 			end
 		end
 
-		match(vm, ')'_u8)
+		match(')'_u8)
 
 		-- time to wrap up the loop with a jump
 		vm:emitOp(Opcode.JUMP)
@@ -4557,7 +4557,7 @@ local function statement(vm: *EVM): void
 		vm.line = end_line
 		vm.src_index = end_index
 		
-		next(vm)
+		next()
 
 		-- cleanup any loop init variables allocated
 		local size: uinteger = vm:getScopeLocalsSize()
@@ -4593,15 +4593,15 @@ local function statement(vm: *EVM): void
 			-----------------------------
 		]]
 
-		match(vm, Token.WHILE)
+		match(Token.WHILE)
 
 		a = vm.bytecode_len
 
 		vm:pushLoop(vm.bytecode_len)
 
-		match(vm, '('_u8)
+		match('('_u8)
 
-		expression(vm, Token.ASSIGN)
+		expression(Token.ASSIGN)
 
 		if vm.expr_type.type_id == EVMType.VOID then
 			vm.error = string.format("line %d:\ncannot use expression of type `void` as loop condition", vm.line)
@@ -4637,9 +4637,9 @@ local function statement(vm: *EVM): void
 			coroutine.yield()
 		end
 		
-		match(vm, ')'_u8)
+		match(')'_u8)
 
-		statement(vm)
+		statement()
 
 		vm:emitOp(Opcode.JUMP)
 		vm:emit16(a)
@@ -4651,7 +4651,7 @@ local function statement(vm: *EVM): void
 
 		vm:popLoop()
 	elseif vm.token == Token.RETURN then
-		match(vm, Token.RETURN)
+		match(Token.RETURN)
 
 		if vm.token ~= ';'_u8 then
 			if vm.current_func_id.type_info.type_id == EVMType.VOID then
@@ -4660,7 +4660,7 @@ local function statement(vm: *EVM): void
 				coroutine.yield()
 			end
 
-			expression(vm, Token.ASSIGN)
+			expression(Token.ASSIGN)
 			
 			local target_info: TypeInfo = vm.current_func_id.type_info
 
@@ -4728,11 +4728,11 @@ local function statement(vm: *EVM): void
 			coroutine.yield()
 		end
 
-		match(vm, ';'_u8)
+		match(';'_u8)
 
 		vm:emitOp(Opcode.RETURN)
 	elseif vm.token == Token.BREAK then
-		match(vm, Token.BREAK)
+		match(Token.BREAK)
 
 		if #vm.loop_info_stack == 0 then
 			vm.error = string.format("line %d:\nbreak statement is not in a loop", vm.line)
@@ -4748,9 +4748,9 @@ local function statement(vm: *EVM): void
 		vm:addBreak(vm.bytecode_len)
 		vm:emit16(0)
 		
-		match(vm, ';'_u8)
+		match(';'_u8)
 	elseif vm.token == Token.CONTINUE then
-		match(vm, Token.CONTINUE)
+		match(Token.CONTINUE)
 
 		if #vm.loop_info_stack == 0 then
 			vm.error = string.format("line %d:\ncontinue statement is not in a loop", vm.line)
@@ -4771,11 +4771,11 @@ local function statement(vm: *EVM): void
 			vm:emit16(vm:getLoopStart())
 		end
 
-		match(vm, ';'_u8)
+		match(';'_u8)
 	elseif vm.token == '{'_u8 then
 		local scope_line: uinteger = vm.line
 
-		match(vm, '{'_u8)
+		match('{'_u8)
 
 		vm:pushScope()
 
@@ -4784,10 +4784,10 @@ local function statement(vm: *EVM): void
 		vm:emit16(0)
 		
 		while vm.token ~= '}'_u8 do
-			statement(vm)
+			statement()
 		end
 
-		match(vm, '}'_u8)
+		match('}'_u8)
 
 		-- cleanup any local variables allocated
 		local size: uinteger = vm:getScopeLocalsSize()
@@ -4814,15 +4814,15 @@ local function statement(vm: *EVM): void
 		vm:popScope()
 	elseif vm.token == ';'_u8 then
 		-- empty statement
-		match(vm, ';'_u8)
+		match(';'_u8)
 	else
 		-- TODO: don't allow expressions that will leave an unused value on the opstack
-		expression(vm, Token.ASSIGN)
-		match(vm, ';'_u8)
+		expression(Token.ASSIGN)
+		match(';'_u8)
 	end
 end
 
-local function enumDeclaration(vm: *EVM): void
+local function enumDeclaration(): void
 	local i: int32
 	while vm.token ~= '}'_u8 do
 		if vm.token ~= Token.ID then
@@ -4832,17 +4832,17 @@ local function enumDeclaration(vm: *EVM): void
 			vm.compile_err = true
 			coroutine.yield()
 		end
-		next(vm)
+		next()
 
 		if vm.token == Token.ASSIGN then
-			next(vm)
+			next()
 			if vm.token ~= Token.INT_LITERAL then
 				vm.error = string.format("line %d:\nbad enum value", vm.line)
 				vm.compile_err = true
 				coroutine.yield()
 			end
 			i = vm.token_val
-			next(vm)
+			next()
 		end
 
 		vm.current_id.class = Class.CONSTANT
@@ -4852,12 +4852,12 @@ local function enumDeclaration(vm: *EVM): void
 		i = i + 1
 
 		if vm.token == ','_u8 then
-			next(vm)
+			next()
 		end
 	end
 end
 
-local function functionParameters(vm: *EVM, hook_index: integer): void
+local function functionParameters(hook_index: integer): void
 	local arg_type: uinteger
 	local arg_index: uinteger
 
@@ -4867,32 +4867,32 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 		arg_type = EVMType.INT
 		
 		if vm.token == Token.VOID then
-			match(vm, Token.VOID)
+			match(Token.VOID)
 			arg_type = EVMType.VOID
 		elseif vm.token == Token.INT then
-			match(vm, Token.INT)
+			match(Token.INT)
 			arg_type = EVMType.INT
 		elseif vm.token == Token.FLOAT then
-			match(vm, Token.FLOAT)
+			match(Token.FLOAT)
 			arg_type = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			structref = vm.struct_vec2
-			match(vm, Token.VEC2)
+			match(Token.VEC2)
 			arg_type = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			structref = vm.struct_vec3
-			match(vm, Token.VEC3)
+			match(Token.VEC3)
 			arg_type = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			structref = vm.current_id.type_info.structref
-			match(vm, Token.STRUCT_ID)
+			match(Token.STRUCT_ID)
 			arg_type = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			structref = vm.struct_string
-			match(vm, Token.STRING)
+			match(Token.STRING)
 			arg_type = EVMType.STRING
 		elseif vm.token == Token.VARARGS then
-			match(vm, Token.VARARGS)
+			match(Token.VARARGS)
 			vm.current_func_id.is_varargs = true
 			vm.current_func_id.varargs_index = arg_index
 			break
@@ -4907,20 +4907,20 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			arg_type = arg_type + EVMType.POINTER
 		end
 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
-			match(vm, '('_u8)
-			fptr_info = functionPointerType(vm, structref, arg_type, false)
+			match('('_u8)
+			fptr_info = functionPointerType(structref, arg_type, false)
 			structref = nilptr
 			arg_type = EVMType.FUNC_POINTER
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			arg_type = arg_type + EVMType.POINTER
 		end
 
@@ -4944,7 +4944,7 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 			coroutine.yield()
 		end
 
-		match(vm, Token.ID)
+		match(Token.ID)
 
 		vm.current_id.class = Class.ARG
 		vm.current_id.type_info = {arg_type, structref, fptr_info}
@@ -4962,7 +4962,7 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 		vm.current_func_id.argdata:push(vm.current_id.type_info)
 
 		if vm.token == ','_u8 then
-			match(vm, ','_u8)
+			match(','_u8)
 		end
 	end
 
@@ -4987,22 +4987,22 @@ local function functionParameters(vm: *EVM, hook_index: integer): void
 	end
 end
 
-local function functionBody(vm: *EVM): void
+local function functionBody(): void
 	vm.local_index = 0
 	while vm.token ~= '}'_u8 do
-		statement(vm)
+		statement()
 	end
 
 	--if vm.prev_opcode ~= Opcode.RETURN then
 	vm:emitOp(Opcode.RETURN)
 end
 
-local function functionDeclaration(vm: *EVM, hook_index: integer): void
+local function functionDeclaration(hook_index: integer): void
 	vm:pushScope() -- function scope
-	match(vm, '('_u8)
-	functionParameters(vm, hook_index)
-	match(vm, ')'_u8)
-	match(vm, '{'_u8)
+	match('('_u8)
+	functionParameters(hook_index)
+	match(')'_u8)
+	match('{'_u8)
 
 	if vm.current_func_id.is_varargs then
 		-- establish starting point for vararg pointer and set vargs flag
@@ -5014,8 +5014,8 @@ local function functionDeclaration(vm: *EVM, hook_index: integer): void
 	local new_l_index: uinteger = vm.bytecode_len
 	vm:emit16(0)
 	
-	functionBody(vm)
-	match(vm, '}'_u8)
+	functionBody()
+	match('}'_u8)
 	
 	-- patch new_l size
 	local size: uinteger = vm:getScopeLocalsSize()
@@ -5033,7 +5033,7 @@ local function functionDeclaration(vm: *EVM, hook_index: integer): void
 	vm:popScope()
 end
 
-local function structDeclaration(vm: *EVM): void
+local function structDeclaration(): void
 	local struct_id: *Identifier
 	local struct: *Struct = new(@Struct)
 	local member: *Identifier
@@ -5045,7 +5045,7 @@ local function structDeclaration(vm: *EVM): void
 
 	struct.is_complete = false
 	
-	match(vm, Token.STRUCT)
+	match(Token.STRUCT)
 
 	if vm.token ~= Token.ID then
 		vm.error = string.format(
@@ -5069,36 +5069,36 @@ local function structDeclaration(vm: *EVM): void
 	struct_id.type_info = {EVMType.STRUCT, struct}
 	vm.struct_ids[struct_id.name] = struct_id
 
-	match(vm, Token.ID)
-	match(vm, '{'_u8)
+	match(Token.ID)
+	match('{'_u8)
 
 	while vm.token ~= '}'_u8 do
 		member_structref = nilptr
 		base_type = EVMType.INT
 		
 		if vm.token == Token.VOID then
-			match(vm, Token.VOID)
+			match(Token.VOID)
 			base_type = EVMType.VOID
 		elseif vm.token == Token.INT then
-			match(vm, Token.INT)
+			match(Token.INT)
 		elseif vm.token == Token.FLOAT then
-			match(vm, Token.FLOAT)
+			match(Token.FLOAT)
 			base_type = EVMType.FLOAT
 		elseif vm.token == Token.VEC2 then
 			member_structref = vm.struct_vec2
-			match(vm, Token.VEC2)
+			match(Token.VEC2)
 			base_type = EVMType.VEC2
 		elseif vm.token == Token.VEC3 then
 			member_structref = vm.struct_vec3
-			match(vm, Token.VEC3)
+			match(Token.VEC3)
 			base_type = EVMType.VEC3
 		elseif vm.token == Token.STRUCT_ID then
 			member_structref = vm.current_id.type_info.structref
-			match(vm, Token.STRUCT_ID)
+			match(Token.STRUCT_ID)
 			base_type = EVMType.STRUCT
 		elseif vm.token == Token.STRING then
 			member_structref = vm.struct_string
-			match(vm, Token.STRING)
+			match(Token.STRING)
 			base_type = EVMType.STRING
 		else
 			vm.error = string.format(
@@ -5113,20 +5113,20 @@ local function structDeclaration(vm: *EVM): void
 		member_type = base_type
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			member_type = member_type + EVMType.POINTER
 		end
 
 		-- check for function pointer syntax
 		if vm.token == '('_u8 then
-			match(vm, '('_u8)
-			member_fptr_info = functionPointerType(vm, member_structref, member_type, true)
+			match('('_u8)
+			member_fptr_info = functionPointerType(member_structref, member_type, true)
 			member_structref = nilptr
 			member_type = EVMType.FUNC_POINTER
 		end
 
 		while vm.token == Token.MUL do
-			match(vm, Token.MUL)
+			match(Token.MUL)
 			member_type = member_type + EVMType.POINTER
 		end
 
@@ -5153,7 +5153,7 @@ local function structDeclaration(vm: *EVM): void
 			coroutine.yield()
 		end
 
-		match(vm, Token.ID)
+		match(Token.ID)
 		member = new(@Identifier)
 		member.name = vm.current_id_name
 		member.type_info = {member_type, member_structref, member_fptr_info}
@@ -5169,15 +5169,15 @@ local function structDeclaration(vm: *EVM): void
 		
 		struct:addMember(member)
 		
-		match(vm, ';'_u8)
+		match(';'_u8)
 	end
 
 	struct.is_complete = true
 
-	match(vm, '}'_u8)
+	match('}'_u8)
 end
 
-local function globalDeclaration(vm: *EVM): void
+local function globalDeclaration(): void
 	local base_type: uinteger
 	local var_type: uinteger
 	local temp: uinteger
@@ -5187,42 +5187,42 @@ local function globalDeclaration(vm: *EVM): void
 	base_type = EVMType.INT
 
 	if vm.token == Token.ENUM then
-		match(vm, Token.ENUM)
-		match(vm, '{'_u8)
-		enumDeclaration(vm)
-		match(vm, '}'_u8)
-		match(vm, ';'_u8)
+		match(Token.ENUM)
+		match('{'_u8)
+		enumDeclaration()
+		match('}'_u8)
+		match(';'_u8)
 		return
 	elseif vm.token == Token.STRUCT then
-		structDeclaration(vm)
-		match(vm, ';'_u8)
+		structDeclaration()
+		match(';'_u8)
 		return
 	end
 
 	if vm.token == Token.VOID then
-		match(vm, Token.VOID)
+		match(Token.VOID)
 		base_type = EVMType.VOID
 	elseif vm.token == Token.INT then
-		match(vm, Token.INT)
+		match(Token.INT)
 		base_type = EVMType.INT
 	elseif vm.token == Token.FLOAT then
-		match(vm, Token.FLOAT)
+		match(Token.FLOAT)
 		base_type = EVMType.FLOAT
 	elseif vm.token == Token.VEC2 then
 		structref = vm.struct_vec2
-		match(vm, Token.VEC2)
+		match(Token.VEC2)
 		base_type = EVMType.VEC2
 	elseif vm.token == Token.VEC3 then
 		structref = vm.struct_vec3
-		match(vm, Token.VEC3)
+		match(Token.VEC3)
 		base_type = EVMType.VEC3
 	elseif vm.token == Token.STRUCT_ID then
 		structref = vm.current_id.type_info.structref
-		match(vm, Token.STRUCT_ID)
+		match(Token.STRUCT_ID)
 		base_type = EVMType.STRUCT
 	elseif vm.token == Token.STRING then
 		structref = vm.struct_string
-		match(vm, Token.STRING)
+		match(Token.STRING)
 		base_type = EVMType.STRING
 	else
 		vm.error = string.format(
@@ -5237,20 +5237,20 @@ local function globalDeclaration(vm: *EVM): void
 	var_type = base_type
 	
 	while vm.token == Token.MUL do
-		match(vm, Token.MUL)
+		match(Token.MUL)
 		var_type = var_type + EVMType.POINTER
 	end
 
 	-- check for function pointer syntax
 	if vm.token == '('_u8 then
-		match(vm, '('_u8)
-		fptr_info = functionPointerType(vm, structref, var_type, false)
+		match('('_u8)
+		fptr_info = functionPointerType(structref, var_type, false)
 		structref = nilptr
 		var_type = EVMType.FUNC_POINTER
 	end
 
 	while vm.token == Token.MUL do
-		match(vm, Token.MUL)
+		match(Token.MUL)
 		var_type = var_type + EVMType.POINTER
 	end
 
@@ -5269,7 +5269,7 @@ local function globalDeclaration(vm: *EVM): void
 		coroutine.yield()
 	end
 
-	match(vm, Token.ID)
+	match(Token.ID)
 	vm.current_id.type_info = {var_type, structref, fptr_info}
 	vm:addScopedSymbol(vm.current_id.name, vm.current_id)
 
@@ -5306,7 +5306,7 @@ local function globalDeclaration(vm: *EVM): void
 		end
 
 		vm.current_func_id = vm.current_id
-		functionDeclaration(vm, hook_index)
+		functionDeclaration(hook_index)
 	else
 		if var_type ~= EVMType.VOID then
 			vm.current_id.class = Class.GLOBAL
@@ -5324,13 +5324,13 @@ local function globalDeclaration(vm: *EVM): void
 				vm.current_id.is_array = true
 				vm.current_id.type_info.type_id = vm.current_id.type_info.type_id + EVMType.POINTER
 
-				match(vm, Token.BRAK)
+				match(Token.BRAK)
 				
 				local array_size: uinteger
 
 				if vm.token == Token.INT_LITERAL then
 					array_size = vm.token_val
-					match(vm, Token.INT_LITERAL)
+					match(Token.INT_LITERAL)
 				elseif vm.token == Token.ID then
 					if not vm.has_id then
 						vm.error = string.format("line %d:\nundefined identifier `%s`", vm.line, vm.current_id.name)
@@ -5344,7 +5344,7 @@ local function globalDeclaration(vm: *EVM): void
 
 					array_size = vm.current_id.const_val
 					
-					match(vm, Token.ID)
+					match(Token.ID)
 				else
 					vm.error = string.format(
 						"line %d:\nexpected tokens `int literal` or `constant identifier`, got `%s`",
@@ -5365,7 +5365,7 @@ local function globalDeclaration(vm: *EVM): void
 
 				vm.globals_len = vm.globals_len + array_size
 
-				match(vm, ']'_u8)
+				match(']'_u8)
 			else
 				vm.globals_len = vm.globals_len + type_size
 			end
@@ -5376,7 +5376,7 @@ local function globalDeclaration(vm: *EVM): void
 				coroutine.yield()
 			end
 
-			match(vm, ';'_u8)
+			match(';'_u8)
 		else
 			vm.error = string.format("line %d:\ncannot declare variable of type `void`", vm.line)
 			vm.compile_err = true
@@ -5385,7 +5385,7 @@ local function globalDeclaration(vm: *EVM): void
 	end
 end
 
-local function program(vm: *EVM): void
+local function program(): void
 	vm.rom_len = 0
 	vm.bytecode_len = 0
 	vm.globals_len = 0
@@ -5400,9 +5400,9 @@ local function program(vm: *EVM): void
 	vm.prev_src_index = 1
 	vm:pushScope() -- global scope
 	
-	next(vm)
+	next()
 	while vm.token ~= 0 do
-		globalDeclaration(vm)
+		globalDeclaration()
 	end
 
 	vm:popScope()

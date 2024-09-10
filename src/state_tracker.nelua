@@ -31,6 +31,10 @@ local TrackerData = @record {
     byte_val: uint8
 }
 
+local load_sample_filters: []cstring = {
+    "*.wav"
+}
+
 local note_names: [SOUNDCHIP_OCTAVE_SIZE]string = {
     "C-",
     "C#",
@@ -80,14 +84,14 @@ local mouse_in_seqbank_list: boolean = false
 local mouse_in_wavbank_list: boolean = false
 local data: TrackerData
 
-local function drawLevels(sm: *StateMachine, vm: *EVM): void
+local function drawLevels(): void
     local l: BKFrame = 0
     local r: BKFrame = 0
 
     for i = 0, < SOUNDCHIP_FRAMES_PER_UPDATE do
         local idx: uinteger = i * 2
-        local ltemp: BKFrame = math.abs(vm.soundchip.aobmem[idx])
-        local rtemp: BKFrame = math.abs(vm.soundchip.aobmem[idx + 1])
+        local ltemp: BKFrame = math.abs(soundchip.aobmem[idx])
+        local rtemp: BKFrame = math.abs(soundchip.aobmem[idx + 1])
 
         if ltemp > l then l = ltemp end
         if rtemp > r then r = rtemp end
@@ -96,32 +100,32 @@ local function drawLevels(sm: *StateMachine, vm: *EVM): void
     --print("left", l, "right", r)
 end
 
-local function drawSong(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:print2D(6, 18, GPU_WHITE, "SEQBANK:")
+local function drawSong(): void
+    gpu:print2D(6, 18, GPU_WHITE, "SEQBANK:")
     local bank_x: int32 = 60
     for i = 0, <= 7 do
-        if i + 1 == vm.soundchip.current_seqbank then
-            vm.gpu:drawRect2D(bank_x, 18, 12, 9, GPU_ALPHA_GRAY)
-            vm.gpu:printHexNibble2D(bank_x + 3, 18, core.cursor_color, i)
+        if i + 1 == soundchip.current_seqbank then
+            gpu:drawRect2D(bank_x, 18, 12, 9, GPU_ALPHA_GRAY)
+            gpu:printHexNibble2D(bank_x + 3, 18, core.cursor_color, i)
         else
-            vm.gpu:printHexNibble2D(bank_x + 3, 18, GPU_LGRAY, i)
+            gpu:printHexNibble2D(bank_x + 3, 18, GPU_LGRAY, i)
         end
         bank_x = bank_x + 12
     end
-    vm.gpu:print2D(6, 27, GPU_WHITE, "WAVBANK:")
+    gpu:print2D(6, 27, GPU_WHITE, "WAVBANK:")
     local bank_x: int32 = 60
     for i = 0, <= 1 do
-        if i + 1 == vm.soundchip.current_wavbank then
-            vm.gpu:drawRect2D(bank_x, 27, 12, 9, GPU_ALPHA_GRAY)
-            vm.gpu:printHexNibble2D(bank_x + 3, 27, core.cursor_color, i)
+        if i + 1 == soundchip.current_wavbank then
+            gpu:drawRect2D(bank_x, 27, 12, 9, GPU_ALPHA_GRAY)
+            gpu:printHexNibble2D(bank_x + 3, 27, core.cursor_color, i)
         else
-            vm.gpu:printHexNibble2D(bank_x + 3, 27, GPU_LGRAY, i)
+            gpu:printHexNibble2D(bank_x + 3, 27, GPU_LGRAY, i)
         end
         bank_x = bank_x + 12
     end
 
     local selcol: uint32 = (data.current_editor == Editor.SONG) and core.cursor_color or GPU_GRAY
-    vm.gpu:drawRectLines2D(4, 16, 154, 94, selcol)
+    gpu:drawRectLines2D(4, 16, 154, 94, selcol)
 
     local start_row: int32 = util.midI(0, data.song_y - 3, 248)
 
@@ -130,20 +134,20 @@ local function drawSong(sm: *StateMachine, vm: *EVM): void
             local startx: int32 = 18 + x * 12
             local starty: int32 = 36 + y * 9
             local row: int32
-            local byte_val: uint8 = vm.soundchip.song_data[8 * (start_row + y) + x]
+            local byte_val: uint8 = soundchip.song_data[8 * (start_row + y) + x]
 
-            vm.gpu:printHexByte2D(6, starty, GPU_LGRAY, start_row + y)
+            gpu:printHexByte2D(6, starty, GPU_LGRAY, start_row + y)
 
             if (data.song_x /// 2) == x and data.song_y == (start_row + y) then
-                vm.gpu:drawRect2D(startx + ((data.song_x & 1) * 6), starty, 6, 9, selcol)
+                gpu:drawRect2D(startx + ((data.song_x & 1) * 6), starty, 6, 9, selcol)
             end
 
             local col: uint32 = GPU_PALETTE[x]
 
             if byte_val == SOUNDCHIP_EMPTY_VALUE then
-                vm.gpu:print2D(startx, starty, col, "..")
+                gpu:print2D(startx, starty, col, "..")
             else
-                vm.gpu:printHexByte2D(startx, starty, col, byte_val)
+                gpu:printHexByte2D(startx, starty, col, byte_val)
             end
         end
     end
@@ -163,7 +167,7 @@ local function getNoteText(note: uint8): string
     end
 end
 
-local function drawPatterns(sm: *StateMachine, vm: *EVM): void
+local function drawPatterns(): void
     local start_track: int32 = 0
     local start_pattern_y: int32 = 126
 
@@ -171,18 +175,18 @@ local function drawPatterns(sm: *StateMachine, vm: *EVM): void
         local start_pattern_x: int32 = 6 + (i * 13 * 6)
 
         local selcol: uint32 = (data.current_editor == Editor.PATTERN and data.track == start_track + i) and core.cursor_color or GPU_GRAY
-        vm.gpu:drawRectLines2D(start_pattern_x - 2, start_pattern_y - 11, 76, 157, selcol)
+        gpu:drawRectLines2D(start_pattern_x - 2, start_pattern_y - 11, 76, 157, selcol)
 
         local col: uint32 = GPU_PALETTE[start_track + i]
-        vm.gpu:print2D(start_pattern_x + 12, start_pattern_y - 9, col, "TRACK")
-        vm.gpu:printHexNibble2D(start_pattern_x + 48, start_pattern_y - 9, col, start_track + i)
+        gpu:print2D(start_pattern_x + 12, start_pattern_y - 9, col, "TRACK")
+        gpu:printHexNibble2D(start_pattern_x + 48, start_pattern_y - 9, col, start_track + i)
 
-        local pattern_id: uint8 = vm.soundchip.song_data[8 * data.song_y + (start_track + i)]
+        local pattern_id: uint8 = soundchip.song_data[8 * data.song_y + (start_track + i)]
 
         if pattern_id == SOUNDCHIP_EMPTY_VALUE then
-            vm.gpu:print2D(start_pattern_x + 60, start_pattern_y - 9, GPU_GRAY, "..")
+            gpu:print2D(start_pattern_x + 60, start_pattern_y - 9, GPU_GRAY, "..")
         else
-            vm.gpu:printHexByte2D(start_pattern_x + 60, start_pattern_y - 9, GPU_LGRAY, pattern_id)
+            gpu:printHexByte2D(start_pattern_x + 60, start_pattern_y - 9, GPU_LGRAY, pattern_id)
         end
 
         if pattern_id ~= SOUNDCHIP_EMPTY_VALUE then
@@ -202,56 +206,56 @@ local function drawPatterns(sm: *StateMachine, vm: *EVM): void
                         cx = 18 + ((data.pattern_x - 1) * 6)
                     end
 
-                    vm.gpu:drawRect2D(start_pattern_x + 12 + cx, y, cw, 9, selcol)
+                    gpu:drawRect2D(start_pattern_x + 12 + cx, y, cw, 9, selcol)
                 end
 
-                local row: *[0]uint8 = vm.soundchip:getPatternRow(pattern_id, start_row + j)
+                local row: *[0]uint8 = soundchip:getPatternRow(pattern_id, start_row + j)
                 local note: uint8 = row[0]
                 local vol: uint8 = row[1]
                 local instr: uint8 = row[2]
                 local fx: uint8 = row[3]
                 local arg: uint8 = row[4]
 
-                vm.gpu:printHexByte2D(start_pattern_x, y, ((start_row + j) & 0b11 == 0) and GPU_LGRAY or GPU_GRAY, start_row + j)
-                vm.gpu:print2D(start_pattern_x + 12, y, GPU_WHITE, getNoteText(note))
+                gpu:printHexByte2D(start_pattern_x, y, ((start_row + j) & 0b11 == 0) and GPU_LGRAY or GPU_GRAY, start_row + j)
+                gpu:print2D(start_pattern_x + 12, y, GPU_WHITE, getNoteText(note))
                 if vol == SOUNDCHIP_EMPTY_VALUE then
-                    vm.gpu:print2D(start_pattern_x + 30, y, GPU_GREEN, "..")
+                    gpu:print2D(start_pattern_x + 30, y, GPU_GREEN, "..")
                 else
-                    vm.gpu:printHexByte2D(start_pattern_x + 30, y, GPU_GREEN, vol)
+                    gpu:printHexByte2D(start_pattern_x + 30, y, GPU_GREEN, vol)
                 end
                 if instr == SOUNDCHIP_EMPTY_VALUE then
-                    vm.gpu:print2D(start_pattern_x + 42, y, GPU_LBLUE, "..")
+                    gpu:print2D(start_pattern_x + 42, y, GPU_LBLUE, "..")
                 else
-                    vm.gpu:printHexByte2D(start_pattern_x + 42, y, GPU_LBLUE, instr)
+                    gpu:printHexByte2D(start_pattern_x + 42, y, GPU_LBLUE, instr)
                 end
-                vm.gpu:print2D(start_pattern_x + 54, y, GPU_PURPULE, ".")
+                gpu:print2D(start_pattern_x + 54, y, GPU_PURPULE, ".")
                 if fx == SOUNDCHIP_EMPTY_VALUE then
-                    vm.gpu:print2D(start_pattern_x + 60, y, GPU_PINK, "..")
+                    gpu:print2D(start_pattern_x + 60, y, GPU_PINK, "..")
                 else
-                    vm.gpu:printHexByte2D(start_pattern_x + 60, y, GPU_PINK, arg)
+                    gpu:printHexByte2D(start_pattern_x + 60, y, GPU_PINK, arg)
                 end
             end
         else
-            vm.gpu:print2D(start_pattern_x + 18, start_pattern_y + 7 * 9, GPU_LGRAY, "EMPTY")
+            gpu:print2D(start_pattern_x + 18, start_pattern_y + 7 * 9, GPU_LGRAY, "EMPTY")
         end
     end
 end
 
-local function drawInstrument(sm: *StateMachine, vm: *EVM): void
+local function drawInstrument(): void
     local selcol: uint32 = (data.current_editor == Editor.INSTRUMENT) and core.cursor_color or GPU_GRAY
-    vm.gpu:drawRectLines2D(4, 277, 154, 67, selcol)
+    gpu:drawRectLines2D(4, 277, 154, 67, selcol)
 
-    vm.gpu:print2D(6, 279, GPU_WHITE, "INSTRUMENT")
+    gpu:print2D(6, 279, GPU_WHITE, "INSTRUMENT")
 
     if data.instrument_id == SOUNDCHIP_EMPTY_VALUE then
-        vm.gpu:print2D(71, 279, GPU_GRAY, "..")
+        gpu:print2D(71, 279, GPU_GRAY, "..")
     else
-        vm.gpu:printHexByte2D(71, 279, GPU_LGRAY, data.instrument_id)
+        gpu:printHexByte2D(71, 279, GPU_LGRAY, data.instrument_id)
 
         local label_x: int32 = 6
         local value_x: int32 = 78
         local current_y: int32 = 288
-        local idata: *[0]uint8 = vm.soundchip:getInstrument(data.instrument_id)
+        local idata: *[0]uint8 = soundchip:getInstrument(data.instrument_id)
         local flags: uint8 = idata[0]
         local sample_start: uint32 = ((@uint32)(idata[1]) << 16) | ((@uint32)(idata[2]) << 8) | (@uint32)(idata[3])
         local sample_end: uint32 = ((@uint32)(idata[4]) << 16) | ((@uint32)(idata[5]) << 8) | (@uint32)(idata[6])
@@ -263,92 +267,92 @@ local function drawInstrument(sm: *StateMachine, vm: *EVM): void
         local release: uint8 = idata[16]
 
         -- draw name background rect
-        vm.gpu:drawRect2D(value_x, current_y, 48, 9, GPU_DGRAY)
+        gpu:drawRect2D(value_x, current_y, 48, 9, GPU_DGRAY)
 
         -- draw cursor
         switch data.instrument_y do
             case 0 then -- name
-                vm.gpu:drawRect2D(value_x + data.instrument_x * 6, 288, 6, 9, selcol)
+                gpu:drawRect2D(value_x + data.instrument_x * 6, 288, 6, 9, selcol)
             case 1 then -- sample mode
-                vm.gpu:drawRect2D(value_x, 297, 36, 9, selcol)
+                gpu:drawRect2D(value_x, 297, 36, 9, selcol)
             case 2 then -- sample start+end/wavmap id
-                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 306, 6, 9, selcol)
+                gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 306, 6, 9, selcol)
             case 3 then -- loop mode
-                vm.gpu:drawRect2D(value_x, 315, 48, 9, selcol)
+                gpu:drawRect2D(value_x, 315, 48, 9, selcol)
             case 4 then -- loop range
-                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 324, 6, 9, selcol)
+                gpu:drawRect2D(value_x + ((data.instrument_x /// 6) * 42) + ((data.instrument_x % 6) * 6), 324, 6, 9, selcol)
             case 5 then -- adsr
                 local y: int32 = 324
                 if flags & InstrumentFlag.LOOP_MASK == InstrumentFlag.LOOP_RANGE then
                     y = 333
                 end
-                vm.gpu:drawRect2D(value_x + ((data.instrument_x /// 2) * 18) + ((data.instrument_x & 1) * 6), y, 6, 9, selcol)
+                gpu:drawRect2D(value_x + ((data.instrument_x /// 2) * 18) + ((data.instrument_x & 1) * 6), y, 6, 9, selcol)
         end
 
-        vm.gpu:print2D(label_x, current_y, GPU_GRAY, "NAME")
+        gpu:print2D(label_x, current_y, GPU_GRAY, "NAME")
         local x: int32 = value_x
         for i = 0, < 8 do
-            vm.gpu:drawChar2D(idata[17 + i], &x, current_y, {0xFF, 0xFF, 0xFF, 0xFF})
+            gpu:drawChar2D(idata[17 + i], &x, current_y, {0xFF, 0xFF, 0xFF, 0xFF})
         end
         current_y = current_y + 9
 
-        vm.gpu:print2D(label_x, current_y, GPU_GRAY, "SAMPLE MODE")
+        gpu:print2D(label_x, current_y, GPU_GRAY, "SAMPLE MODE")
         if flags & InstrumentFlag.MANUAL ~= 0 then
-            vm.gpu:print2D(value_x, current_y, GPU_WHITE, "MANUAL")
+            gpu:print2D(value_x, current_y, GPU_WHITE, "MANUAL")
             current_y = current_y + 9
 
-            vm.gpu:print2D(label_x, current_y, GPU_GRAY, "START/END")
-            vm.gpu:printHexByte2D(value_x, current_y, GPU_WHITE, (sample_start >> 16) & 0xFF)
-            vm.gpu:printHexByte2D(value_x + 12, current_y, GPU_WHITE, (sample_start >> 8) & 0xFF)
-            vm.gpu:printHexByte2D(value_x + 24, current_y, GPU_WHITE, sample_start & 0xFF)
+            gpu:print2D(label_x, current_y, GPU_GRAY, "START/END")
+            gpu:printHexByte2D(value_x, current_y, GPU_WHITE, (sample_start >> 16) & 0xFF)
+            gpu:printHexByte2D(value_x + 12, current_y, GPU_WHITE, (sample_start >> 8) & 0xFF)
+            gpu:printHexByte2D(value_x + 24, current_y, GPU_WHITE, sample_start & 0xFF)
 
-            vm.gpu:printHexByte2D(value_x + 42, current_y, GPU_WHITE, (sample_end >> 16) & 0xFF)
-            vm.gpu:printHexByte2D(value_x + 54, current_y, GPU_WHITE, (sample_end >> 8) & 0xFF)
-            vm.gpu:printHexByte2D(value_x + 66, current_y, GPU_WHITE, sample_end & 0xFF)
+            gpu:printHexByte2D(value_x + 42, current_y, GPU_WHITE, (sample_end >> 16) & 0xFF)
+            gpu:printHexByte2D(value_x + 54, current_y, GPU_WHITE, (sample_end >> 8) & 0xFF)
+            gpu:printHexByte2D(value_x + 66, current_y, GPU_WHITE, sample_end & 0xFF)
         else
-            vm.gpu:print2D(value_x, current_y, GPU_WHITE, "WAVMAP")
+            gpu:print2D(value_x, current_y, GPU_WHITE, "WAVMAP")
             current_y = current_y + 9
 
-            vm.gpu:print2D(label_x, current_y, GPU_GRAY, "MAP ID")
-            vm.gpu:printHexNibble2D(value_x, current_y, GPU_WHITE, (sample_start >> 8) & 0xF)
-            vm.gpu:printHexByte2D(value_x + 6, current_y, GPU_WHITE, sample_start & 0xFF)
+            gpu:print2D(label_x, current_y, GPU_GRAY, "MAP ID")
+            gpu:printHexNibble2D(value_x, current_y, GPU_WHITE, (sample_start >> 8) & 0xF)
+            gpu:printHexByte2D(value_x + 6, current_y, GPU_WHITE, sample_start & 0xFF)
         end
         current_y = current_y + 9
     
-        vm.gpu:print2D(label_x, current_y, GPU_GRAY, "LOOP MODE")
+        gpu:print2D(label_x, current_y, GPU_GRAY, "LOOP MODE")
         switch flags & InstrumentFlag.LOOP_MASK do
             case InstrumentFlag.LOOP_OFF then
-                vm.gpu:print2D(value_x, current_y, GPU_WHITE, "OFF")
+                gpu:print2D(value_x, current_y, GPU_WHITE, "OFF")
             case InstrumentFlag.LOOP_FORWARD then
-                vm.gpu:print2D(value_x, current_y, GPU_WHITE, "FORWARD")
+                gpu:print2D(value_x, current_y, GPU_WHITE, "FORWARD")
             case InstrumentFlag.LOOP_PINGPONG then
-                vm.gpu:print2D(value_x, current_y, GPU_WHITE, "PINGPONG")
+                gpu:print2D(value_x, current_y, GPU_WHITE, "PINGPONG")
             case InstrumentFlag.LOOP_RANGE then
-                vm.gpu:print2D(value_x, current_y, GPU_WHITE, "RANGE")
+                gpu:print2D(value_x, current_y, GPU_WHITE, "RANGE")
                 current_y = current_y + 9
 
                 local range_color: uint32 = (flags & InstrumentFlag.LOOP_MASK == InstrumentFlag.LOOP_RANGE) and GPU_WHITE or GPU_GRAY
-                vm.gpu:print2D(label_x, current_y, GPU_GRAY, "LOOP RANGE")
-                vm.gpu:printHexByte2D(value_x, current_y, range_color, (sustain_start >> 16) & 0xFF)
-                vm.gpu:printHexByte2D(value_x + 12, current_y, range_color, (sustain_start >> 8) & 0xFF)
-                vm.gpu:printHexByte2D(value_x + 24, current_y, range_color, sustain_start & 0xFF)
+                gpu:print2D(label_x, current_y, GPU_GRAY, "LOOP RANGE")
+                gpu:printHexByte2D(value_x, current_y, range_color, (sustain_start >> 16) & 0xFF)
+                gpu:printHexByte2D(value_x + 12, current_y, range_color, (sustain_start >> 8) & 0xFF)
+                gpu:printHexByte2D(value_x + 24, current_y, range_color, sustain_start & 0xFF)
                 
-                vm.gpu:printHexByte2D(value_x + 42, current_y, range_color, (sustain_end >> 16) & 0xFF)
-                vm.gpu:printHexByte2D(value_x + 54, current_y, range_color, (sustain_end >> 8) & 0xFF)
-                vm.gpu:printHexByte2D(value_x + 66, current_y, range_color, sustain_end & 0xFF)
+                gpu:printHexByte2D(value_x + 42, current_y, range_color, (sustain_end >> 16) & 0xFF)
+                gpu:printHexByte2D(value_x + 54, current_y, range_color, (sustain_end >> 8) & 0xFF)
+                gpu:printHexByte2D(value_x + 66, current_y, range_color, sustain_end & 0xFF)
         end
         current_y = current_y + 9
     
-        vm.gpu:print2D(label_x, current_y, GPU_GRAY, "ADSR")
-        vm.gpu:printHexByte2D(value_x, current_y, GPU_WHITE, attack)
-        vm.gpu:printHexByte2D(value_x + 18, current_y, GPU_WHITE, decay)
-        vm.gpu:printHexByte2D(value_x + 36, current_y, GPU_WHITE, sustain)
-        vm.gpu:printHexByte2D(value_x + 54, current_y, GPU_WHITE, release)
+        gpu:print2D(label_x, current_y, GPU_GRAY, "ADSR")
+        gpu:printHexByte2D(value_x, current_y, GPU_WHITE, attack)
+        gpu:printHexByte2D(value_x + 18, current_y, GPU_WHITE, decay)
+        gpu:printHexByte2D(value_x + 36, current_y, GPU_WHITE, sustain)
+        gpu:printHexByte2D(value_x + 54, current_y, GPU_WHITE, release)
     end
 end
 
-local function doNoteInput(vm: *EVM): boolean
-    local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
+local function doNoteInput(): boolean
+    local row: *[0]uint8 = soundchip:getPatternRow(soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
 
     if input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
         row[0] = SOUNDCHIP_EMPTY_VALUE
@@ -368,7 +372,7 @@ local function doNoteInput(vm: *EVM): boolean
     else
         for i = 0, < PIANO_KEYS_COUNT do
             if rl.isKeyPressed(piano_keys[i]) then
-                if vm.soundchip.audio_state.playing_flags == 0 then
+                if soundchip.audio_state.playing_flags == 0 then
                     local note: uint8 = (@uint8)(i + data.octave * SOUNDCHIP_OCTAVE_SIZE)
 
                     row[0] = note
@@ -385,11 +389,11 @@ local function doNoteInput(vm: *EVM): boolean
                         data.prev_instrument = row[2]
                     end
 
-                    vm.soundchip:playPreviewNote(note, data.prev_volume, data.prev_instrument)
+                    soundchip:playPreviewNote(note, data.prev_volume, data.prev_instrument)
                     return true
                 end
             elseif rl.isKeyReleased(piano_keys[i]) then
-                vm.soundchip:stopPreviewNote()
+                soundchip:stopPreviewNote()
                 return false
             end
         end
@@ -398,7 +402,7 @@ local function doNoteInput(vm: *EVM): boolean
     return false
 end
 
-global function stateTrackerInit(sm: *StateMachine, vm: *EVM): void
+global function stateTrackerInit(): void
     data.clipboard_len = 0
     data.clipboard_type = 0
     data.selection_start = 0
@@ -418,17 +422,54 @@ global function stateTrackerInit(sm: *StateMachine, vm: *EVM): void
     data.prev_instrument = 0
 end
 
-global function stateTrackerEnter(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setRenderTexture(RenderTexture.TRACKER)
+global function stateTrackerEnter(): void
+    gpu:setRenderTexture(RenderTexture.TRACKER)
 end
 
-global function stateTrackerExit(sm: *StateMachine, vm: *EVM): void
+global function stateTrackerExit(): void
 end
 
-global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
+global function stateTrackerUpdate(): void
     if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
-        sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
-        sm.queued_dialog = DialogID.IMPORT_SAMPLE
+        core:popup(LogEntryType.HOST_ERROR, "sample importing is disabled for now")
+
+        --[[
+
+        local sample_load_path: cstring = tinyfd.openFileDialog(
+			"Load Sample",
+			core.user_directory,
+			#load_sample_filters,
+			&load_sample_filters,
+			nilptr,
+			false
+		)
+
+		if sample_load_path ~= nilptr then
+            core.sample_to_import = rl.loadWave(sample_load_path)
+
+            if not rl.isWaveReady(core.sample_to_import) then
+                core:log(LogEntryType.HOST_ERROR, "failed to open sample file", true)
+                core.has_loaded_sample = false
+                return
+            end
+
+            if core.sample_to_import.sampleRate ~= SOUNDCHIP_SAMPLE_RATE or core.sample_to_import.sampleSize ~= 16 or core.sample_to_import.channels ~= 2 then
+                rl.waveFormat(&core.sample_to_import, SOUNDCHIP_SAMPLE_RATE, 16, 2)
+            end
+
+            if core.sample_to_import.frameCount > (MEMORY_WAVMEM_SIZE_ELEMENTS /// 2) then
+                core:log(LogEntryType.HOST_ERROR, "failed to load sample: file is too large", true)
+                rl.unloadWave(core.sample_to_import)
+                core.has_loaded_sample = false
+                return
+            end
+
+            core.has_loaded_sample = true
+            statemachine.queued_dialog = DialogID.SAMPLE_CONFIG
+		end
+
+        ]]
+
         return
     end
 
@@ -440,30 +481,30 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
         end
 
         if should_play then
-            if vm.soundchip.audio_state.playing_flags ~= 0 then
-                vm.soundchip:stopAllTracks()
+            if soundchip.audio_state.playing_flags ~= 0 then
+                soundchip:stopAllTracks()
             else
-                vm.soundchip:playSongRow(data.song_y)
+                soundchip:playSongRow(data.song_y)
             end
             return
         end
     end
 
-    if vm.soundchip.audio_state.playing_flags ~= 0 then
+    if soundchip.audio_state.playing_flags ~= 0 then
         return
     end
 
     mouse_in_seqbank_list = input.isMouseInRect(60, 18, 96, 9)
     mouse_in_wavbank_list = input.isMouseInRect(60, 27, 24, 9)
     if mouse_in_seqbank_list and input.left_clicked then
-        vm.soundchip:setBankPointers(
-            vm.soundchip.current_wavbank,
+        soundchip:setBankPointers(
+            soundchip.current_wavbank,
             SoundchipBank.SEQBANK0 + ((input.mouse_x - 60) /// 12)
         )
     elseif mouse_in_wavbank_list and input.left_clicked then
-        vm.soundchip:setBankPointers(
+        soundchip:setBankPointers(
             SoundchipBank.WAVBANK0 + ((input.mouse_x - 60) /// 12),
-            vm.soundchip.current_seqbank
+            soundchip.current_seqbank
         )
     end
     
@@ -523,7 +564,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                 end
             else
                 if input.hexEdit(
-                    &vm.soundchip.song_data[8 * data.song_y + (data.song_x /// 2)],
+                    &soundchip.song_data[8 * data.song_y + (data.song_x /// 2)],
                     &data.byte_val,
                     data.song_x & 1,
                     true
@@ -601,13 +642,13 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
             else
                 switch data.pattern_x do
                     case 0 then -- note
-                        if doNoteInput(vm) then
+                        if doNoteInput() then
                             data.pattern_y = util.wrapI(data.pattern_y + 1, 0, 64)
                         end
                     case 1,2,3,4,6,7 then -- vol, inst, arg
                         local nibble_index: uinteger
                         local byte_index: uinteger
-                        local row: *[0]uint8 = vm.soundchip:getPatternRow(vm.soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
+                        local row: *[0]uint8 = soundchip:getPatternRow(soundchip.song_data[8 * data.song_y + data.track], data.pattern_y)
 
                         if data.pattern_x < 6 then
                             nibble_index = (data.pattern_x - 1) & 1
@@ -649,7 +690,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                     data.instrument_x = 0
                     data.instrument_y = util.wrapI(data.instrument_y - 1, 0, 6)
                     if data.instrument_y == 4 then
-                        local idata: *[0]uint8 = vm.soundchip:getInstrument(data.instrument_id)
+                        local idata: *[0]uint8 = soundchip:getInstrument(data.instrument_id)
                         if idata[0] & InstrumentFlag.LOOP_MASK ~= InstrumentFlag.LOOP_RANGE then
                             data.instrument_y = data.instrument_y - 1
                         end
@@ -666,7 +707,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                     data.instrument_x = 0
                     data.instrument_y = util.wrapI(data.instrument_y + 1, 0, 6)
                     if data.instrument_y == 4 then
-                        local idata: *[0]uint8 = vm.soundchip:getInstrument(data.instrument_id)
+                        local idata: *[0]uint8 = soundchip:getInstrument(data.instrument_id)
                         if idata[0] & InstrumentFlag.LOOP_MASK ~= InstrumentFlag.LOOP_RANGE then
                             data.instrument_y = data.instrument_y + 1
                         end
@@ -681,7 +722,7 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
                 data.instrument_x = 0
                 data.instrument_y = 0
             else
-                local idata: *[0]uint8 = vm.soundchip:getInstrument(data.instrument_id)
+                local idata: *[0]uint8 = soundchip:getInstrument(data.instrument_id)
                 local flags: uint8 = idata[0]
                 local sample_start: uint32 = ((@uint32)(idata[1]) << 16) | ((@uint32)(idata[2]) << 8) | (@uint32)(idata[3])
                 local sample_end: uint32 = ((@uint32)(idata[4]) << 16) | ((@uint32)(idata[5]) << 8) | (@uint32)(idata[6])
@@ -808,28 +849,28 @@ global function stateTrackerUpdate(sm: *StateMachine, vm: *EVM): void
     end
 end
 
-global function stateTrackerDraw(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:colorMask(GPU_COLOR_MASK_A)
-	vm.gpu:clearColor(0)
-	vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
-    vm.gpu:camera2D(-1)
+global function stateTrackerDraw(): void
+    gpu:colorMask(GPU_COLOR_MASK_A)
+	gpu:clearColor(0)
+	gpu:clear(GPU_CLEAR_ALL)
+	gpu:colorMask(GPU_COLOR_MASK_ALL)
+    gpu:camera2D(-1)
 
     -- TODO: disable editing when in empty phrase/instrument
 
-    vm.gpu:print2D(250, 18, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SAMPLE")
+    gpu:print2D(250, 18, GPU_GRAY, "PRESS [CTRL+I] TO IMPORT SAMPLE")
 
-    if vm.soundchip.audio_state.playing_flags ~= 0 then
-        local ts: *TrackState = vm.soundchip:getTrackState(data.track)
+    if soundchip.audio_state.playing_flags ~= 0 then
+        local ts: *TrackState = soundchip:getTrackState(data.track)
         data.song_y = ts.song_pos
         data.pattern_y = ts.pattern_pos
     end
 
-    --drawLevels(sm, vm)
-    drawSong(sm, vm)
-    drawPatterns(sm, vm)
-    drawInstrument(sm, vm)
+    --drawLevels()
+    drawSong()
+    drawPatterns()
+    drawInstrument()
 end
 
-global function stateTrackerCleanup(sm: *StateMachine, vm: *EVM): void
+global function stateTrackerCleanup(): void
 end

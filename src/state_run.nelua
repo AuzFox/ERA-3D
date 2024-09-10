@@ -6,23 +6,23 @@ local current_wavbank: uint8
 local current_seqbank: uint8
 local run_cart: boolean
 
-global function stateRunInit(sm: *StateMachine, vm: *EVM): void
+global function stateRunInit(): void
 end
 
-global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setRenderTexture(RenderTexture.CODE)
+global function stateRunEnter(): void
+    gpu:setRenderTexture(RenderTexture.CODE)
 
-    current_texbank = vm.gpu.current_texbank
-    current_objbank = vm.gpu.current_objbank
-    vm.gpu:setBankPointers(
+    current_texbank = gpu.current_texbank
+    current_objbank = gpu.current_objbank
+    gpu:setBankPointers(
         GPUBank.SYSTEM,
         GPUBank.SYSTEM
     )
-    vm.gpu.update_tex = true
+    gpu.update_tex = true
     
-    current_wavbank = vm.soundchip.current_wavbank
-    current_seqbank = vm.soundchip.current_seqbank
-    vm.soundchip:setBankPointers(
+    current_wavbank = soundchip.current_wavbank
+    current_seqbank = soundchip.current_seqbank
+    soundchip:setBankPointers(
         SoundchipBank.SYSTEM,
         SoundchipBank.SYSTEM
     )
@@ -30,14 +30,14 @@ global function stateRunEnter(sm: *StateMachine, vm: *EVM): void
     run_cart = true
 end
 
-global function stateRunExit(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setBankPointers(
+global function stateRunExit(): void
+    gpu:setBankPointers(
         current_texbank,
         current_objbank
     )
-    vm.gpu.update_tex = true
+    gpu.update_tex = true
     
-    vm.soundchip:setBankPointers(
+    soundchip:setBankPointers(
         current_wavbank,
         current_seqbank
     )
@@ -45,39 +45,39 @@ global function stateRunExit(sm: *StateMachine, vm: *EVM): void
     rl.enableCursor()
 end
 
-global function stateRunUpdate(sm: *StateMachine, vm: *EVM): void
+global function stateRunUpdate(): void
     if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
         run_cart = false
-        sm:back()
+        statemachine:back()
     end
     
     if not vm:callHook(Hook.UPDATE) then
         core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
         core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
         run_cart = false
-        sm:back()
+        statemachine:back()
     end
     --print("update()", vm.cycle_count)
 end
 
-global function stateRunDraw(sm: *StateMachine, vm: *EVM): void
+global function stateRunDraw(): void
     if not run_cart then
         return
     end
 
-    vm.gpu:camera3D(0) -- configure default camera
-    vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT -- camera3D() enables depth test
+    gpu:camera3D(0) -- configure default camera
+    gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT -- camera3D() enables depth test
 
-    vm.gpu:enableRenderState()
+    gpu:enableRenderState()
     if not vm:callHook(Hook.DRAW) then
         core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
         core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
-        sm:back()
+        statemachine:back()
     end
-    vm.gpu:disableRenderState()
+    gpu:disableRenderState()
     --print("draw()", vm.cycle_count)
     vm.cycle_count = 0
 end
 
-global function stateRunCleanup(sm: *StateMachine, vm: *EVM): void
+global function stateRunCleanup(): void
 end

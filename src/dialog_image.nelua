@@ -1,0 +1,564 @@
+require("statemachine")
+
+local TEXBANK_VIEW_X <comptime> = 6
+local TEXBANK_VIEW_Y <comptime> = 27
+local TEXBANK_VIEW_W <comptime> = GPU_VSCREEN_HALF_W - 12
+local TEXBANK_VIEW_H <comptime> = 256
+
+local SOURCE_VIEW_X <comptime> = GPU_VSCREEN_HALF_W + 6
+local SOURCE_VIEW_Y <comptime> = TEXBANK_VIEW_Y
+local SOURCE_VIEW_W <comptime> = TEXBANK_VIEW_W
+local SOURCE_VIEW_H <comptime> = TEXBANK_VIEW_H
+
+local texbank_view: gui.TextureView
+local source_view: gui.TextureView
+local src_x_vb: gui.ValueBox
+local src_y_vb: gui.ValueBox
+local src_w_vb: gui.ValueBox
+local src_h_vb: gui.ValueBox
+local dest_x_vb: gui.ValueBox
+local dest_y_vb: gui.ValueBox
+local ok_button: gui.Button
+local cancel_button: gui.Button
+
+local dragging_src: boolean
+local dragging_dest: boolean
+local src_drag_start_x: int32
+local src_drag_start_y: int32
+local dest_drag_start_x: int32
+local dest_drag_start_y: int32
+
+local function coordsAreValid(): boolean
+    local dx: int32 = dest_x_vb.value
+    local dy: int32 = dest_y_vb.value
+    local sx: int32 = src_x_vb.value
+    local sy: int32 = src_y_vb.value
+    local sw: int32 = src_w_vb.value
+    local sh: int32 = src_h_vb.value
+
+    if (dx < 0) or (dy < 0) or (dx + sw > 1024) or (dy + sh > 1024) then
+        return false
+    end
+
+    return true
+end
+
+local function texbank_input_callback(): void
+    if (not texbank_view.mouse_in_bounds) or texbank_view.panning then
+        return
+    end
+
+    local x: int32 = texbank_view.texture.x + (dest_x_vb.value * texbank_view.pixel_size)
+    local y: int32 = texbank_view.texture.y + (dest_y_vb.value * texbank_view.pixel_size)
+    local w: int32 = src_w_vb.value * texbank_view.pixel_size
+    local h: int32 = src_h_vb.value * texbank_view.pixel_size
+    if input.left_clicked and input.isMouseInRect(x, y, w, h) then
+        dragging_dest = true
+        dest_drag_start_x = dest_x_vb.value
+        dest_drag_start_y = dest_y_vb.value
+    end
+
+    if not dragging_dest then
+        local step: int32 = 1
+        if input.is_shift_down then
+            step = 16
+        end
+
+        if input.pressedRepeat(rl.keyboardKey.UP) then
+            if input.is_ctrl_down then
+                src_h_vb:incValue(-step)
+                src_y_vb:setRange(0, core.import_texture.height - src_h_vb.value)
+                dest_y_vb:setRange(0, 1024 - src_h_vb.value)
+            else
+                dest_y_vb:incValue(-step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+            if input.is_ctrl_down then
+                src_h_vb:incValue(step)
+                src_y_vb:setRange(0, core.import_texture.height - src_h_vb.value)
+                dest_y_vb:setRange(0, 1024 - src_h_vb.value)
+            else
+                dest_y_vb:incValue(step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.LEFT) then
+            if input.is_ctrl_down then
+                src_w_vb:incValue(-step)
+                src_x_vb:setRange(0, core.import_texture.width - src_w_vb.value)
+                dest_x_vb:setRange(0, 1024 - src_w_vb.value)
+            else
+                dest_x_vb:incValue(-step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+            if input.is_ctrl_down then
+                src_w_vb:incValue(step)
+                src_x_vb:setRange(0, core.import_texture.width - src_w_vb.value)
+                dest_x_vb:setRange(0, 1024 - src_w_vb.value)
+            else
+                dest_x_vb:incValue(step)
+            end
+        end
+    end
+end
+
+local function texbank_draw_callback(): void
+    gpu:stencilMode(true)
+    gpu:stencilMask(GPU_FRONT_AND_BACK, 0xFF) -- write to stencil buffer
+    gpu:clearStencil(0)
+    gpu:clear(GPU_CLEAR_STENCIL)
+    gpu:stencilOp(GPU_FRONT_AND_BACK, GPU_KEEP, GPU_KEEP, GPU_REPLACE)
+    gpu:stencilFunc(GPU_FRONT_AND_BACK, GPU_ALWAYS, 1, 0xFF) -- always set stencil to 1
+
+    gpu:colorMask(0) -- don't write to color buffer
+
+    local texbank_x: float32 = (@float32)(texbank_view.texture.x)
+    local texbank_y: float32 = (@float32)(texbank_view.texture.y)
+    local texbank_w: float32 = (@float32)(texbank_view.texture.width * texbank_view.pixel_size)
+    local texbank_h: float32 = (@float32)(texbank_view.texture.height * texbank_view.pixel_size)
+    local import_x: int32 = texbank_view.texture.x + (dest_x_vb.value * texbank_view.pixel_size)
+    local import_y: int32 = texbank_view.texture.y + (dest_y_vb.value * texbank_view.pixel_size)
+    local import_w: int32 = src_w_vb.value * texbank_view.pixel_size
+    local import_h: int32 = src_h_vb.value * texbank_view.pixel_size
+
+    -- draw stencil rect
+    gpu:drawRect2D(import_x, import_y, import_w, import_h, GPU_RED)
+    
+    gpu:colorMask(GPU_COLOR_MASK_ALL) -- write to color buffer
+
+    gpu:stencilFunc(GPU_FRONT_AND_BACK, GPU_EQUAL, 0, 0xFF) -- pass if stencil is zero
+    gpu:stencilMask(GPU_FRONT_AND_BACK, 0) -- don't write to stencil buffer
+
+    -- draw texbank texture
+    gpu:beginMeshWithTexture(GPU_QUADS, texbank_view.texture.id)
+        gpu:vertColor(0xFFFFFFFF)
+        gpu:vertUV({0.0, 0.0})
+        gpu:vertex2D({texbank_x, texbank_y})
+        gpu:vertUV({0.0, 1.0})
+        gpu:vertex2D({texbank_x, texbank_y + texbank_h})
+        gpu:vertUV({1.0, 1.0})
+        gpu:vertex2D({texbank_x + texbank_w, texbank_y + texbank_h})
+        gpu:vertUV({1.0, 0.0})
+        gpu:vertex2D({texbank_x + texbank_w, texbank_y})
+    gpu:endMeshWithTexture()
+
+    gpu:stencilMode(false)
+
+    -- draw import texture
+    rl.drawTexturePro(
+        core.import_texture,
+        {
+            src_x_vb.value,
+            src_y_vb.value,
+            src_w_vb.value,
+            src_h_vb.value
+        },
+        {
+            import_x,
+            import_y,
+            import_w,
+            import_h
+        },
+        {0.0, 0.0},
+        0.0,
+        rl.WHITE
+    )
+end
+
+local function source_input_callback(): void
+    if (not source_view.mouse_in_bounds) or source_view.panning then
+        return
+    end
+
+    local x: int32 = source_view.texture.x + (src_x_vb.value * source_view.pixel_size)
+    local y: int32 = source_view.texture.y + (src_y_vb.value * source_view.pixel_size)
+    local w: int32 = src_w_vb.value * source_view.pixel_size
+    local h: int32 = src_h_vb.value * source_view.pixel_size
+    if input.left_clicked and input.isMouseInRect(x, y, w, h) then
+        dragging_src = true
+        src_drag_start_x = src_x_vb.value
+        src_drag_start_y = src_y_vb.value
+    end
+
+    if not dragging_src then
+        local step: int32 = 1
+        if input.is_shift_down then
+            step = 16
+        end
+
+        if input.pressedRepeat(rl.keyboardKey.UP) then
+            if input.is_ctrl_down then
+                src_h_vb:incValue(-step)
+                src_y_vb:setRange(0, core.import_texture.height - src_h_vb.value)
+                dest_y_vb:setRange(0, 1024 - src_h_vb.value)
+            else
+                src_y_vb:incValue(-step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.DOWN) then
+            if input.is_ctrl_down then
+                src_h_vb:incValue(step)
+                src_y_vb:setRange(0, core.import_texture.height - src_h_vb.value)
+                dest_y_vb:setRange(0, 1024 - src_h_vb.value)
+            else
+                src_y_vb:incValue(step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.LEFT) then
+            if input.is_ctrl_down then
+                src_w_vb:incValue(-step)
+                src_x_vb:setRange(0, core.import_texture.width - src_w_vb.value)
+                dest_x_vb:setRange(0, 1024 - src_w_vb.value)
+            else
+                src_x_vb:incValue(-step)
+            end
+        elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
+            if input.is_ctrl_down then
+                src_w_vb:incValue(step)
+                src_x_vb:setRange(0, core.import_texture.width - src_w_vb.value)
+                dest_x_vb:setRange(0, 1024 - src_w_vb.value)
+            else
+                src_x_vb:incValue(step)
+            end
+        end
+    end
+end
+
+local function source_draw_callback(): void
+    local source_x: float32 = (@float32)(source_view.texture.x)
+    local source_y: float32 = (@float32)(source_view.texture.y)
+    local source_w: float32 = (@float32)(source_view.texture.width * source_view.pixel_size)
+    local source_h: float32 = (@float32)(source_view.texture.height * source_view.pixel_size)
+    local dim_x: int32 = source_view.texture.x + (src_x_vb.value * source_view.pixel_size)
+    local dim_y: int32 = source_view.texture.y + (src_y_vb.value * source_view.pixel_size)
+    local dim_w: int32 = src_w_vb.value * source_view.pixel_size
+    local dim_h: int32 = src_h_vb.value * source_view.pixel_size
+    
+    -- draw import texture
+    gpu:beginMeshWithTexture(GPU_QUADS, source_view.texture.id)
+        gpu:vertColor(0xFFFFFFFF)
+        gpu:vertUV({0.0, 0.0})
+        gpu:vertex2D({source_x, source_y})
+        gpu:vertUV({0.0, 1.0})
+        gpu:vertex2D({source_x, source_y + source_h})
+        gpu:vertUV({1.0, 1.0})
+        gpu:vertex2D({source_x + source_w, source_y + source_h})
+        gpu:vertUV({1.0, 0.0})
+        gpu:vertex2D({source_x + source_w, source_y})
+    gpu:endMeshWithTexture()
+
+    gpu:stencilMode(true)
+    gpu:stencilMask(GPU_FRONT_AND_BACK, 0xFF) -- write to stencil buffer
+    gpu:clearStencil(0)
+    gpu:clear(GPU_CLEAR_STENCIL)
+    gpu:stencilOp(GPU_FRONT_AND_BACK, GPU_KEEP, GPU_KEEP, GPU_REPLACE)
+    gpu:stencilFunc(GPU_FRONT_AND_BACK, GPU_ALWAYS, 1, 0xFF) -- always set stencil to 1
+
+    gpu:colorMask(0) -- don't write to color buffer
+
+    -- draw stencil rect
+    gpu:drawRect2D(dim_x, dim_y, dim_w, dim_h, GPU_RED)
+    
+    gpu:colorMask(GPU_COLOR_MASK_ALL) -- write to color buffer
+
+    gpu:stencilFunc(GPU_FRONT_AND_BACK, GPU_EQUAL, 0, 0xFF) -- pass if stencil is zero
+    gpu:stencilMask(GPU_FRONT_AND_BACK, 0) -- don't write to stencil buffer
+
+    -- draw dimming rect
+    gpu:drawRect2D(
+        source_view.texture.x,
+        source_view.texture.y,
+        source_view.texture.width * source_view.pixel_size,
+        source_view.texture.height * source_view.pixel_size,
+        GPU_ALPHA_DGRAY
+    )
+
+    gpu:stencilMode(false)
+end
+
+global function dialogImageConfigReset(): void
+    texbank_view = {
+        x = TEXBANK_VIEW_X,
+        y = TEXBANK_VIEW_Y,
+        width = TEXBANK_VIEW_W,
+        height = TEXBANK_VIEW_H,
+        texture = {gpu.gfx_texture.id, TEXBANK_VIEW_X, TEXBANK_VIEW_Y, 1024, 1024},
+        zoom_level = 0,
+        pixel_size = 1,
+        input_callback = texbank_input_callback,
+        draw_callback = texbank_draw_callback
+    }
+
+    source_view = {
+        x = SOURCE_VIEW_X,
+        y = SOURCE_VIEW_Y,
+        width = SOURCE_VIEW_W,
+        height = SOURCE_VIEW_H,
+        texture = {core.import_texture.id, SOURCE_VIEW_X, SOURCE_VIEW_Y, core.import_texture.width, core.import_texture.height},
+        zoom_level = 0,
+        pixel_size = 1,
+        input_callback = source_input_callback,
+        draw_callback = source_draw_callback
+    }
+
+    src_x_vb = {
+        x = SOURCE_VIEW_X + 9 * 6,
+        y = SOURCE_VIEW_Y + SOURCE_VIEW_H + 9,
+        width = 4 * 6 + 4,
+        height = 16,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 0,
+        max = 0,
+        shift_step = 8
+    }
+
+    src_y_vb = {
+        x = src_x_vb.x,
+        y = src_x_vb.y + src_x_vb.height + 2,
+        width = src_x_vb.width,
+        height = src_x_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 0,
+        max = 0,
+        shift_step = 8
+    }
+
+    local max_src_w: int32 = math.min(1024, core.import_texture.width)
+    local max_src_h: int32 = math.min(1024, core.import_texture.height)
+
+    src_w_vb = {
+        x = src_x_vb.x + src_x_vb.width + 9 + (14 * 6),
+        y = src_x_vb.y,
+        width = src_x_vb.width,
+        height = src_x_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 1,
+        max = max_src_w,
+        value = max_src_w,
+        shift_step = 8
+    }
+
+    src_h_vb = {
+        x = src_x_vb.x + src_x_vb.width + 9 + (14 * 6),
+        y = src_y_vb.y,
+        width = src_x_vb.width,
+        height = src_x_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 1,
+        max = max_src_h,
+        value = max_src_h,
+        shift_step = 8
+    }
+
+    dest_x_vb = {
+        x = TEXBANK_VIEW_X + 14 * 6,
+        y = TEXBANK_VIEW_Y + TEXBANK_VIEW_H + 9,
+        width = 4 * 6 + 4,
+        height = 16,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 0,
+        max = 1023,
+        shift_step = 8
+    }
+
+    dest_y_vb = {
+        x = dest_x_vb.x,
+        y = dest_x_vb.y + dest_x_vb.height + 2,
+        width = dest_x_vb.width,
+        height = dest_x_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-4d",
+        min = 0,
+        max = 1023,
+        shift_step = 8
+    }
+
+    ok_button = {
+        x = GPU_VSCREEN_W - 6 - 48 - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_GREEN,
+        text = "OK"
+    }
+
+    cancel_button = {
+        x = GPU_VSCREEN_W - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_RED,
+        text = "CANCEL"
+    }
+
+    dragging_dest = false
+    dragging_src = false
+end
+
+global function dialogImageConfigUpdate(): void
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        rl.unloadTexture(core.import_texture)
+        core.has_import_texture = false
+
+        rl.unloadImage(core.image_to_import)
+        core.has_loaded_image = false
+        
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    if input.left_click_released then
+        dragging_src = false
+        dragging_dest = false
+    end
+
+    if not coordsAreValid() then
+        gui.locked = true
+    end
+
+    if gui.updateButton(&ok_button) then
+        gpu:loadTextureData(
+            gpu.current_texbank - GPUBank.TEXBANK0,
+            src_x_vb.value,
+            src_y_vb.value,
+            src_w_vb.value,
+            src_h_vb.value,
+            dest_x_vb.value,
+            dest_y_vb.value
+        )
+        gpu.update_tex = true
+        
+        rl.unloadTexture(core.import_texture)
+        core.has_import_texture = false
+        
+        rl.unloadImage(core.image_to_import)
+        core.has_loaded_image = false
+        
+        core:log(LogEntryType.INFO, "image data loaded", true)
+
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    gui.locked = false
+
+    if gui.updateButton(&cancel_button) then
+        rl.unloadTexture(core.import_texture)
+        core.has_import_texture = false
+
+        rl.unloadImage(core.image_to_import)
+        core.has_loaded_image = false
+        
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    gui.updateValueBox(&src_w_vb)
+    src_x_vb:setRange(0, core.import_texture.width - src_w_vb.value)
+    dest_x_vb:setRange(0, 1024 - src_w_vb.value)
+
+    gui.updateValueBox(&src_h_vb)
+    src_y_vb:setRange(0, core.import_texture.height - src_h_vb.value)
+    dest_y_vb:setRange(0, 1024 - src_h_vb.value)
+
+    gui.updateValueBox(&src_x_vb)
+    gui.updateValueBox(&src_y_vb)
+    gui.updateValueBox(&dest_x_vb)
+    gui.updateValueBox(&dest_y_vb)
+
+    gui.updateTextureView(&texbank_view)
+    gui.updateTextureView(&source_view)
+
+    if texbank_view.panning then
+        dragging_dest = false
+    end
+    if source_view.panning then
+        dragging_src = false
+    end
+
+    if dragging_src then
+        src_x_vb:setValue(src_drag_start_x + (input.left_drag_x /// source_view.pixel_size))
+        src_y_vb:setValue(src_drag_start_y + (input.left_drag_y /// source_view.pixel_size))
+    elseif dragging_dest then
+        dest_x_vb:setValue(dest_drag_start_x + (input.left_drag_x /// texbank_view.pixel_size))
+        dest_y_vb:setValue(dest_drag_start_y + (input.left_drag_y /// texbank_view.pixel_size))
+    end
+end
+
+global function dialogImageConfigDraw(): void
+    gpu:print2D(
+        TEXBANK_VIEW_X,
+        TEXBANK_VIEW_Y - 11,
+        GPU_WHITE,
+        rl.textFormat(
+            "TEXBANK %d PREVIEW:",
+            (@cint)(gpu.current_texbank - GPUBank.TEXBANK0)
+        )
+    )
+    gpu:drawRectLines2D(TEXBANK_VIEW_X - 1, TEXBANK_VIEW_Y - 1, TEXBANK_VIEW_W + 2, TEXBANK_VIEW_H + 2, GPU_GRAY)
+    gui.drawTextureView(&texbank_view)
+
+    gpu:scissorMode(true)
+    gpu:scissor(texbank_view.x, texbank_view.y, texbank_view.width, texbank_view.height)
+
+    local import_x: int32 = texbank_view.texture.x + (dest_x_vb.value * texbank_view.pixel_size)
+    local import_y: int32 = texbank_view.texture.y + (dest_y_vb.value * texbank_view.pixel_size)
+    local import_w: int32 = src_w_vb.value * texbank_view.pixel_size
+    local import_h: int32 = src_h_vb.value * texbank_view.pixel_size
+    local factor: float32 = (math.sin(rl.getTime() * 4.0) * 0.5) + 0.5
+    local v: uint32 = (@uint8)(factor * 255.0) & 0xFF
+    local bounds_color: uint32 = (v << 24) | (v << 16) | (v << 8) | 0xFF
+    gpu:drawRectLines2D(import_x - 1, import_y - 1, import_w + 2, import_h + 2, bounds_color)
+
+    gpu:scissorMode(false)
+
+    gpu:print2D(TEXBANK_VIEW_X, dest_x_vb.y + 4, GPU_WHITE, "DESTINATION X:")
+    gui.drawValueBox(&dest_x_vb)
+    
+    gpu:print2D(TEXBANK_VIEW_X, dest_y_vb.y + 4, GPU_WHITE, "DESTINATION Y:")
+    gui.drawValueBox(&dest_y_vb)
+    
+    gpu:print2D(
+        SOURCE_VIEW_X,
+        SOURCE_VIEW_Y - 11,
+        GPU_WHITE,
+        rl.textFormat(
+            "SOURCE IMAGE: (%dx%d)",
+            core.import_texture.width,
+            core.import_texture.height
+        )
+    )
+    gpu:drawRectLines2D(SOURCE_VIEW_X - 1, SOURCE_VIEW_Y - 1, SOURCE_VIEW_W + 2, SOURCE_VIEW_H + 2, GPU_GRAY)
+    gui.drawTextureView(&source_view)
+
+    gpu:scissorMode(true)
+    gpu:scissor(source_view.x, source_view.y, source_view.width, source_view.height)
+    
+    local dim_x: int32 = source_view.texture.x + (src_x_vb.value * source_view.pixel_size)
+    local dim_y: int32 = source_view.texture.y + (src_y_vb.value * source_view.pixel_size)
+    local dim_w: int32 = src_w_vb.value * source_view.pixel_size
+    local dim_h: int32 = src_h_vb.value * source_view.pixel_size
+    gpu:drawRectLines2D(dim_x - 1, dim_y - 1, dim_w + 2, dim_h + 2, bounds_color)
+
+    gpu:scissorMode(false)
+
+    gpu:print2D(SOURCE_VIEW_X, src_x_vb.y + 4, GPU_WHITE, "SOURCE X:")
+    gui.drawValueBox(&src_x_vb)
+    
+    gpu:print2D(SOURCE_VIEW_X, src_y_vb.y + 4, GPU_WHITE, "SOURCE Y:")
+    gui.drawValueBox(&src_y_vb)
+
+    gpu:print2D(src_x_vb.x + src_x_vb.width + 9, src_w_vb.y + 4, GPU_WHITE, "SOURCE WIDTH:")
+    gui.drawValueBox(&src_w_vb)
+    
+    gpu:print2D(src_x_vb.x + src_x_vb.width + 9, src_h_vb.y + 4, GPU_WHITE, "SOURCE HEIGHT:")
+    gui.drawValueBox(&src_h_vb)
+
+    if ok_button.state == gui.LOCKED then
+        gpu:print2D(ok_button.x - 33 * 6, ok_button.y + 4, GPU_RED, "SOURCE DOES NOT FIT INTO TEXBANK")
+    end
+
+    gui.drawButton(&ok_button)
+    gui.drawButton(&cancel_button)
+end

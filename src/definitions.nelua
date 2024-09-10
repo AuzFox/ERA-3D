@@ -9,6 +9,7 @@ require("blipkit")
 require("raylib")
 require("rlgl")
 require("json")
+require("tinyfiledialogs")
 
 -- --------------------------------
 -- CONSTANTS
@@ -622,37 +623,10 @@ global StateID = @enum {
 
 global DialogID = @enum {
     NONE = 0,
-	IMPORT_CODE,
-	IMPORT_TEXTURE,
-	IMPORT_MODEL,
-	IMPORT_SAMPLE,
-	LOAD_CART,
-	SAVE_CART,
-    COUNT
-}
-
-global DialogStep = @enum {
-    FILE_BROWSER = 0,
-	TEXTURE_CONFIG,
+	IMAGE_CONFIG,
+	SAMPLE_CONFIG,
 	MODEL_CONFIG,
-	SAMPLE_CONFIG
-}
-
-global FileBrowserMode = @enum {
-    LOAD = 0,
-	SAVE
-}
-
-global FileBrowserInputMode = @enum {
-    SET_FILENAME = 0,
-	SELECT_FILE_OR_DIR
-}
-
-global FileBrowserResult = @enum {
-    CONTINUE = 0,
-	CANCEL,
-	SELECTED_FILE,
-	SELECTED_DIRECTORY
+    COUNT
 }
 
 global MenuAnimation = @enum {
@@ -692,7 +666,7 @@ global Identifier <forwarddecl> = @record {}
 
 global FuncPointerInfo <forwarddecl> = @record {}
 
-global APIFunction: type = @function(vm: *EVM): boolean
+global APIFunction: type = @function(): boolean
 
 -- union used to store values of different types
 global IntFloat = @union {
@@ -1282,7 +1256,7 @@ EVM = @record {
 global State <forwarddecl> = @record {}
 global StateMachine <forwarddecl> = @record {}
 
-global StateFunction: type = @function(*StateMachine, *EVM): void
+global StateFunction: type = @function(): void
 
 State = @record {
 	init: StateFunction,
@@ -1294,6 +1268,7 @@ State = @record {
 }
 
 global Dialog = @record {
+	reset: StateFunction,
 	update: StateFunction,
 	draw: StateFunction
 }
@@ -1303,7 +1278,6 @@ StateMachine = @record {
 	dialogs: [DialogID.COUNT]Dialog,
 	state_ptr: *State,
 	dialog_ptr: *Dialog,
-	vm_ptr: *EVM,
 	state_id: integer,
 	dialog_id: integer,
 	queued_state: integer,
@@ -1324,12 +1298,6 @@ global ConfigInfo = @record {
 
 -- global data record
 global CoreData = @record {
-	--gpu: GPU,
-	--soundchip: Soundchip,
-	--vm: EVM,
-	--compiler: Compiler,
-	--sm: Statemachine,
-
 	-- menu animation data
 	animation_type: uint32,
 	anim_time: float32,
@@ -1372,7 +1340,6 @@ global CoreData = @record {
 	memcards_directory: string,
 	current_cart_path: string,
 	current_cart_name: string,
-	current_browser_path: string,
 	config_file_path: string,
 	popup_text: string,
 	popup_state: integer,
@@ -1382,13 +1349,6 @@ global CoreData = @record {
 	popup_current_factor: float32,
 	popup_offset: int32,
 	popup_color: uint32,
-	file_name: [65]uint8, -- used to name a file when saving
-	byte_buffer: [8]uint8,
-	dialog_val0: int32, -- general purpose integer used by dialogs
-	dialog_val1: int32, -- general purpose integer used by dialogs
-	dialog_val2: int32, -- general purpose integer used by dialogs
-	dialog_val3: int32, -- general purpose integer used by dialogs
-	file_paths: rl.filePathList,
 	image_to_import: rl.image,
 	import_texture: rl.texture,
 	sample_to_import: rl.wave,
@@ -1398,25 +1358,15 @@ global CoreData = @record {
 	log_count: integer,
 	log_offset: float32,
 	log_state: integer,
-	dialog_step: uinteger,
-	browser_index: integer,
-	browser_mode: integer,
-	browser_input_mode: integer, -- setting file name vs selecting dir/file
-	browser_last_clicked_index: integer,
-	browser_double_click_timer: float32,
 	queued_log_state: integer,
-	has_loaded_paths: boolean,
 	has_loaded_image: boolean,
 	has_import_texture: boolean,
 	has_loaded_sample: boolean,
 	has_loaded_model: boolean,
 
-	cursor_color: uint32
+	cursor_color: uint32,
+	cursor_color_dark: uint32
 }
-
---function CoreData:__close(): void
---	-- do cleanup here...
---end
 
 function CoreData:setDefaultConfig(): void
 	self.config.log_level = rl.traceLogLevel.NONE
@@ -1716,4 +1666,8 @@ function CoreData:clearSrc(): void
 	self.start_char = 1
 end
 
-global core: CoreData --<close>
+global core: CoreData
+global statemachine: StateMachine
+global vm: *EVM
+global gpu: *GPU
+global soundchip: *SoundChip

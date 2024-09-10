@@ -36,12 +36,12 @@ function EVM:heapAlloc(size: uint32): uint32 <forwarddecl> end
 function EVM:heapRealloc(size: uint32, ptr: uint32): uint32 <forwarddecl> end
 function EVM:heapFree(ptr: uint32): void <forwarddecl> end
 
-local CollisionFunction: type = @function(*EVM, uint32, uint32): (boolean, uint32)
+local CollisionFunction: type = @function(uint32, uint32): (boolean, uint32)
 
 -- COLLISION DETECTION FUNCTIONS:
 
 --[[ TODO: rewrite this!
-	local function apiCheckAABBPoint(vm: *EVM): boolean
+	local function apiCheckAABBPoint(): boolean
 	-- signature:
 	-- int checkAABBPoint(box b, vec3 p);
 
@@ -72,7 +72,7 @@ local CollisionFunction: type = @function(*EVM, uint32, uint32): (boolean, uint3
 	return true
 end]]
 
-local function checkPointPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkPointPoint(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	local a: ColPoint
 	local b: ColPoint
 	if not vm:getMemColPoint(a_addr, &a) then return false, 0 end
@@ -87,31 +87,31 @@ local function checkPointPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boole
 	end
 end
 
-local function checkPointAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkPointAABB(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkPointSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkPointSphere(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkPointCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkPointCylinder(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkPointTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkPointTriangle(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkAABBPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkPointAABB(vm, b_addr, a_addr)
+local function checkAABBPoint(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkPointAABB(b_addr, a_addr)
 end
 
-local function checkAABBAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkAABBAABB(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	local a: ColAABB
 	local b: ColAABB
 	if not vm:getMemColAABB(a_addr, &a) then return false, 0 end
@@ -157,83 +157,83 @@ local function checkAABBAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean
 	end
 end
 
-local function checkAABBSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkAABBSphere(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkAABBCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkAABBCylinder(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkAABBTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkAABBTriangle(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkSpherePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkPointSphere(vm, b_addr, a_addr)
+local function checkSpherePoint(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkPointSphere(b_addr, a_addr)
 end
 
-local function checkSphereAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkAABBSphere(vm, b_addr, a_addr)
+local function checkSphereAABB(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkAABBSphere(b_addr, a_addr)
 end
 
-local function checkSphereSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkSphereSphere(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkSphereCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkSphereCylinder(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkSphereTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkSphereTriangle(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkCylinderPoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkPointCylinder(vm, b_addr, a_addr)
+local function checkCylinderPoint(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkPointCylinder(b_addr, a_addr)
 end
 
-local function checkCylinderAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkAABBCylinder(vm, b_addr, a_addr)
+local function checkCylinderAABB(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkAABBCylinder(b_addr, a_addr)
 end
 
-local function checkCylinderSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkSphereCylinder(vm, b_addr, a_addr)
+local function checkCylinderSphere(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkSphereCylinder(b_addr, a_addr)
 end
 
-local function checkCylinderCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkCylinderCylinder(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkCylinderTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkCylinderTriangle(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
 
-local function checkTrianglePoint(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkPointTriangle(vm, b_addr, a_addr)
+local function checkTrianglePoint(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkPointTriangle(b_addr, a_addr)
 end
 
-local function checkTriangleAABB(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkAABBTriangle(vm, b_addr, a_addr)
+local function checkTriangleAABB(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkAABBTriangle(b_addr, a_addr)
 end
 
-local function checkTriangleSphere(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkSphereTriangle(vm, b_addr, a_addr)
+local function checkTriangleSphere(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkSphereTriangle(b_addr, a_addr)
 end
 
-local function checkTriangleCylinder(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
-	return checkCylinderTriangle(vm, b_addr, a_addr)
+local function checkTriangleCylinder(a_addr: uint32, b_addr: uint32): (boolean, uint32)
+	return checkCylinderTriangle(b_addr, a_addr)
 end
 
-local function checkTriangleTriangle(vm: *EVM, a_addr: uint32, b_addr: uint32): (boolean, uint32)
+local function checkTriangleTriangle(a_addr: uint32, b_addr: uint32): (boolean, uint32)
 	-- TODO: implement
 	return true, 0
 end
@@ -267,7 +267,7 @@ local collision_functions: [ColType.COUNT][ColType.COUNT]CollisionFunction = {
 -- API HELPER FUNCTIONS:
 
 -- getMem8() helper function for apiPrint2D()
-local function getMem8(vm: *EVM, addr: uint32, c: *uint8): boolean
+local function getMem8(addr: uint32, c: *uint8): boolean
 	if addr > MEMORY_MAX_ADDR then
 		vm.error = string.format("invalid byte read address 0x%08X", addr)
 		return false
@@ -279,7 +279,7 @@ local function getMem8(vm: *EVM, addr: uint32, c: *uint8): boolean
 end
 
 -- getMem32() helper function for apiPrint2D()
-local function getMem32(vm: *EVM, addr: uint32, v: *uint32): boolean
+local function getMem32(addr: uint32, v: *uint32): boolean
 	if addr > MEMORY_MAX_ADDR then
 		vm.error = string.format("invalid word read address 0x%08X", addr)
 		return false
@@ -295,7 +295,7 @@ end
 
 -- vargv() helper function.
 -- gets vargv() for the *api* function
-local function vargv(vm: *EVM, offset: uint32): uint32
+local function vargv(offset: uint32): uint32
 	vm.cf.vargc = vm.cf.vargc - offset
 	
 	-- get adress vargp currently points to
@@ -333,7 +333,7 @@ end
 
 -- API FUNCTIONS:
 
-local function apiAlloc(vm: *EVM): boolean
+local function apiAlloc(): boolean
 	-- signature:
 	-- void* alloc(int size);
 
@@ -344,20 +344,20 @@ local function apiAlloc(vm: *EVM): boolean
 	return true
 end
 
-local function apiAmbientColor(vm: *EVM): boolean
+local function apiAmbientColor(): boolean
 	-- signature:
 	-- void ambientColor(int color);
 
 	local col: uint32 = vm:getArgU(0)
 
-	vm.gpu:ambientColor(col)
+	gpu:ambientColor(col)
 
-	util.pokeU(&vm.gpu.render_state.ambient_color_r, col)
+	util.pokeU(&gpu.render_state.ambient_color_r, col)
 
 	return true
 end
 
-local function apiAmbientFactor(vm: *EVM): boolean
+local function apiAmbientFactor(): boolean
 	-- signature:
 	-- void ambientFactor(float factor);
 
@@ -368,14 +368,14 @@ local function apiAmbientFactor(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:ambientFactor(factor)
+	gpu:ambientFactor(factor)
 
-	util.pokeF(&vm.gpu.render_state.ambient_factor0, factor)
+	util.pokeF(&gpu.render_state.ambient_factor0, factor)
 
 	return true
 end
 
-local function apiBeginMesh(vm: *EVM): boolean
+local function apiBeginMesh(): boolean
 	-- signature:
 	-- void beginMesh(int mode);
 
@@ -386,12 +386,12 @@ local function apiBeginMesh(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:beginMesh(mode)
+	gpu:beginMesh(mode)
 	
 	return true
 end
 
-local function apiBlendFactors(vm: *EVM): boolean
+local function apiBlendFactors(): boolean
 	-- signature:
 	-- void blendFactors(int src, int dest, int eq);
 
@@ -414,17 +414,17 @@ local function apiBlendFactors(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:blendFactors(src, dest, eq)
+	gpu:blendFactors(src, dest, eq)
 
 	-- update render state
-	vm.gpu.render_state.rgb_factors = (@uint8)((src << 4) | dest)
-	vm.gpu.render_state.alpha_factors = (@uint8)((src << 4) | dest)
-	vm.gpu.render_state.blend_equations = (@uint8)((eq << 4) | eq)
+	gpu.render_state.rgb_factors = (@uint8)((src << 4) | dest)
+	gpu.render_state.alpha_factors = (@uint8)((src << 4) | dest)
+	gpu.render_state.blend_equations = (@uint8)((eq << 4) | eq)
 
 	return true
 end
 
-local function apiBlendFactorsEx(vm: *EVM): boolean
+local function apiBlendFactorsEx(): boolean
 	-- signature:
 	-- void blendFactorsEx(int src_rgb, int dest_rgb, int src_alpha, int dest_alpha, int eq_rgb, int eq_alpha);
 
@@ -465,17 +465,17 @@ local function apiBlendFactorsEx(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:blendFactorsEx(src_rgb, dest_rgb, src_alpha, dest_alpha, eq_rgb, eq_alpha)
+	gpu:blendFactorsEx(src_rgb, dest_rgb, src_alpha, dest_alpha, eq_rgb, eq_alpha)
 
 	-- update render state
-	vm.gpu.render_state.rgb_factors = (@uint8)((src_rgb << 4) | dest_rgb)
-	vm.gpu.render_state.alpha_factors = (@uint8)((src_alpha << 4) | dest_alpha)
-	vm.gpu.render_state.blend_equations = (@uint8)((eq_rgb << 4) | eq_alpha)
+	gpu.render_state.rgb_factors = (@uint8)((src_rgb << 4) | dest_rgb)
+	gpu.render_state.alpha_factors = (@uint8)((src_alpha << 4) | dest_alpha)
+	gpu.render_state.blend_equations = (@uint8)((eq_rgb << 4) | eq_alpha)
 
 	return true
 end
 
-local function apiBlendMode(vm: *EVM): boolean
+local function apiBlendMode(): boolean
 	-- signature:
 	-- void blendMode(int mode);
 
@@ -486,19 +486,19 @@ local function apiBlendMode(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:blendMode(mode)
+	gpu:blendMode(mode)
 
-	vm.gpu.render_state.flags_00sttbbb = (vm.gpu.render_state.flags_00sttbbb & ~GPU_BLEND_MODE_MASK) | mode
+	gpu.render_state.flags_00sttbbb = (gpu.render_state.flags_00sttbbb & ~GPU_BLEND_MODE_MASK) | mode
 
 	return true
 end
 
-local function apiCam3DForward(vm: *EVM): boolean
+local function apiCam3DForward(): boolean
 	-- signature:
 	-- vec3 cam3DForward(int id);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
-	local cam: *EVMCam3D = &vm.gpu.cameras3D[id]
+	local cam: *EVMCam3D = &gpu.cameras3D[id]
 
 	local v: rl.vector3 = v3Normalize({
 		util.peekF(&cam.target_x0) - util.peekF(&cam.position_x0),
@@ -510,13 +510,13 @@ local function apiCam3DForward(vm: *EVM): boolean
 	return true
 end
 
-local function apiCam3DRight(vm: *EVM): boolean
+local function apiCam3DRight(): boolean
 	-- signature:
 	-- vec3 cam3DRight(int id);
 
 	-- get camera
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
-	local cam: *EVMCam3D = &vm.gpu.cameras3D[id]
+	local cam: *EVMCam3D = &gpu.cameras3D[id]
 
 	-- calculate forward vector
 	local forward: rl.vector3 = v3Normalize({
@@ -539,33 +539,33 @@ local function apiCam3DRight(vm: *EVM): boolean
 	return true
 end
 
-local function apiCamera2D(vm: *EVM): boolean
+local function apiCamera2D(): boolean
 	-- signature:
 	-- void camera2D(int id);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	
-	vm.gpu:camera2D(id)
+	gpu:camera2D(id)
 
-	vm.gpu.render_state.flags_tmccs0fl = (vm.gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT)
+	gpu.render_state.flags_tmccs0fl = (gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT)
 
 	return true
 end
 
-local function apiCamera3D(vm: *EVM): boolean
+local function apiCamera3D(): boolean
 	-- signature:
 	-- void camera3D(int id);
 
 	local id: uinteger = math.clamp(vm:getArgU(0), 0, GPU_CAMERAS_COUNT - 1)
 	
-	vm.gpu:camera3D(id)
+	gpu:camera3D(id)
 
-	vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
+	gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
 
 	return true
 end
 
-local function apiCeil(vm: *EVM): boolean
+local function apiCeil(): boolean
 	-- signature:
 	-- float ceil(float x);
 
@@ -576,57 +576,57 @@ local function apiCeil(vm: *EVM): boolean
 	return true
 end
 
-local function apiClear(vm: *EVM): boolean
+local function apiClear(): boolean
 	-- signature:
 	-- void clear(int flags);
 
 	local flags: uint32 = vm:getArgU(0)
 
-	vm.gpu:clear(flags)
+	gpu:clear(flags)
 
 	return true
 end
 
-local function apiClearColor(vm: *EVM): boolean
+local function apiClearColor(): boolean
 	-- signature:
 	-- void clearColor(int col);
 
 	local col: uint32 = vm:getArgU(0)
 
-	vm.gpu:clearColor(col)
+	gpu:clearColor(col)
 
-	util.pokeU(&vm.gpu.render_state.clear_color_r, col)
+	util.pokeU(&gpu.render_state.clear_color_r, col)
 
 	return true
 end
 
-local function apiClearDepth(vm: *EVM): boolean
+local function apiClearDepth(): boolean
 	-- signature:
 	-- void clearDepth(float depth);
 
 	local depth: uint32 = vm:getArgF(0)
 
-	vm.gpu:clearDepth(depth)
+	gpu:clearDepth(depth)
 
-	util.pokeF(&vm.gpu.render_state.clear_depth0, depth)
+	util.pokeF(&gpu.render_state.clear_depth0, depth)
 
 	return true
 end
 
-local function apiClearStencil(vm: *EVM): boolean
+local function apiClearStencil(): boolean
 	-- signature:
 	-- void clearStencil(int stencil);
 
 	local stencil: int32 = vm:getArgI(0)
 
-	vm.gpu:clearStencil(stencil)
+	gpu:clearStencil(stencil)
 
-	vm.gpu.render_state.clear_stencil = (@uint8)(stencil & 0xFF)
+	gpu.render_state.clear_stencil = (@uint8)(stencil & 0xFF)
 
 	return true
 end
 
-local function apiCollide(vm: *EVM): boolean
+local function apiCollide(): boolean
 	-- signature:
 	-- int collide(void* a, void* b);
 
@@ -635,11 +635,11 @@ local function apiCollide(vm: *EVM): boolean
 	local a_type: uint32
 	local b_type: uint32
 
-	if not getMem32(vm, a_addr, &a_type) then
+	if not getMem32(a_addr, &a_type) then
 		return false
 	end
 
-	if not getMem32(vm, b_addr, &b_type) then
+	if not getMem32(b_addr, &b_type) then
 		return false
 	end
 
@@ -660,7 +660,7 @@ local function apiCollide(vm: *EVM): boolean
 
 	local success: boolean
 	local collision: int32
-	success, collision = cfunc(vm, a_addr, b_addr)
+	success, collision = cfunc(a_addr, b_addr)
 
 	if success then
 		vm:pushI(collision)
@@ -670,20 +670,20 @@ local function apiCollide(vm: *EVM): boolean
 	end
 end
 
-local function apiColorMask(vm: *EVM): boolean
+local function apiColorMask(): boolean
 	-- signature:
 	-- void colorMask(int mask);
 
 	local mask: uint8 = (@uint8)(vm:getArgU(0) & GPU_COLOR_MASK_ALL)
 
-	vm.gpu:colorMask(mask)
+	gpu:colorMask(mask)
 
-	vm.gpu.render_state.flags_00ppcccc = (vm.gpu.render_state.flags_00ppcccc & ~GPU_COLOR_MASK_MASK) | mask
+	gpu.render_state.flags_00ppcccc = (gpu.render_state.flags_00ppcccc & ~GPU_COLOR_MASK_MASK) | mask
 
 	return true
 end
 
-local function apiCos(vm: *EVM): boolean
+local function apiCos(): boolean
 	-- signature:
 	-- float cos(float x);
 	
@@ -694,7 +694,7 @@ local function apiCos(vm: *EVM): boolean
 	return true
 end
 
-local function apiCullMode(vm: *EVM): boolean
+local function apiCullMode(): boolean
 	-- signature:
 	-- void cullMode(int mode);
 
@@ -705,14 +705,14 @@ local function apiCullMode(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:cullMode(mode)
+	gpu:cullMode(mode)
 
-	vm.gpu.render_state.flags_tmccs0fl = (vm.gpu.render_state.flags_tmccs0fl & ~GPU_CULL_MODE_MASK) | (@uint8)(mode << 4)
+	gpu.render_state.flags_tmccs0fl = (gpu.render_state.flags_tmccs0fl & ~GPU_CULL_MODE_MASK) | (@uint8)(mode << 4)
 
 	return true
 end
 
-local function apiDeg(vm: *EVM): boolean
+local function apiDeg(): boolean
 	-- signature:
 	-- float deg(float x);
 
@@ -723,7 +723,7 @@ local function apiDeg(vm: *EVM): boolean
 	return true
 end
 
-local function apiDepthFunc(vm: *EVM): boolean
+local function apiDepthFunc(): boolean
 	-- signature:
 	-- void depthFunc(int func);
 	
@@ -734,48 +734,48 @@ local function apiDepthFunc(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:depthFunc(func)
+	gpu:depthFunc(func)
 
-	vm.gpu.render_state.depth_function = (@uint8)(func)
+	gpu.render_state.depth_function = (@uint8)(func)
 
 	return true
 end
 
-local function apiDepthMask(vm: *EVM): boolean
+local function apiDepthMask(): boolean
 	-- signature:
 	-- void depthMask(int enable);
 	
 	local enable: uint32 = vm:getArgU(0)
 
 	if enable ~= 0 then
-		vm.gpu:depthMask(true)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_DEPTH_MASK_BIT
+		gpu:depthMask(true)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_MASK_BIT
 	else
-		vm.gpu:depthMask(false)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_MASK_BIT
+		gpu:depthMask(false)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_MASK_BIT
 	end
 
 	return true
 end
 
-local function apiDepthTest(vm: *EVM): boolean
+local function apiDepthTest(): boolean
 	-- signature:
 	-- void depthTest(int enable);
 	
 	local enable: uint32 = vm:getArgU(0)
 
 	if enable ~= 0 then
-		vm.gpu:depthTest(true)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
+		gpu:depthTest(true)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
 	else
-		vm.gpu:depthTest(false)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT
+		gpu:depthTest(false)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT
 	end
 
 	return true
 end
 
-local function apiDrawObj(vm: *EVM): boolean
+local function apiDrawObj(): boolean
 	-- signature:
 	-- void drawObj(int id);
 
@@ -786,12 +786,12 @@ local function apiDrawObj(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:drawObj(id)
+	gpu:drawObj(id)
 
 	return true
 end
 
-local function apiDrawObjEx(vm: *EVM): boolean
+local function apiDrawObjEx(): boolean
 	-- signature:
 	-- void drawObjEx(int mode, int start, int n);
 
@@ -799,21 +799,21 @@ local function apiDrawObjEx(vm: *EVM): boolean
 	local start: uint32 = vm:getArgU(1)
 	local n: uint32 = vm:getArgU(2)
 
-	vm.gpu:drawObjEx(mode, start, n)
+	gpu:drawObjEx(mode, start, n)
 
 	return true
 end
 
-local function apiEndMesh(vm: *EVM): boolean
+local function apiEndMesh(): boolean
 	-- signature:
 	-- void endMesh();
 
-	vm.gpu:endMesh()
+	gpu:endMesh()
 	
 	return true
 end
 
-local function apiFloor(vm: *EVM): boolean
+local function apiFloor(): boolean
 	-- signature:
 	-- float floor(float x);
 
@@ -824,63 +824,63 @@ local function apiFloor(vm: *EVM): boolean
 	return true
 end
 
-local function apiFogColor(vm: *EVM): boolean
+local function apiFogColor(): boolean
 	-- signature:
 	-- void fogColor(float color);
 
 	local col: uint32 = vm:getArgU(0)
 	
-	vm.gpu:fogColor(col)
+	gpu:fogColor(col)
 
-	util.pokeU(&vm.gpu.render_state.fog_color_r, col)
+	util.pokeU(&gpu.render_state.fog_color_r, col)
 
 	return true
 end
 
-local function apiFogEnd(vm: *EVM): boolean
+local function apiFogEnd(): boolean
 	-- signature:
 	-- void fogEnd(float end);
 	
 	local fend: float32 = math.clamp(vm:getArgF(0), 0.0, 1000.0)
 	
-	vm.gpu:fogEnd(fend)
+	gpu:fogEnd(fend)
 
-	util.pokeF(&vm.gpu.render_state.fog_end0, fend)
+	util.pokeF(&gpu.render_state.fog_end0, fend)
 
 	return true
 end
 
-local function apiFogMode(vm: *EVM): boolean
+local function apiFogMode(): boolean
 	-- signature:
 	-- void fogMode(int mode);
 
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode ~= 0 then
-		vm.gpu:fogMode(true)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_FOG_BIT
+		gpu:fogMode(true)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_FOG_BIT
 	else
-		vm.gpu:fogMode(false)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl & ~GPU_FOG_BIT
+		gpu:fogMode(false)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_FOG_BIT
 	end
 
 	return true
 end
 
-local function apiFogStart(vm: *EVM): boolean
+local function apiFogStart(): boolean
 	-- signature:
 	-- void fogStart(float start);
 
 	local start: float32 = math.clamp(vm:getArgF(0), 0.0, 1000.0)
 	
-	vm.gpu:fogStart(start)
+	gpu:fogStart(start)
 
-	util.pokeF(&vm.gpu.render_state.fog_start0, start)
+	util.pokeF(&gpu.render_state.fog_start0, start)
 	
 	return true
 end
 
-local function apiFract(vm: *EVM): boolean
+local function apiFract(): boolean
 	-- signature:
 	-- float fract(float x);
 
@@ -891,7 +891,7 @@ local function apiFract(vm: *EVM): boolean
 	return true
 end
 
-local function apiFree(vm: *EVM): boolean
+local function apiFree(): boolean
 	-- signature:
 	-- void free(void* block);
 
@@ -902,7 +902,7 @@ local function apiFree(vm: *EVM): boolean
 	return true
 end
 
-local function apiFrustum(vm: *EVM): boolean
+local function apiFrustum(): boolean
 	-- signature:
 	-- void frustum(float left, float right, float bottom, float top, float near, float far);
 
@@ -923,7 +923,7 @@ local function apiFrustum(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetCam2D(vm: *EVM): boolean
+local function apiGetCam2D(): boolean
 	-- signature:
 	-- cam2d* getCam2D(int index);
 
@@ -934,7 +934,7 @@ local function apiGetCam2D(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetCam3D(vm: *EVM): boolean
+local function apiGetCam3D(): boolean
 	-- signature:
 	-- void getCam3D(int index);
 
@@ -945,7 +945,7 @@ local function apiGetCam3D(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetLight(vm: *EVM): boolean
+local function apiGetLight(): boolean
 	-- signature:
 	-- void getLight(int index);
 
@@ -956,7 +956,7 @@ local function apiGetLight(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetModelViewMatrix(vm: *EVM): boolean
+local function apiGetModelViewMatrix(): boolean
 	-- signature:
 	-- matrix getModelViewMatrix();
 
@@ -965,7 +965,7 @@ local function apiGetModelViewMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetMouseDelta(vm: *EVM): boolean
+local function apiGetMouseDelta(): boolean
 	vm:pushV2({
 		(@float32)(input.mouse_delta_x),
 		(@float32)(input.mouse_delta_y)
@@ -974,7 +974,7 @@ local function apiGetMouseDelta(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetMouseDrag(vm: *EVM): boolean
+local function apiGetMouseDrag(): boolean
 	local b: uint32 = vm:getArgU(0)
 
 	if b > 2 then
@@ -1002,13 +1002,13 @@ local function apiGetMouseDrag(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetMouseLock(vm: *EVM): boolean
+local function apiGetMouseLock(): boolean
 	vm:pushU(rl.isCursorHidden() and 1 or 0)
 
 	return true
 end
 
-local function apiGetMousePosition(vm: *EVM): boolean
+local function apiGetMousePosition(): boolean
 	vm:pushV2({
 		(@float32)(input.mouse_x),
 		(@float32)(input.mouse_y)
@@ -1017,13 +1017,13 @@ local function apiGetMousePosition(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetMouseWheel(vm: *EVM): boolean
+local function apiGetMouseWheel(): boolean
 	vm:pushI(input.mouse_wheel_y)
 
 	return true
 end
 
-local function apiGetProjectionMatrix(vm: *EVM): boolean
+local function apiGetProjectionMatrix(): boolean
 	-- signature:
 	-- matrix getProjectionMatrix();
 
@@ -1032,7 +1032,7 @@ local function apiGetProjectionMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetRaycastNormal(vm: *EVM): boolean
+local function apiGetRaycastNormal(): boolean
 	-- signature:
 	-- vec3 getRaycastNormal();
 
@@ -1041,7 +1041,7 @@ local function apiGetRaycastNormal(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetRaycastPoint(vm: *EVM): boolean
+local function apiGetRaycastPoint(): boolean
 	-- signature:
 	-- vec3 getRaycastPoint();
 
@@ -1050,7 +1050,7 @@ local function apiGetRaycastPoint(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetTopMatrix(vm: *EVM): boolean
+local function apiGetTopMatrix(): boolean
 	-- signature:
 	-- matrix getTopMatrix();
 
@@ -1059,40 +1059,40 @@ local function apiGetTopMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiGetTrackBPM(vm: *EVM): boolean
+local function apiGetTrackBPM(): boolean
 	-- signature:
 	-- int getTrackBPM(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 
-	vm:pushU(vm.soundchip:getTrackBPM(track))
+	vm:pushU(soundchip:getTrackBPM(track))
 	
 	return true
 end
 
-local function apiGetTrackPan(vm: *EVM): boolean
+local function apiGetTrackPan(): boolean
 	-- signature:
 	-- int getTrackPan(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 
-	vm:pushI(vm.soundchip:getTrackPan(track))
+	vm:pushI(soundchip:getTrackPan(track))
 	
 	return true
 end
 
-local function apiGetTrackVolume(vm: *EVM): boolean
+local function apiGetTrackVolume(): boolean
 	-- signature:
 	-- int getTrackVolume(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 
-	vm:pushU(vm.soundchip:getTrackVolume(track))
+	vm:pushU(soundchip:getTrackVolume(track))
 	
 	return true
 end
 
-local function apiHeld(vm: *EVM): boolean
+local function apiHeld(): boolean
 	-- signature:
 	-- int held(int player, int btn);
 
@@ -1113,7 +1113,7 @@ local function apiHeld(vm: *EVM): boolean
 	return true
 end
 
-local function apiIdentity(vm: *EVM): boolean
+local function apiIdentity(): boolean
 	-- signature:
 	-- void identity();
 
@@ -1122,7 +1122,7 @@ local function apiIdentity(vm: *EVM): boolean
 	return true
 end
 
-local function apiInitMemCard(vm: *EVM): boolean
+local function apiInitMemCard(): boolean
 	-- signature:
 	-- void initMemCard(string id);
 
@@ -1157,19 +1157,19 @@ local function apiInitMemCard(vm: *EVM): boolean
 	return vm:loadMemCard(new_id)
 end
 
-local function apiLightingMode(vm: *EVM): boolean
+local function apiLightingMode(): boolean
 	-- signature:
 	-- void lightingMode(int mode);
 
 	local mode: uint32 = vm:getArgU(0)
 
 	-- note: lightingMode() updates the GPU render state
-	vm.gpu:lightingMode(mode ~= 0)
+	gpu:lightingMode(mode ~= 0)
 
 	return true
 end
 
-local function apiLoadObjBank(vm: *EVM): boolean
+local function apiLoadObjBank(): boolean
 	-- signature:
 	-- void loadObjBank(int bank);
 
@@ -1180,12 +1180,12 @@ local function apiLoadObjBank(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:loadObjBank(bank)
+	gpu:loadObjBank(bank)
 
 	return true
 end
 
-local function apiLoadSeqBank(vm: *EVM): boolean
+local function apiLoadSeqBank(): boolean
 	-- signature:
 	-- void loadSeqBank(int bank);
 
@@ -1196,12 +1196,12 @@ local function apiLoadSeqBank(vm: *EVM): boolean
 		return false
 	end
 
-	vm.soundchip:loadSeqBank(bank)
+	soundchip:loadSeqBank(bank)
 
 	return true
 end
 
-local function apiLoadTexBank(vm: *EVM): boolean
+local function apiLoadTexBank(): boolean
 	-- signature:
 	-- void loadTexBank(int bank);
 
@@ -1212,12 +1212,12 @@ local function apiLoadTexBank(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:loadTexBank(bank)
+	gpu:loadTexBank(bank)
 
 	return true
 end
 
-local function apiLoadWavBank(vm: *EVM): boolean
+local function apiLoadWavBank(): boolean
 	-- signature:
 	-- void loadWavBank(int bank);
 
@@ -1228,12 +1228,12 @@ local function apiLoadWavBank(vm: *EVM): boolean
 		return false
 	end
 
-	vm.soundchip:loadWavBank(bank)
+	soundchip:loadWavBank(bank)
 
 	return true
 end
 
-local function apiLookAt(vm: *EVM): boolean
+local function apiLookAt(): boolean
 	-- signature:
 	-- void lookAt(vec3 eye, vec3 target, vec3 up);
 
@@ -1248,7 +1248,7 @@ local function apiLookAt(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixAdd(vm: *EVM): boolean
+local function apiMatrixAdd(): boolean
 	-- signature:
 	-- matrix matrixAdd(matrix a, matrix b);
 
@@ -1260,7 +1260,7 @@ local function apiMatrixAdd(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixIdentity(vm: *EVM): boolean
+local function apiMatrixIdentity(): boolean
 	-- signature:
 	-- matrix matrixIdentity();
 
@@ -1269,7 +1269,7 @@ local function apiMatrixIdentity(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixInvert(vm: *EVM): boolean
+local function apiMatrixInvert(): boolean
 	-- signature:
 	-- matrix matrixInvert(matrix m);
 
@@ -1280,7 +1280,7 @@ local function apiMatrixInvert(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixLookAt(vm: *EVM): boolean
+local function apiMatrixLookAt(): boolean
 	-- signature:
 	-- matrix matrixLookAt(vce3 eye, vec3 target, vec3 up);
 
@@ -1293,7 +1293,7 @@ local function apiMatrixLookAt(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixMode(vm: *EVM): boolean
+local function apiMatrixMode(): boolean
 	-- signature:
 	-- void matrixMode(int mode);
 
@@ -1304,12 +1304,12 @@ local function apiMatrixMode(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:matrixMode(mode)
+	gpu:matrixMode(mode)
 
 	return true
 end
 
-local function apiMatrixMultiply(vm: *EVM): boolean
+local function apiMatrixMultiply(): boolean
 	-- signature:
 	-- matrix matrixMultiply(matrix a, matrix b);
 
@@ -1321,7 +1321,7 @@ local function apiMatrixMultiply(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixRotate(vm: *EVM): boolean
+local function apiMatrixRotate(): boolean
 	-- signature:
 	-- matrix matrixRotate(matrix m, vec3 v);
 
@@ -1333,7 +1333,7 @@ local function apiMatrixRotate(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixScale(vm: *EVM): boolean
+local function apiMatrixScale(): boolean
 	-- signature:
 	-- matrix matrixScale(matrix m, vec3 v);
 
@@ -1352,7 +1352,7 @@ local function apiMatrixScale(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixSubtract(vm: *EVM): boolean
+local function apiMatrixSubtract(): boolean
 	-- signature:
 	-- matrix matrixSubtract(matrix a, matrix b);
 
@@ -1364,7 +1364,7 @@ local function apiMatrixSubtract(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixTranslate(vm: *EVM): boolean
+local function apiMatrixTranslate(): boolean
 	-- signature:
 	-- matrix matrixTranslate(matrix m, vec3 v);
 
@@ -1383,7 +1383,7 @@ local function apiMatrixTranslate(vm: *EVM): boolean
 	return true
 end
 
-local function apiMatrixTranspose(vm: *EVM): boolean
+local function apiMatrixTranspose(): boolean
 	-- signature:
 	-- matrix matrixTranspose(matrix m);
 
@@ -1394,7 +1394,7 @@ local function apiMatrixTranspose(vm: *EVM): boolean
 	return true
 end
 
-local function apiMaxf(vm: *EVM): boolean
+local function apiMaxf(): boolean
 	-- signature:
 	-- float maxf(float a, float b);
 
@@ -1410,7 +1410,7 @@ local function apiMaxf(vm: *EVM): boolean
 	return true
 end
 
-local function apiMaxi(vm: *EVM): boolean
+local function apiMaxi(): boolean
 	-- signature:
 	-- int maxi(int a, int b);
 	
@@ -1426,7 +1426,7 @@ local function apiMaxi(vm: *EVM): boolean
 	return true
 end
 
-local function apiMemcpy(vm: *EVM): boolean
+local function apiMemcpy(): boolean
 	-- signature:
 	-- void memcpy(void* src, void* dest, int nbytes);
 
@@ -1490,7 +1490,7 @@ local function apiMemcpy(vm: *EVM): boolean
 	return true
 end
 
-local function apiMemset(vm: *EVM): boolean
+local function apiMemset(): boolean
 	-- signature:
 	-- void memset(void* dest, int nbytes, int value);
 
@@ -1520,62 +1520,62 @@ local function apiMemset(vm: *EVM): boolean
 	return true
 end
 
-local function apiMeshColor(vm: *EVM): boolean
+local function apiMeshColor(): boolean
 	-- signature:
 	-- void meshColor(int col);
 
 	local col: uint32 = vm:getArgU(0)
 	
-	vm.gpu:vertColor(col)
+	gpu:vertColor(col)
 	
 	return true
 end
 
-local function apiMeshNormal(vm: *EVM): boolean
+local function apiMeshNormal(): boolean
 	-- signature:
 	-- void meshNormal(vec3 normal);
 
 	local v: rl.vector3 = vm:getArgV3(0)
 	
-	vm.gpu:vertNormal(v)
+	gpu:vertNormal(v)
 	
 	return true
 end
 
-local function apiMeshUV(vm: *EVM): boolean
+local function apiMeshUV(): boolean
 	-- signature:
 	-- void meshUV(vec2 uv);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 	
-	vm.gpu:vertUV(v)
+	gpu:vertUV(v)
 	
 	return true
 end
 
-local function apiMeshVertex(vm: *EVM): boolean
+local function apiMeshVertex(): boolean
 	-- signature:
 	-- void meshVertex(vec3 v);
 
 	local v: rl.vector3 = vm:getArgV3(0)
 
-	vm.gpu:vertex(v)
+	gpu:vertex(v)
 	
 	return true
 end
 
-local function apiMeshVertex2D(vm: *EVM): boolean
+local function apiMeshVertex2D(): boolean
 	-- signature:
 	-- void meshVertex2D(vec2 v);
 
 	local v: rl.vector2 = vm:getArgV2(0)
 
-	vm.gpu:vertex2D(v)
+	gpu:vertex2D(v)
 	
 	return true
 end
 
-local function apiMidf(vm: *EVM): boolean
+local function apiMidf(): boolean
 	-- signature:
 	-- float midf(float a, float b, float c);
 
@@ -1588,7 +1588,7 @@ local function apiMidf(vm: *EVM): boolean
 	return true
 end
 
-local function apiMidi(vm: *EVM): boolean
+local function apiMidi(): boolean
 	-- signature:
 	-- int midi(int a, int b, int c);
 
@@ -1601,7 +1601,7 @@ local function apiMidi(vm: *EVM): boolean
 	return true
 end
 
-local function apiMinf(vm: *EVM): boolean
+local function apiMinf(): boolean
 	-- signature:
 	-- float minf(float a, float b);
 
@@ -1617,7 +1617,7 @@ local function apiMinf(vm: *EVM): boolean
 	return true
 end
 
-local function apiMini(vm: *EVM): boolean
+local function apiMini(): boolean
 	-- signature:
 	-- int mini(int a, int b);
 	
@@ -1633,7 +1633,7 @@ local function apiMini(vm: *EVM): boolean
 	return true
 end
 
-local function apiMouseDragging(vm: *EVM): boolean
+local function apiMouseDragging(): boolean
 	local b: uint32 = vm:getArgU(0)
 
 	if b > 2 then
@@ -1652,7 +1652,7 @@ local function apiMouseDragging(vm: *EVM): boolean
 	return true
 end
 
-local function apiMouseHeld(vm: *EVM): boolean
+local function apiMouseHeld(): boolean
 	local b: uint32 = vm:getArgU(0)
 
 	if b > 2 then
@@ -1671,7 +1671,7 @@ local function apiMouseHeld(vm: *EVM): boolean
 	return true
 end
 
-local function apiMousePressed(vm: *EVM): boolean
+local function apiMousePressed(): boolean
 	local b: uint32 = vm:getArgU(0)
 
 	if b > 2 then
@@ -1690,7 +1690,7 @@ local function apiMousePressed(vm: *EVM): boolean
 	return true
 end
 
-local function apiMouseReleased(vm: *EVM): boolean
+local function apiMouseReleased(): boolean
 	local b: uint32 = vm:getArgU(0)
 
 	if b > 2 then
@@ -1709,7 +1709,7 @@ local function apiMouseReleased(vm: *EVM): boolean
 	return true
 end
 
-local function apiMultiplyTopMatrix(vm: *EVM): boolean
+local function apiMultiplyTopMatrix(): boolean
 	-- signature:
 	-- void multiplyTopMatrix(matrix m);
 
@@ -1721,18 +1721,18 @@ local function apiMultiplyTopMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiMuteTrack(vm: *EVM): boolean
+local function apiMuteTrack(): boolean
 	-- signature:
 	-- void muteTrack(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	
-	vm.soundchip:muteTrack(track)
+	soundchip:muteTrack(track)
 
 	return true
 end
 
-local function apiMuteTracks(vm: *EVM): boolean
+local function apiMuteTracks(): boolean
 	-- signature:
 	-- void muteTracks(int mask);
 
@@ -1740,14 +1740,14 @@ local function apiMuteTracks(vm: *EVM): boolean
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		if mask & (0x80 >> i) ~= 0 then
-			vm.soundchip:muteTrack(i)
+			soundchip:muteTrack(i)
 		end
 	end
 
 	return true
 end
 
-local function apiOrtho(vm: *EVM): boolean
+local function apiOrtho(): boolean
 	-- signature:
 	-- void ortho(float left, float right, float bottom, float top, float near, float far);
 	
@@ -1768,30 +1768,30 @@ local function apiOrtho(vm: *EVM): boolean
 	return true
 end
 
-local function apiPauseTrack(vm: *EVM): boolean
+local function apiPauseTrack(): boolean
 	-- signature:
 	-- void pauseTrack(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local mask: uint8 = 0x80 >> track
 
-	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags & ~mask
+	soundchip.audio_state.playing_flags = soundchip.audio_state.playing_flags & ~mask
 
 	return true
 end
 
-local function apiPauseTracks(vm: *EVM): boolean
+local function apiPauseTracks(): boolean
 	-- signature:
 	-- void pauseTracks(int mask);
 
 	local mask: uint32 = vm:getArgU(0)
 
-	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags & ~((@uint8)(mask))
+	soundchip.audio_state.playing_flags = soundchip.audio_state.playing_flags & ~((@uint8)(mask))
 
 	return true
 end
 
-local function apiPeek32(vm: *EVM): boolean
+local function apiPeek32(): boolean
 	-- signature:
 	-- int peek32(int addr);
 
@@ -1810,7 +1810,7 @@ local function apiPeek32(vm: *EVM): boolean
 	return true
 end
 
-local function apiPeek8(vm: *EVM): boolean
+local function apiPeek8(): boolean
 	-- signature:
 	-- int peek8(int addr);
 
@@ -1826,42 +1826,42 @@ local function apiPeek8(vm: *EVM): boolean
 	return true
 end
 
-local function apiPlayPattern(vm: *EVM): boolean
+local function apiPlayPattern(): boolean
 	-- signature:
 	-- void playPattern(int track, int pattern);
 
 	local track: uint32 = vm:getArgU(0)
 	local pattern: uint32 = vm:getArgU(1)
 
-	vm.soundchip:playPattern((@uint8)(track), (@uint8)(pattern))
+	soundchip:playPattern((@uint8)(track), (@uint8)(pattern))
 
 	return true
 end
 
-local function apiPlaySong(vm: *EVM): boolean
+local function apiPlaySong(): boolean
 	-- signature:
 	-- void playSong(int row);
 
 	local row: uint32 = vm:getArgU(0)
 
-	vm.soundchip:playSongRow((@uint8)(row))
+	soundchip:playSongRow((@uint8)(row))
 
 	return true
 end
 
-local function apiPlayTrack(vm: *EVM): boolean
+local function apiPlayTrack(): boolean
 	-- signature:
 	-- void playTrack(int track, int song_row);
 
 	local track: uint32 = vm:getArgU(0)
 	local row: uint32 = vm:getArgU(1)
 
-	vm.soundchip:playTrack((@uint8)(track), (@uint8)(row))
+	soundchip:playTrack((@uint8)(track), (@uint8)(row))
 
 	return true
 end
 
-local function apiPlayWav(vm: *EVM): boolean
+local function apiPlayWav(): boolean
 	-- signature:
 	-- void playWav(int track, int id, int note, float volume, int loop_mode);
 
@@ -1878,12 +1878,12 @@ local function apiPlayWav(vm: *EVM): boolean
 
 	volume = util.midF(0.0, volume, 100.0)
 
-	vm.soundchip:playWav(track, id, note, volume, loop_mode)
+	soundchip:playWav(track, id, note, volume, loop_mode)
 
 	return true
 end
 
-local function apiPlayWavEx(vm: *EVM): boolean
+local function apiPlayWavEx(): boolean
 	-- signature:
 	--[[
 		void playWavEx(
@@ -1908,7 +1908,7 @@ local function apiPlayWavEx(vm: *EVM): boolean
 
 	volume = util.midF(0.0, volume, 100.0)
 
-	vm.soundchip:playWavEx(
+	soundchip:playWavEx(
 		track,
 		sample_start,
 		sample_end,
@@ -1922,7 +1922,7 @@ local function apiPlayWavEx(vm: *EVM): boolean
 	return true
 end
 
-local function apiPoke32(vm: *EVM): boolean
+local function apiPoke32(): boolean
 	-- signature:
 	-- void poke32(int addr, int val);
 
@@ -1945,7 +1945,7 @@ local function apiPoke32(vm: *EVM): boolean
 	return true
 end
 
-local function apiPoke8(vm: *EVM): boolean
+local function apiPoke8(): boolean
 	-- signature:
 	-- void poke8(int addr, int val);
 
@@ -1965,7 +1965,7 @@ local function apiPoke8(vm: *EVM): boolean
 	return true
 end
 
-local function apiPolygonMode(vm: *EVM): boolean
+local function apiPolygonMode(): boolean
 	-- signature:
 	-- void polygonMode(int mode);
 	
@@ -1976,31 +1976,31 @@ local function apiPolygonMode(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:polygonMode(mode)
+	gpu:polygonMode(mode)
 
-	vm.gpu.render_state.flags_00ppcccc = (vm.gpu.render_state.flags_00ppcccc & ~GPU_POLYGON_MODE_MASK) | (@uint8)(mode << 4)
+	gpu.render_state.flags_00ppcccc = (gpu.render_state.flags_00ppcccc & ~GPU_POLYGON_MODE_MASK) | (@uint8)(mode << 4)
 
 	return true
 end
 
-local function apiPopMatrix(vm: *EVM): boolean
+local function apiPopMatrix(): boolean
 	-- signature:
 	-- void popMatrix();
 
-	if vm.gpu.matrix_mode == rlgl.PROJECTION then
-		if vm.gpu.proj_matrix_count == 0 then
+	if gpu.matrix_mode == rlgl.PROJECTION then
+		if gpu.proj_matrix_count == 0 then
 			vm.error = "projection matrix stack underflow"
 			return false
 		end
 
-		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count - 1
+		gpu.proj_matrix_count = gpu.proj_matrix_count - 1
 	else
-		if vm.gpu.view_matrix_count == 0 then
+		if gpu.view_matrix_count == 0 then
 			vm.error = "view matrix stack underflow"
 			return false
 		end
 
-		vm.gpu.view_matrix_count = vm.gpu.view_matrix_count - 1
+		gpu.view_matrix_count = gpu.view_matrix_count - 1
 	end
 
 	rlgl.popMatrix()
@@ -2008,7 +2008,7 @@ local function apiPopMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiPowf(vm: *EVM): boolean
+local function apiPowf(): boolean
 	-- signature:
 	-- float powf(float a, float b);
 	
@@ -2020,7 +2020,7 @@ local function apiPowf(vm: *EVM): boolean
 	return true
 end
 
-local function apiPressed(vm: *EVM): boolean
+local function apiPressed(): boolean
 	-- signature:
 	-- int pressed(int player, int btn);
 
@@ -2041,7 +2041,7 @@ local function apiPressed(vm: *EVM): boolean
 	return true
 end
 
-local function apiPrint2D(vm: *EVM): boolean
+local function apiPrint2D(): boolean
 	-- signature:
 	-- void print2D(int x, int y, int color, string fmt, ...);
 
@@ -2085,10 +2085,10 @@ local function apiPrint2D(vm: *EVM): boolean
 
 		addr = start_addr + i
 
-		if not getMem8(vm, addr, &c) then return false end
+		if not getMem8(addr, &c) then return false end
 		
 		if c == '%'_u8 then
-			if not getMem8(vm, addr + 1, &c) then return false end
+			if not getMem8(addr + 1, &c) then return false end
 
 			switch c do
 				case 'i'_u8, 'd'_u8 then
@@ -2097,8 +2097,8 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 1)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(1)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.i)
@@ -2110,7 +2110,7 @@ local function apiPrint2D(vm: *EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+						gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -2120,8 +2120,8 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 1)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(1)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%d", arg_val0.u)
@@ -2133,7 +2133,7 @@ local function apiPrint2D(vm: *EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+						gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -2143,8 +2143,8 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 1)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(1)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08x", arg_val0.u)
@@ -2156,7 +2156,7 @@ local function apiPrint2D(vm: *EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+						gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -2166,8 +2166,8 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 1)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(1)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%08X", arg_val0.u)
@@ -2179,7 +2179,7 @@ local function apiPrint2D(vm: *EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+						gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
@@ -2189,8 +2189,8 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 1)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
+					arg_addr = vargv(1)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
 
 					vm.sb:clear()
 					vm.sb:writef("%.2f", arg_val0.f)
@@ -2202,12 +2202,12 @@ local function apiPrint2D(vm: *EVM): boolean
 							return true
 						end
 
-						vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+						gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 					end
 
 					i = i + 1
 				case 'v'_u8 then
-					if not getMem8(vm, addr + 2, &c) then return false end
+					if not getMem8(addr + 2, &c) then return false end
 
 					switch c do
 						case '2'_u8 then
@@ -2216,9 +2216,9 @@ local function apiPrint2D(vm: *EVM): boolean
 								return false
 							end
 		
-							arg_addr = vargv(vm, 2)
-							if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
-							if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
+							arg_addr = vargv(2)
+							if not getMem32(arg_addr, &arg_val0.u) then return false end
+							if not getMem32(arg_addr + 4, &arg_val1.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f)", arg_val0.f, arg_val1.f)
@@ -2230,7 +2230,7 @@ local function apiPrint2D(vm: *EVM): boolean
 									return true
 								end
 		
-								vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+								gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -2240,10 +2240,10 @@ local function apiPrint2D(vm: *EVM): boolean
 								return false
 							end
 		
-							arg_addr = vargv(vm, 3)
-							if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
-							if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
-							if not getMem32(vm, arg_addr + 8, &arg_val2.u) then return false end
+							arg_addr = vargv(3)
+							if not getMem32(arg_addr, &arg_val0.u) then return false end
+							if not getMem32(arg_addr + 4, &arg_val1.u) then return false end
+							if not getMem32(arg_addr + 8, &arg_val2.u) then return false end
 		
 							vm.sb:clear()
 							vm.sb:writef("(%.2f, %.2f, %.2f)", arg_val0.f, arg_val1.f, arg_val2.f)
@@ -2255,7 +2255,7 @@ local function apiPrint2D(vm: *EVM): boolean
 									return true
 								end
 		
-								vm.gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
+								gpu:drawChar2D(s[j + 1], &cur_x, y, ray_col)
 							end
 
 							i = i + 2
@@ -2269,9 +2269,9 @@ local function apiPrint2D(vm: *EVM): boolean
 						return false
 					end
 
-					arg_addr = vargv(vm, 2)
-					if not getMem32(vm, arg_addr, &arg_val0.u) then return false end
-					if not getMem32(vm, arg_addr + 4, &arg_val1.u) then return false end
+					arg_addr = vargv(2)
+					if not getMem32(arg_addr, &arg_val0.u) then return false end
+					if not getMem32(arg_addr + 4, &arg_val1.u) then return false end
 
 					for j = 0, < arg_val0.u do
 						if y >= GPU_VSCREEN_H or cur_x >= GPU_VSCREEN_W then
@@ -2279,14 +2279,14 @@ local function apiPrint2D(vm: *EVM): boolean
 						end
 
 						local sc: uint8
-						if not getMem8(vm, arg_val1.u + j, &sc) then return false end
+						if not getMem8(arg_val1.u + j, &sc) then return false end
 
-						vm.gpu:drawChar2D(sc, &cur_x, y, ray_col)
+						gpu:drawChar2D(sc, &cur_x, y, ray_col)
 					end
 
 					i = i + 1
 				case '%'_u8 then
-					vm.gpu:drawChar2D(c, &cur_x, y, ray_col)
+					gpu:drawChar2D(c, &cur_x, y, ray_col)
 				else
 					vm.error = string.format("invalid format specifier `%%%c`", c)
 					return false
@@ -2295,7 +2295,7 @@ local function apiPrint2D(vm: *EVM): boolean
 			cur_x = x
 			y = y + 9
 		else
-			vm.gpu:drawChar2D(c, &cur_x, y, ray_col)
+			gpu:drawChar2D(c, &cur_x, y, ray_col)
 		end
 
 		i = i + 1
@@ -2304,24 +2304,24 @@ local function apiPrint2D(vm: *EVM): boolean
 	return true
 end
 
-local function apiPushMatrix(vm: *EVM): boolean
+local function apiPushMatrix(): boolean
 	-- signature:
 	-- void pushMatrix();
 
-	if vm.gpu.matrix_mode == rlgl.PROJECTION then
-		if vm.gpu.proj_matrix_count >= 24 then
+	if gpu.matrix_mode == rlgl.PROJECTION then
+		if gpu.proj_matrix_count >= 24 then
 			vm.error = "projection matrix stack overflow"
 			return false
 		end
 
-		vm.gpu.proj_matrix_count = vm.gpu.proj_matrix_count + 1
+		gpu.proj_matrix_count = gpu.proj_matrix_count + 1
 	else
-		if vm.gpu.view_matrix_count >= 24 then
+		if gpu.view_matrix_count >= 24 then
 			vm.error = "view matrix stack overflow"
 			return false
 		end
 
-		vm.gpu.view_matrix_count = vm.gpu.view_matrix_count + 1
+		gpu.view_matrix_count = gpu.view_matrix_count + 1
 	end
 	
 	rlgl.pushMatrix()
@@ -2329,7 +2329,7 @@ local function apiPushMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiRad(vm: *EVM): boolean
+local function apiRad(): boolean
 	-- signature:
 	-- float rad(float x);
 
@@ -2340,7 +2340,7 @@ local function apiRad(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandf(vm: *EVM): boolean
+local function apiRandf(): boolean
 	-- signature:
 	-- float randf(float min, float max);
 
@@ -2358,7 +2358,7 @@ local function apiRandf(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandfEx(vm: *EVM): boolean
+local function apiRandfEx(): boolean
 	-- signature:
 	-- float randfEx();
 
@@ -2367,7 +2367,7 @@ local function apiRandfEx(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandi(vm: *EVM): boolean
+local function apiRandi(): boolean
 	-- signature:
 	-- int randi(int min, int max);
 
@@ -2383,7 +2383,7 @@ local function apiRandi(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandiEx(vm: *EVM): boolean
+local function apiRandiEx(): boolean
 	-- signature:
 	-- int randiEx();
 
@@ -2392,7 +2392,7 @@ local function apiRandiEx(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandomize(vm: *EVM): boolean
+local function apiRandomize(): boolean
 	-- signature:
 	-- void randomize();
 
@@ -2401,7 +2401,7 @@ local function apiRandomize(vm: *EVM): boolean
 	return true
 end
 
-local function apiRandomizeEx(vm: *EVM): boolean
+local function apiRandomizeEx(): boolean
 	-- signature:
 	-- void randomizeEx(int seed);
 
@@ -2412,7 +2412,7 @@ local function apiRandomizeEx(vm: *EVM): boolean
 	return true
 end
 
-local function apiRaycast(vm: *EVM): boolean
+local function apiRaycast(): boolean
 	-- signature:
 	-- int raycast(vec3 position, vec3 direction, float distance, void* colobj);
 
@@ -2421,7 +2421,7 @@ local function apiRaycast(vm: *EVM): boolean
 	return true
 end
 
-local function apiRealloc(vm: *EVM): boolean
+local function apiRealloc(): boolean
 	-- signature:
 	-- void* realloc(void* block, int size);
 
@@ -2433,7 +2433,7 @@ local function apiRealloc(vm: *EVM): boolean
 	return true
 end
 
-local function apiReleased(vm: *EVM): boolean
+local function apiReleased(): boolean
 	-- signature:
 	-- int released(int player, int btn);
 
@@ -2454,7 +2454,7 @@ local function apiReleased(vm: *EVM): boolean
 	return true
 end
 
-local function apiRepeated(vm: *EVM): boolean
+local function apiRepeated(): boolean
 	-- signature:
 	-- int repeated(int player, int btn);
 
@@ -2475,30 +2475,30 @@ local function apiRepeated(vm: *EVM): boolean
 	return true
 end
 
-local function apiResumeTrack(vm: *EVM): boolean
+local function apiResumeTrack(): boolean
 	-- signature:
 	-- void resumeTrack(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local mask: uint8 = 0x80 >> track
 	
-	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags | mask
+	soundchip.audio_state.playing_flags = soundchip.audio_state.playing_flags | mask
 
 	return true
 end
 
-local function apiResumeTracks(vm: *EVM): boolean
+local function apiResumeTracks(): boolean
 	-- signature:
 	-- void resumeTracks(int mask);
 
 	local mask: uint32 = vm:getArgU(0)
 
-	vm.soundchip.audio_state.playing_flags = vm.soundchip.audio_state.playing_flags | (@uint8)(mask)
+	soundchip.audio_state.playing_flags = soundchip.audio_state.playing_flags | (@uint8)(mask)
 
 	return true
 end
 
-local function apiRotate(vm: *EVM): boolean
+local function apiRotate(): boolean
 	-- signature:
 	-- void rotate(vec3 rot);
 
@@ -2511,7 +2511,7 @@ local function apiRotate(vm: *EVM): boolean
 	return true
 end
 
-local function apiRound(vm: *EVM): boolean
+local function apiRound(): boolean
 	-- signature:
 	-- float round(float x);
 
@@ -2522,7 +2522,7 @@ local function apiRound(vm: *EVM): boolean
 	return true
 end
 
-local function apiScale(vm: *EVM): boolean
+local function apiScale(): boolean
 	-- signature:
 	-- void scale(vec3 sca);
 	
@@ -2533,7 +2533,7 @@ local function apiScale(vm: *EVM): boolean
 	return true
 end
 
-local function apiScissor(vm: *EVM): boolean
+local function apiScissor(): boolean
 	-- signature:
 	-- void scissor(int x, int y, int w, int h);
 	
@@ -2542,34 +2542,34 @@ local function apiScissor(vm: *EVM): boolean
 	local w: int32 = vm:getArgI(2)
 	local h: int32 = vm:getArgI(3)
 	
-	vm.gpu:scissor(x, y, w, h)
+	gpu:scissor(x, y, w, h)
 
-	util.pokeI(&vm.gpu.render_state.scissor_x0, x)
-	util.pokeI(&vm.gpu.render_state.scissor_y0, y)
-	util.pokeI(&vm.gpu.render_state.scissor_width0, w)
-	util.pokeI(&vm.gpu.render_state.scissor_height0, h)
+	util.pokeI(&gpu.render_state.scissor_x0, x)
+	util.pokeI(&gpu.render_state.scissor_y0, y)
+	util.pokeI(&gpu.render_state.scissor_width0, w)
+	util.pokeI(&gpu.render_state.scissor_height0, h)
 	
 	return true
 end
 
-local function apiScissorMode(vm: *EVM): boolean
+local function apiScissorMode(): boolean
 	-- signature:
 	-- void scissorMode(int enabled);
 	
 	local enabled: uint32 = vm:getArgU(0)
 	
 	if enabled ~= 0 then
-		vm.gpu:scissorMode(true)
-		vm.gpu.render_state.flags_00sttbbb = vm.gpu.render_state.flags_00sttbbb | GPU_SCISSOR_BIT
+		gpu:scissorMode(true)
+		gpu.render_state.flags_00sttbbb = gpu.render_state.flags_00sttbbb | GPU_SCISSOR_BIT
 	else
-		vm.gpu:scissorMode(false)
-		vm.gpu.render_state.flags_00sttbbb = vm.gpu.render_state.flags_00sttbbb & ~GPU_SCISSOR_BIT
+		gpu:scissorMode(false)
+		gpu.render_state.flags_00sttbbb = gpu.render_state.flags_00sttbbb & ~GPU_SCISSOR_BIT
 	end
 	
 	return true
 end
 
-local function apiSetModelViewMatrix(vm: *EVM): boolean
+local function apiSetModelViewMatrix(): boolean
 	-- signature:
 	-- void setModelViewMatrix(matrix m);
 
@@ -2580,7 +2580,7 @@ local function apiSetModelViewMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiSetMouseLock(vm: *EVM): boolean
+local function apiSetMouseLock(): boolean
 	local lock: uint32 = vm:getArgU(0)
 
 	if lock == 0 then
@@ -2592,7 +2592,7 @@ local function apiSetMouseLock(vm: *EVM): boolean
 	return true
 end
 
-local function apiSetProjectionMatrix(vm: *EVM): boolean
+local function apiSetProjectionMatrix(): boolean
 	-- signature:
 	-- void setProjectionMatrix(matrix m);
 
@@ -2603,19 +2603,19 @@ local function apiSetProjectionMatrix(vm: *EVM): boolean
 	return true
 end
 
-local function apiSetTrackBPM(vm: *EVM): boolean
+local function apiSetTrackBPM(): boolean
 	-- signature:
 	-- void setTrackBPM(int track, int bpm);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local bpm: uint8 = (@uint8)(vm:getArgU(1))
 
-	vm.soundchip:setTrackBPM(track, bpm)
+	soundchip:setTrackBPM(track, bpm)
 
 	return true
 end
 
-local function apiSetTrackPan(vm: *EVM): boolean
+local function apiSetTrackPan(): boolean
 	-- signature:
 	-- void setTrackPan(int track, int pan);
 
@@ -2628,24 +2628,24 @@ local function apiSetTrackPan(vm: *EVM): boolean
 		pan = -100
 	end
 
-	vm.soundchip:setTrackPan(track, pan)
+	soundchip:setTrackPan(track, pan)
 
 	return true
 end
 
-local function apiSetTrackVolume(vm: *EVM): boolean
+local function apiSetTrackVolume(): boolean
 	-- signature:
 	-- void setTrackVolume(int track, int volume);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	local volume: uint8 = (@uint8)(vm:getArgU(1))
 
-	vm.soundchip:setTrackVolume(track, volume)
+	soundchip:setTrackVolume(track, volume)
 
 	return true
 end
 
-local function apiSignf(vm: *EVM): boolean
+local function apiSignf(): boolean
 	-- signature:
 	-- float signf(float x);
 
@@ -2656,7 +2656,7 @@ local function apiSignf(vm: *EVM): boolean
 	return true
 end
 
-local function apiSigni(vm: *EVM): boolean
+local function apiSigni(): boolean
 	-- signature:
 	-- int signi(int x);
 
@@ -2667,7 +2667,7 @@ local function apiSigni(vm: *EVM): boolean
 	return true
 end
 
-local function apiSin(vm: *EVM): boolean
+local function apiSin(): boolean
 	-- signature:
 	-- float sin(float x);
 
@@ -2678,7 +2678,7 @@ local function apiSin(vm: *EVM): boolean
 	return true
 end
 
-local function apiSprite2D(vm: *EVM): boolean
+local function apiSprite2D(): boolean
 	-- signature:
 	-- void sprite2D(int srcx, int srcy, int srcw, int srch, int destx, int desty);
 
@@ -2697,12 +2697,12 @@ local function apiSprite2D(vm: *EVM): boolean
 	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
 	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(srcw), (@float32)(srch) };
 
-	rl.drawTexturePro(vm.gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+	rl.drawTexturePro(gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 
 	return true
 end
 
-local function apiSprite2DEx(vm: *EVM): boolean
+local function apiSprite2DEx(): boolean
 	-- signature:
 	-- void sprite2DEx(int srcx, int srcy, int srcw, int srch, int destx, int desy, int destw, int desth);
 
@@ -2723,12 +2723,12 @@ local function apiSprite2DEx(vm: *EVM): boolean
 	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
 	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(destw), (@float32)(desth) };
 
-	rl.drawTexturePro(vm.gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+	rl.drawTexturePro(gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
 
 	return true
 end
 
-local function apiStencilFunc(vm: *EVM): boolean
+local function apiStencilFunc(): boolean
 	-- signature:
 	-- void stencilFunc(int face, int func, int ref, int mask)
 
@@ -2747,29 +2747,29 @@ local function apiStencilFunc(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:stencilFunc(face, func, ref, mask)
+	gpu:stencilFunc(face, func, ref, mask)
 
 	switch face do
 		case GPU_FRONT then
-			vm.gpu.render_state.stencil_functions = (vm.gpu.render_state.stencil_functions & 0b00001111) | (@uint8)(func << 4)
-			vm.gpu.render_state.stencil_ref_front = (@uint8)(ref)
-			vm.gpu.render_state.stencil_func_mask_front = (@uint8)(mask)
+			gpu.render_state.stencil_functions = (gpu.render_state.stencil_functions & 0b00001111) | (@uint8)(func << 4)
+			gpu.render_state.stencil_ref_front = (@uint8)(ref)
+			gpu.render_state.stencil_func_mask_front = (@uint8)(mask)
 		case GPU_BACK then
-			vm.gpu.render_state.stencil_functions = (vm.gpu.render_state.stencil_functions & 0b11110000) | (@uint8)(func)
-			vm.gpu.render_state.stencil_ref_back = (@uint8)(ref)
-			vm.gpu.render_state.stencil_func_mask_back = (@uint8)(mask)
+			gpu.render_state.stencil_functions = (gpu.render_state.stencil_functions & 0b11110000) | (@uint8)(func)
+			gpu.render_state.stencil_ref_back = (@uint8)(ref)
+			gpu.render_state.stencil_func_mask_back = (@uint8)(mask)
 		case GPU_FRONT_AND_BACK then
-			vm.gpu.render_state.stencil_functions = (@uint8)(func << 4) | (@uint8)(func)
-			vm.gpu.render_state.stencil_ref_front = (@uint8)(ref)
-			vm.gpu.render_state.stencil_func_mask_front = (@uint8)(mask)
-			vm.gpu.render_state.stencil_ref_back = (@uint8)(ref)
-			vm.gpu.render_state.stencil_func_mask_back = (@uint8)(mask)
+			gpu.render_state.stencil_functions = (@uint8)(func << 4) | (@uint8)(func)
+			gpu.render_state.stencil_ref_front = (@uint8)(ref)
+			gpu.render_state.stencil_func_mask_front = (@uint8)(mask)
+			gpu.render_state.stencil_ref_back = (@uint8)(ref)
+			gpu.render_state.stencil_func_mask_back = (@uint8)(mask)
 	end
 
 	return true
 end
 
-local function apiStencilMask(vm: *EVM): boolean
+local function apiStencilMask(): boolean
 	-- signature:
 	-- void stencilMask(int face, int mask)
 
@@ -2781,39 +2781,39 @@ local function apiStencilMask(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:stencilMask(face, mask)
+	gpu:stencilMask(face, mask)
 
 	switch face do
 		case GPU_FRONT then
-			vm.gpu.render_state.stencil_mask_front = (@uint8)(mask)
+			gpu.render_state.stencil_mask_front = (@uint8)(mask)
 		case GPU_BACK then
-			vm.gpu.render_state.stencil_mask_back = (@uint8)(mask)
+			gpu.render_state.stencil_mask_back = (@uint8)(mask)
 		case GPU_FRONT_AND_BACK then
-			vm.gpu.render_state.stencil_mask_front = (@uint8)(mask)
-			vm.gpu.render_state.stencil_mask_back = (@uint8)(mask)
+			gpu.render_state.stencil_mask_front = (@uint8)(mask)
+			gpu.render_state.stencil_mask_back = (@uint8)(mask)
 	end
 
 	return true
 end
 
-local function apiStencilMode(vm: *EVM): boolean
+local function apiStencilMode(): boolean
 	-- signature:
 	-- void stencilMode(int mode)
 
 	local mode: uint32 = vm:getArgU(0)
 
 	if mode ~= 0 then
-		vm.gpu:stencilMode(true)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl | GPU_STENCIL_BIT
+		gpu:stencilMode(true)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_STENCIL_BIT
 	else
-		vm.gpu:stencilMode(false)
-		vm.gpu.render_state.flags_tmccs0fl = vm.gpu.render_state.flags_tmccs0fl & ~GPU_STENCIL_BIT
+		gpu:stencilMode(false)
+		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_STENCIL_BIT
 	end
 
 	return true
 end
 
-local function apiStencilOp(vm: *EVM): boolean
+local function apiStencilOp(): boolean
 	-- signature:
 	-- void stencilOp(int face, int sfail, int dpfail, int dppass)
 
@@ -2842,38 +2842,38 @@ local function apiStencilOp(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:stencilOp(face, sfail, dpfail, dppass)
+	gpu:stencilOp(face, sfail, dpfail, dppass)
 
 	switch face do
 		case GPU_FRONT then
-			vm.gpu.render_state.stencil_sfails = (vm.gpu.render_state.stencil_sfails & 0b00001111) | (uint8)(sfail << 4)
-			vm.gpu.render_state.stencil_dpfails = (vm.gpu.render_state.stencil_dpfails & 0b00001111) | (uint8)(dpfail << 4)
-			vm.gpu.render_state.stencil_dppasses = (vm.gpu.render_state.stencil_dppasses & 0b00001111) | (uint8)(dppass << 4)
+			gpu.render_state.stencil_sfails = (gpu.render_state.stencil_sfails & 0b00001111) | (uint8)(sfail << 4)
+			gpu.render_state.stencil_dpfails = (gpu.render_state.stencil_dpfails & 0b00001111) | (uint8)(dpfail << 4)
+			gpu.render_state.stencil_dppasses = (gpu.render_state.stencil_dppasses & 0b00001111) | (uint8)(dppass << 4)
 		case GPU_BACK then
-			vm.gpu.render_state.stencil_sfails = (vm.gpu.render_state.stencil_sfails & 0b11110000) | (uint8)(sfail)
-			vm.gpu.render_state.stencil_dpfails = (vm.gpu.render_state.stencil_dpfails & 0b11110000) | (uint8)(dpfail)
-			vm.gpu.render_state.stencil_dppasses = (vm.gpu.render_state.stencil_dppasses & 0b11110000) | (uint8)(dppass)
+			gpu.render_state.stencil_sfails = (gpu.render_state.stencil_sfails & 0b11110000) | (uint8)(sfail)
+			gpu.render_state.stencil_dpfails = (gpu.render_state.stencil_dpfails & 0b11110000) | (uint8)(dpfail)
+			gpu.render_state.stencil_dppasses = (gpu.render_state.stencil_dppasses & 0b11110000) | (uint8)(dppass)
 		case GPU_FRONT_AND_BACK then
-			vm.gpu.render_state.stencil_sfails = (uint8)(sfail << 4) | (uint8)(sfail)
-			vm.gpu.render_state.stencil_dpfails = (uint8)(dpfail << 4) | (uint8)(dpfail)
-			vm.gpu.render_state.stencil_dppasses = (uint8)(dppass << 4) | (uint8)(dppass)
+			gpu.render_state.stencil_sfails = (uint8)(sfail << 4) | (uint8)(sfail)
+			gpu.render_state.stencil_dpfails = (uint8)(dpfail << 4) | (uint8)(dpfail)
+			gpu.render_state.stencil_dppasses = (uint8)(dppass << 4) | (uint8)(dppass)
 	end
 
 	return true
 end
 
-local function apiStopTrack(vm: *EVM): boolean
+local function apiStopTrack(): boolean
 	-- signature:
 	-- void stopTrack(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	
-	vm.soundchip:stopTrack(track)
+	soundchip:stopTrack(track)
 
 	return true
 end
 
-local function apiStopTracks(vm: *EVM): boolean
+local function apiStopTracks(): boolean
 	-- signature:
 	-- void stopTracks(int mask);
 
@@ -2881,14 +2881,14 @@ local function apiStopTracks(vm: *EVM): boolean
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		if mask & (0x80 >> i) ~= 0 then
-			vm.soundchip:stopTrack(i)
+			soundchip:stopTrack(i)
 		end
 	end
 
 	return true
 end
 
-local function apiStrcat(vm: *EVM): boolean
+local function apiStrcat(): boolean
 	-- signature:
 	-- string strcat(string a, string b);
 
@@ -2931,7 +2931,7 @@ local function apiStrcat(vm: *EVM): boolean
 	return true
 end
 
-local function apiStrdup(vm: *EVM): boolean
+local function apiStrdup(): boolean
 	-- signature:
 	-- string strdup(string s);
 
@@ -2963,7 +2963,7 @@ local function apiStrdup(vm: *EVM): boolean
 	return true
 end
 
-local function apiStrfmt(vm: *EVM): boolean
+local function apiStrfmt(): boolean
 	-- signature:
 	-- string strfmt(string fmt, ...);
 
@@ -2976,7 +2976,7 @@ local function apiStrfmt(vm: *EVM): boolean
 	return true
 end
 
-local function apiTexture(vm: *EVM): boolean
+local function apiTexture(): boolean
 	-- signature:
 	-- void texture(int x, int y, int w, int h);
 
@@ -2990,17 +2990,17 @@ local function apiTexture(vm: *EVM): boolean
 	x = math.clamp(x, 0, 1024 - w)
 	y = math.clamp(y, 0, 1024 - h)
 
-	vm.gpu:texture(x, y, w, h)
+	gpu:texture(x, y, w, h)
 
-	util.pokeI(&vm.gpu.render_state.texture_x0, x)
-	util.pokeI(&vm.gpu.render_state.texture_y0, y)
-	vm.gpu.render_state.texture_width = (uint8)(w - 1)
-	vm.gpu.render_state.texture_height = (uint8)(h - 1)
+	util.pokeI(&gpu.render_state.texture_x0, x)
+	util.pokeI(&gpu.render_state.texture_y0, y)
+	gpu.render_state.texture_width = (uint8)(w - 1)
+	gpu.render_state.texture_height = (uint8)(h - 1)
 
 	return true
 end
 
-local function apiTextureMode(vm: *EVM): boolean
+local function apiTextureMode(): boolean
 	-- signature:
 	-- void textureMode(int mode);
 
@@ -3011,14 +3011,14 @@ local function apiTextureMode(vm: *EVM): boolean
 		return false
 	end
 
-	vm.gpu:textureMode(mode)
+	gpu:textureMode(mode)
 
-	vm.gpu.render_state.flags_00sttbbb = (vm.gpu.render_state.flags_00sttbbb & ~GPU_TEXTURE_MODE_MASK) | (uint8)(mode << 3)
+	gpu.render_state.flags_00sttbbb = (gpu.render_state.flags_00sttbbb & ~GPU_TEXTURE_MODE_MASK) | (uint8)(mode << 3)
 
 	return true
 end
 
-local function apiTime(vm: *EVM): boolean
+local function apiTime(): boolean
 	-- signature:
 	-- float time();
 
@@ -3027,7 +3027,7 @@ local function apiTime(vm: *EVM): boolean
 	return true
 end
 
-local function apiTranslate(vm: *EVM): boolean
+local function apiTranslate(): boolean
 	-- signature:
 	-- void translate(vec3 pos);
 
@@ -3038,18 +3038,18 @@ local function apiTranslate(vm: *EVM): boolean
 	return true
 end
 
-local function apiUnmuteTrack(vm: *EVM): boolean
+local function apiUnmuteTrack(): boolean
 	-- signature:
 	-- void unmuteTrack(int track);
 
 	local track: uint8 = (@uint8)(vm:getArgU(0))
 	
-	vm.soundchip:unmuteTrack(track)
+	soundchip:unmuteTrack(track)
 
 	return true
 end
 
-local function apiUnmuteTracks(vm: *EVM): boolean
+local function apiUnmuteTracks(): boolean
 	-- signature:
 	-- void unmuteTracks(int mask);
 
@@ -3057,14 +3057,14 @@ local function apiUnmuteTracks(vm: *EVM): boolean
 
 	for i = 0, < SOUNDCHIP_TRACK_COUNT do
 		if mask & (0x80 >> i) ~= 0 then
-			vm.soundchip:unmuteTrack(i)
+			soundchip:unmuteTrack(i)
 		end
 	end
 
 	return true
 end
 
-local function apiVargc(vm: *EVM): boolean
+local function apiVargc(): boolean
 	-- signature:
 	-- int vargc();
 
@@ -3087,7 +3087,7 @@ local function apiVargc(vm: *EVM): boolean
 	return true
 end
 
-local function apiVargv(vm: *EVM): boolean
+local function apiVargv(): boolean
 	-- signature:
 	-- void* vargv(int offset);
 
@@ -3128,7 +3128,7 @@ local function apiVargv(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Angle(vm: *EVM): boolean
+local function apiVec2Angle(): boolean
 	-- signature:
 	-- float vec2Angle(vec2 a, vec2 b);
 
@@ -3140,7 +3140,7 @@ local function apiVec2Angle(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Cross(vm: *EVM): boolean
+local function apiVec2Cross(): boolean
 	-- signature:
 	-- float vec2Cross(vec2 a, vec2 b);
 	
@@ -3152,7 +3152,7 @@ local function apiVec2Cross(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Direction(vm: *EVM): boolean
+local function apiVec2Direction(): boolean
 	-- signature:
 	-- vec2 vec2Direction(vec2 a, vec2 b);
 
@@ -3173,7 +3173,7 @@ local function apiVec2Direction(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Distance(vm: *EVM): boolean
+local function apiVec2Distance(): boolean
 	-- signature:
 	-- float vec2Distance(vec2 a, vec2 b);
 
@@ -3185,7 +3185,7 @@ local function apiVec2Distance(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2DistanceSq(vm: *EVM): boolean
+local function apiVec2DistanceSq(): boolean
 	-- signature:
 	-- float vec2DistanceSq(vec2 a, vec2 b);
 
@@ -3197,7 +3197,7 @@ local function apiVec2DistanceSq(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Dot(vm: *EVM): boolean
+local function apiVec2Dot(): boolean
 	-- signature:
 	-- float vec2Dot(vec2 a, vec2 b);
 	
@@ -3209,7 +3209,7 @@ local function apiVec2Dot(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Invert(vm: *EVM): boolean
+local function apiVec2Invert(): boolean
 	-- signature:
 	-- vec2 vec2Invert(vec2 v);
 	
@@ -3220,7 +3220,7 @@ local function apiVec2Invert(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Length(vm: *EVM): boolean
+local function apiVec2Length(): boolean
 	-- signature:
 	-- float vec2Length(vec2 v);
 
@@ -3231,7 +3231,7 @@ local function apiVec2Length(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2LengthSq(vm: *EVM): boolean
+local function apiVec2LengthSq(): boolean
 	-- signature:
 	-- float vec2LengthSq(vec2 v);
 
@@ -3242,7 +3242,7 @@ local function apiVec2LengthSq(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Lerp(vm: *EVM): boolean
+local function apiVec2Lerp(): boolean
 	-- signature:
 	-- vec2 vec2Lerp(vec2 a, vec2 b, float amount);
 
@@ -3255,7 +3255,7 @@ local function apiVec2Lerp(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2MoveToward(vm: *EVM): boolean
+local function apiVec2MoveToward(): boolean
 	-- signature:
 	-- vec2 vec2MoveToward(vec2 a, vec2 b, float delta);
 
@@ -3279,7 +3279,7 @@ local function apiVec2MoveToward(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Normalize(vm: *EVM): boolean
+local function apiVec2Normalize(): boolean
 	-- signature:
 	-- vec2 vec2Normalize(vec2 v);
 
@@ -3298,7 +3298,7 @@ local function apiVec2Normalize(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Reflect(vm: *EVM): boolean
+local function apiVec2Reflect(): boolean
 	-- signature:
 	-- vec2 vec2Reflect(vec2 a, vec2 b);
 
@@ -3310,7 +3310,7 @@ local function apiVec2Reflect(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec2Rotate(vm: *EVM): boolean
+local function apiVec2Rotate(): boolean
 	-- signature:
 	-- vec2 vec2Rotate(vec2 v, float angle);
 
@@ -3322,7 +3322,7 @@ local function apiVec2Rotate(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Angle(vm: *EVM): boolean
+local function apiVec3Angle(): boolean
 	-- signature:
 	-- float vec3Angle(vec3 a, vec3 b);
 
@@ -3334,7 +3334,7 @@ local function apiVec3Angle(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Cross(vm: *EVM): boolean
+local function apiVec3Cross(): boolean
 	-- signature:
 	-- vec3 vec3Cross(vec3 a, vec3 b);
 	
@@ -3346,7 +3346,7 @@ local function apiVec3Cross(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Direction(vm: *EVM): boolean
+local function apiVec3Direction(): boolean
 	-- signature:
 	-- vec2 vec3Direction(vec3 a, vec3 b);
 
@@ -3371,7 +3371,7 @@ local function apiVec3Direction(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Distance(vm: *EVM): boolean
+local function apiVec3Distance(): boolean
 	-- signature:
 	-- float vec3Distance(vec3 a, vec3 b);
 
@@ -3389,7 +3389,7 @@ local function apiVec3Distance(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3DistanceSq(vm: *EVM): boolean
+local function apiVec3DistanceSq(): boolean
 	-- signature:
 	-- float vec3DistanceSq(vec3 a, vec3 b);
 
@@ -3407,7 +3407,7 @@ local function apiVec3DistanceSq(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Dot(vm: *EVM): boolean
+local function apiVec3Dot(): boolean
 	-- signature:
 	-- float vec3Dot(vec3 a, vec3 b);
 	
@@ -3419,7 +3419,7 @@ local function apiVec3Dot(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Invert(vm: *EVM): boolean
+local function apiVec3Invert(): boolean
 	-- signature:
 	-- vec3 vec3Invert(vec3 a);
 
@@ -3430,7 +3430,7 @@ local function apiVec3Invert(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Length(vm: *EVM): boolean
+local function apiVec3Length(): boolean
 	-- signature:
 	-- float vec3Length(vec3 v);
 	
@@ -3445,7 +3445,7 @@ local function apiVec3Length(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3LengthSq(vm: *EVM): boolean
+local function apiVec3LengthSq(): boolean
 	-- signature:
 	-- float vec3LengthSq(vec3 v);
 
@@ -3460,7 +3460,7 @@ local function apiVec3LengthSq(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Lerp(vm: *EVM): boolean
+local function apiVec3Lerp(): boolean
 	-- signature:
 	-- vec3 vec3Lerp(vec3 a, vec3 b, float amount);
 
@@ -3473,7 +3473,7 @@ local function apiVec3Lerp(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3MoveToward(vm: *EVM): boolean
+local function apiVec3MoveToward(): boolean
 	-- signature:
 	-- vec3 vec3MoveToward(vec3 a, vec3 b, float delta);
 
@@ -3498,7 +3498,7 @@ local function apiVec3MoveToward(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Normalize(vm: *EVM): boolean
+local function apiVec3Normalize(): boolean
 	-- signature:
 	-- vec3 vec3Normalize(vec3 v);
 
@@ -3509,7 +3509,7 @@ local function apiVec3Normalize(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Reflect(vm: *EVM): boolean
+local function apiVec3Reflect(): boolean
 	-- signature:
 	-- vec3 vec3Reflect(vec3 a, vec3 b);
 
@@ -3521,7 +3521,7 @@ local function apiVec3Reflect(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3Rotate(vm: *EVM): boolean
+local function apiVec3Rotate(): boolean
 	-- signature:
 	-- vec3 vec3Rotate(vec3 v, vec3 axis, float angle);
 
@@ -3534,20 +3534,20 @@ local function apiVec3Rotate(vm: *EVM): boolean
 	return true
 end
 
-local function apiVec3ToScreen(vm: *EVM): boolean
+local function apiVec3ToScreen(): boolean
 	-- signature:
 	-- vec2 vec3ToScreen(vec pos, int camera_id);
 
 	--local pos: rl.vector3 = vm:getArgV3(0)
 	--local camera_id: uinteger = math.clamp(vm:getArgU(3), 0, GPU_CAMERAS_COUNT - 1)
 
-	--vm:pushV2(rl.getWorldToScreenEx(pos, vm.gpu.cameras[camera_id], vm.gpu.viewport_w, vm.gpu.viewport_h))
+	--vm:pushV2(rl.getWorldToScreenEx(pos, gpu.cameras[camera_id], gpu.viewport_w, gpu.viewport_h))
 	vm:pushV2({0.0, 0.0})
 
 	return true
 end
 
-local function apiViewport(vm: *EVM): boolean
+local function apiViewport(): boolean
 	-- signature:
 	-- void viewport(int x, int y, int w, int h);
 
@@ -3556,17 +3556,17 @@ local function apiViewport(vm: *EVM): boolean
 	local w: cint = (@cint)(vm:getArgI(2))
 	local h: cint = (@cint)(vm:getArgI(3))
 
-	vm.gpu:viewport(x, y, w, h, false)
+	gpu:viewport(x, y, w, h, false)
 
-	util.pokeI(&vm.gpu.render_state.viewport_x0, x)
-	util.pokeI(&vm.gpu.render_state.viewport_y0, y)
-	util.pokeI(&vm.gpu.render_state.viewport_width0, w)
-	util.pokeI(&vm.gpu.render_state.viewport_height0, h)
+	util.pokeI(&gpu.render_state.viewport_x0, x)
+	util.pokeI(&gpu.render_state.viewport_y0, y)
+	util.pokeI(&gpu.render_state.viewport_width0, w)
+	util.pokeI(&gpu.render_state.viewport_height0, h)
 
 	return true
 end
 
-local function apiWrapf(vm: *EVM): boolean
+local function apiWrapf(): boolean
 	-- signature:
 	-- float wrapf(float x, float min, float max);
 
@@ -3579,7 +3579,7 @@ local function apiWrapf(vm: *EVM): boolean
 	return true
 end
 
-local function apiWrapi(vm: *EVM): boolean
+local function apiWrapi(): boolean
 	-- signature:
 	-- int wrapi(int x, int min, int max);
 

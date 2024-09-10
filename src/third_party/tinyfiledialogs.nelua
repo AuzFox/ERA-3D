@@ -1,0 +1,24 @@
+## cfile "tinyfiledialogs.c"
+## cinclude "tinyfiledialogs.h"
+
+global tinyfd = @record {}
+
+-- in case of multiple files, separator is |
+-- returns nilptr on cancel
+function tinyfd.openFileDialog(
+    aTitle: cstring, -- nilptr or ""
+    aDefaultPathAndOrFile: cstring, -- nilptr or "" , ends with / to set only a directory
+    aNumOfFilterPatterns: cint, -- 0 (2 in the following example) */
+    aFilterPatterns: *[0]cstring, -- nilptr or pointer to array: {"*.png", "*.jpg"}
+    aSingleFilterDescription: cstring, -- nilptr or "image files"
+    aAllowMultipleSelects: boolean
+    ): cstring <cimport'tinyfd_openFileDialog', cinclude'<tinyfiledialogs.h>',nodecl> end
+
+-- returns nilptr on cancel
+function tinyfd.saveFileDialog(
+    aTitle: cstring, -- nilptr or ""
+	aDefaultPathAndOrFile: cstring, -- nilptr or "" , ends with / to set only a directory
+	aNumOfFilterPatterns: cint, -- 0 (1 in the following example)
+	aFilterPatterns: *[0]cstring, -- nilptr or pointer to array: {"*.txt"}
+	aSingleFilterDescription: cstring -- nilptr or "text files"
+    ): cstring <cimport'tinyfd_saveFileDialog', cinclude'<tinyfiledialogs.h>',nodecl> end

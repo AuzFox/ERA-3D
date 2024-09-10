@@ -31,7 +31,8 @@ VM:
 - implement virtual CPU and GPU limits (degrade FPS at certain VM instruction/triangles rendered thresholds, error out at max)
 
 HOST:
-- complete all import dialogs
+- update console API docs
+- complete sample import dialog
+- implement editors
 - implement debugger
 - implement boot animation
-- implement editors

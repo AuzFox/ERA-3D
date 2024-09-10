@@ -1,0 +1,467 @@
+require("definitions")
+
+local MAX_ZOOM <comptime> = 12
+
+local zoom_table: []int32 = {
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+}
+
+global gui = @record {}
+
+    -- state values
+global gui.LOCKED <comptime> = 0xFF
+global gui.NORMAL <comptime> = 0
+global gui.FOCUSED <comptime> = 1
+global gui.FOCUSED_LEFT <comptime> = 2
+global gui.FOCUSED_RIGHT <comptime> = 3
+global gui.PRESSED <comptime> = 4
+global gui.PRESSED_LEFT <comptime> = 5
+global gui.PRESSED_RIGHT <comptime> = 6
+
+global gui.Button = @record {
+    x: int32,
+    y: int32,
+    width: int32,
+    height: int32,
+    text_color: uint32,
+    text: string,
+    state: uint8
+}
+
+global gui.CheckBox = @record {
+    x: int32,
+    y: int32,
+    text: string,
+    enabled: boolean,
+    state: uint8
+}
+
+global gui.ValueBox = @record {
+    x: int32,
+    y: int32,
+    width: int32,
+    height: int32,
+    button_width: int32,
+    text_color: uint32,
+    format_string: string,
+    min: int32,
+    max: int32,
+    shift_step: int32,
+    value: int32,
+    state: uint8
+}
+
+global gui.Texture = @record {
+    id: cint,
+    x: int32,
+    y: int32,
+    width: int32,
+    height: int32
+}
+
+global gui.TextureView = @record {
+    x: int32,
+    y: int32,
+    width: int32,
+    height: int32,
+    texture: gui.Texture,
+    zoom_level: int32,
+    pixel_size: int32,
+    pixel_x: int32,
+    pixel_y: int32,
+    prev_pixel_x: int32,
+    prev_pixel_y: int32,
+    pan_start_x: int32,
+    pan_start_y: int32,
+    panning: boolean,
+    mouse_in_bounds: boolean,
+    input_callback: function(): void,
+    draw_callback: function(): void
+}
+
+global gui.locked: boolean = false
+
+function gui.updateButton(button: *gui.Button): boolean
+    if gui.locked then
+        button.state = gui.LOCKED
+        return false 
+    end
+
+    button.state = gui.NORMAL
+
+    if input.isMouseInRect(button.x, button.y, button.width, button.height) then
+        if input.left_click_held then
+            button.state = gui.PRESSED
+        else
+            button.state = gui.FOCUSED
+        end
+
+        if input.left_click_released then
+            return true
+        end
+    end
+
+    return false
+end
+
+function gui.drawButton(button: *gui.Button): void
+    local border_color: uint32
+    local text_color: uint32 = button.text_color
+
+    switch button.state do
+        case gui.NORMAL then
+            border_color = GPU_GRAY
+        case gui.FOCUSED then
+            border_color = core.cursor_color
+        case gui.PRESSED then
+            border_color = core.cursor_color_dark
+        case gui.LOCKED then
+            border_color = GPU_DGRAY
+            text_color = GPU_GRAY
+    end
+
+    gpu:drawRectLines2D(button.x, button.y, button.width, button.height, border_color)
+    gpu:print2D(
+        button.x + (button.width /// 2) - ((button.text.size * 6) /// 2),
+        button.y + (button.height /// 2) - 4,
+        text_color,
+        button.text
+    )
+end
+
+function gui.updateCheckBox(box: *gui.CheckBox): void
+    if gui.locked then
+        box.state = gui.LOCKED
+    end
+
+    box.state = gui.NORMAL
+
+    local text_width: int32 = box.text.size * 6
+
+    if input.isMouseInRect(box.x, box.y, text_width + 15, 9) then
+        if input.left_click_held then
+            box.state = gui.PRESSED
+        else
+            box.state = gui.FOCUSED
+        end
+
+        if input.left_click_released then
+            box.enabled = not box.enabled
+        end
+    end
+end
+
+function gui.drawCheckBox(box: *gui.CheckBox): void
+    local border_color: uint32
+    local text_color: uint32
+
+    switch box.state do
+        case gui.NORMAL then
+            border_color = GPU_GRAY
+            text_color = GPU_WHITE
+        case gui.FOCUSED then
+            border_color = core.cursor_color
+            text_color = core.cursor_color
+        case gui.PRESSED then
+            border_color = core.cursor_color_dark
+            text_color = core.cursor_color_dark
+        case gui.LOCKED then
+            border_color = GPU_DGRAY
+            text_color = GPU_GRAY
+    end
+
+    local text_width: int32 = box.text.size * 6
+
+    gpu:print2D(
+        box.x,
+        box.y,
+        text_color,
+        box.text
+    )
+
+    -- box
+    gpu:drawRectLines2D(box.x + text_width + 6, box.y, 9, 9, border_color)
+
+    if box.enabled then
+        gpu:drawRect2D(box.x + text_width + 8, box.y + 2, 5, 5, text_color)
+    end
+end
+
+function gui.ValueBox:setValue(value: int32): void
+    self.value = util.midI(self.min, value, self.max)
+end
+
+function gui.ValueBox:incValue(offset: int32): void
+    self.value = util.midI(self.min, self.value + offset, self.max)
+end
+
+function gui.ValueBox:setRange(min: int32, max: int32): void
+    self.min = min
+    self.max = max
+    self.value = util.midI(min, self.value, max)
+end
+
+function gui.ValueBox:setRangeAndValue(min: int32, max: int32, value: int32): void
+    self.min = min
+    self.max = max
+    self.value = util.midI(min, value, max)
+end
+
+function gui.updateValueBox(vb: *gui.ValueBox): void
+    vb.value = util.midI(vb.min, vb.value, vb.max)
+
+    if gui.locked then
+        vb.state = gui.LOCKED
+        return
+    end
+
+    vb.state = gui.NORMAL
+
+    local step: int32 = 1
+    if input.is_shift_down then
+        step = vb.shift_step
+    end
+
+    -- middle rect (value)
+    if input.isMouseInRect(vb.x, vb.y, vb.width, vb.height) then
+        vb.state = gui.FOCUSED
+
+        vb.value = util.midI(vb.min, vb.value + input.mouse_wheel_y * step, vb.max)
+    elseif vb.button_width > 0 then
+        if input.isMouseInRect((vb.x - 1) - vb.button_width, vb.y, vb.button_width, vb.height) then
+
+            if input.left_click_held then
+                vb.state = gui.PRESSED_LEFT
+            else
+                vb.state = gui.FOCUSED_LEFT
+            end
+    
+            if input.left_click_released then
+                vb.value = util.midI(vb.min, vb.value - step, vb.max)
+            end
+        elseif input.isMouseInRect(vb.x + vb.width + 1, vb.y, vb.button_width, vb.height) then
+
+            if input.left_click_held then
+                vb.state = gui.PRESSED_RIGHT
+            else
+                vb.state = gui.FOCUSED_RIGHT
+            end
+    
+            if input.left_click_released then
+                vb.value = util.midI(vb.min, vb.value + step, vb.max)
+            end
+        end
+    end
+end
+
+function gui.drawValueBox(vb: *gui.ValueBox): void
+    local left_border_color: uint32
+    local left_text_color: uint32 = GPU_WHITE
+    local middle_border_color: uint32
+    local middle_text_color: uint32 = vb.text_color
+    local right_border_color: uint32
+    local right_text_color: uint32 = GPU_WHITE
+
+    switch vb.state do
+        case gui.NORMAL then
+            left_border_color = GPU_GRAY
+            middle_border_color = GPU_GRAY
+            right_border_color = GPU_GRAY
+        case gui.FOCUSED then
+            left_border_color = GPU_GRAY
+            middle_border_color = core.cursor_color
+            right_border_color = GPU_GRAY
+        case gui.FOCUSED_LEFT then
+            left_border_color = core.cursor_color
+            middle_border_color = GPU_GRAY
+            right_border_color = GPU_GRAY
+        case gui.FOCUSED_RIGHT then
+            left_border_color = GPU_GRAY
+            middle_border_color = GPU_GRAY
+            right_border_color = core.cursor_color
+        case gui.PRESSED then
+            left_border_color = GPU_GRAY
+            middle_border_color = core.cursor_color_dark
+            right_border_color = GPU_GRAY
+        case gui.PRESSED_LEFT then
+            left_border_color = core.cursor_color_dark
+            middle_border_color = GPU_GRAY
+            right_border_color = GPU_GRAY
+        case gui.PRESSED_RIGHT then
+            left_border_color = GPU_GRAY
+            middle_border_color = GPU_GRAY
+            right_border_color = core.cursor_color_dark
+        case gui.LOCKED then
+            left_border_color = GPU_DGRAY
+            middle_border_color = GPU_DGRAY
+            right_border_color = GPU_DGRAY
+            left_text_color = GPU_GRAY
+            middle_text_color = GPU_GRAY
+            right_text_color = GPU_GRAY
+    end
+
+    -- middle rect (value)
+    local value_str = (@string)(rl.textFormat(vb.format_string, (@cint)(vb.value)))
+    gpu:drawRectLines2D(vb.x, vb.y, vb.width, vb.height, middle_border_color)
+    gpu:drawRect2D(vb.x + 1, vb.y + 1, vb.width - 2, vb.height - 2, GPU_ALPHA_GRAY)
+    gpu:print2D(
+        (vb.x + vb.width) - (value_str.size * 6) - 2,
+        vb.y + (vb.height /// 2) - 4,
+        middle_text_color,
+        value_str
+    )
+
+    if vb.button_width > 0 then
+        local left_x: int32 = (vb.x - 1) - vb.button_width
+        local left_y: int32 = vb.y
+        local right_x: int32 = vb.x + vb.width + 1
+        local right_y: int32 = vb.y
+
+        -- left button (minus)
+        gpu:drawRectLines2D(left_x, left_y, vb.button_width, vb.height, left_border_color)
+        gpu:print2D(
+            left_x + (vb.button_width /// 2) - 3,
+            left_y + (vb.height /// 2) - 4,
+            left_text_color,
+            "-"
+        )
+
+        -- right button (plus)
+        gpu:drawRectLines2D(right_x, right_y, vb.button_width, vb.height, right_border_color)
+        gpu:print2D(
+            right_x + (vb.button_width /// 2) - 3,
+            right_y + (vb.height /// 2) - 4,
+            right_text_color,
+            "+"
+        )
+    end
+end
+
+function gui.updateTextureView(view: *gui.TextureView): void
+    local max_tex_x: int32 = view.x + (view.width /// 2)
+    local max_tex_y: int32 = view.y + (view.height /// 2)
+
+    view.mouse_in_bounds = input.isMouseInRect(view.x, view.y, view.width, view.height)
+
+    if view.mouse_in_bounds then
+        local new_zoom: int32 = view.zoom_level + input.mouse_wheel_y
+        if input.mouse_wheel_y ~= 0 and new_zoom >= 0 and new_zoom <= MAX_ZOOM then
+            view.zoom_level = new_zoom
+            
+            local new_pixel_size: int32 = zoom_table[view.zoom_level]
+            local new_pixel_x: int32 = (input.mouse_x - view.texture.x) // view.pixel_size
+            local new_pixel_y: int32 = (input.mouse_y - view.texture.y) // view.pixel_size
+            local new_tex_x: int32 = (-(new_pixel_x * new_pixel_size)) + input.mouse_x
+            local new_tex_y: int32 = (-(new_pixel_y * new_pixel_size)) + input.mouse_y
+    
+            view.texture.x = util.midI(view.x - (view.texture.width * new_pixel_size) + (view.width /// 2), new_tex_x, max_tex_x)
+            view.texture.y = util.midI(view.y - (view.texture.height * new_pixel_size) + (view.height /// 2), new_tex_y, max_tex_y)
+            view.pixel_size = new_pixel_size
+        end
+
+        view.prev_pixel_x = view.pixel_x
+        view.prev_pixel_y = view.pixel_y
+        view.pixel_x = (input.mouse_x - view.texture.x) // view.pixel_size
+        view.pixel_y = (input.mouse_y - view.texture.y) // view.pixel_size
+
+        if not view.panning and input.middle_clicked then
+            view.pan_start_x = view.texture.x
+            view.pan_start_y = view.texture.y
+            view.panning = true
+        end
+    end
+
+    if view.input_callback ~= nilptr then
+        view.input_callback()
+    end
+
+    if view.panning then
+        if input.middle_click_released then
+            view.panning = false
+        elseif input.middle_dragging then
+            view.texture.x = util.midI(view.x - (view.texture.width * view.pixel_size) + (view.width /// 2), view.pan_start_x + input.middle_drag_x, max_tex_x)
+            view.texture.y = util.midI(view.y - (view.texture.height * view.pixel_size) + (view.height /// 2), view.pan_start_y + input.middle_drag_y, max_tex_y)
+        end
+    end
+end
+
+function gui.drawTextureView(view: *gui.TextureView): void
+    -- checkered background
+    gpu:scissorMode(true)
+    gpu:scissor(view.x, view.y, view.width, view.height)
+
+    local base_dest_x: float32 = (@float32)(view.texture.x)
+    local base_dest_y: float32 = (@float32)(view.texture.y)
+    local base_dest_width: float32 = (@float32)(view.texture.width * view.pixel_size)
+    local base_dest_height: float32 = (@float32)(view.texture.height * view.pixel_size)
+    local checker_tex_width: float32 = (@float32)(view.texture.width /// 32)
+    local checker_tex_height: float32 = (@float32)(view.texture.height /// 32)
+    
+    gpu:beginMeshWithTexture(GPU_QUADS, gpu.gfx_checker_texture.id)
+        gpu:vertColor(0xFFFFFFFF)
+        gpu:vertUV({0.0, 0.0})
+        gpu:vertex2D({base_dest_x, base_dest_y})
+        gpu:vertUV({0.0, checker_tex_height})
+        gpu:vertex2D({base_dest_x, base_dest_y + base_dest_height})
+        gpu:vertUV({checker_tex_width, checker_tex_height})
+        gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y + base_dest_height})
+        gpu:vertUV({checker_tex_width, 0.0})
+        gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y})
+    gpu:endMeshWithTexture()
+
+    if view.draw_callback ~= nilptr then
+        view.draw_callback()
+    else
+        -- bottom image
+        if view.texture.id ~= 0 then
+            gpu:beginMeshWithTexture(GPU_QUADS, view.texture.id)
+                gpu:vertColor(0xFFFFFFFF)
+                gpu:vertUV({0.0, 0.0})
+                gpu:vertex2D({base_dest_x, base_dest_y})
+                gpu:vertUV({0.0, 1.0})
+                gpu:vertex2D({base_dest_x, base_dest_y + base_dest_height})
+                gpu:vertUV({1.0, 1.0})
+                gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y + base_dest_height})
+                gpu:vertUV({1.0, 0.0})
+                gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y})
+            gpu:endMeshWithTexture()
+        end
+    end
+    
+    -- grid
+    if view.pixel_size > 2 then
+        local grid_step: int32 = 16 * view.pixel_size
+        local tile_start_x: int32 = math.max(
+            view.texture.x,
+            (view.x /// grid_step) * grid_step + util.wrapI(view.texture.x, 0, grid_step)
+        )
+        local tile_start_y: int32 = math.max(
+            view.texture.y,
+            (view.y /// grid_step) * grid_step + util.wrapI(view.texture.y, 0, grid_step)
+        )
+        local max_x: int32 = math.min(view.texture.x + view.texture.width * view.pixel_size, GPU_VSCREEN_W)
+        local max_y: int32 = math.min(view.texture.y + view.texture.height * view.pixel_size, GPU_VSCREEN_H)
+
+        for x = tile_start_x, <= max_x, grid_step do
+            gpu:drawRect2D(x, view.texture.y, 1, view.texture.width * view.pixel_size, 0x0000FFFF)
+        end
+
+        for y = tile_start_y, <= max_y, grid_step do
+            gpu:drawRect2D(view.texture.x, y, view.texture.height * view.pixel_size, 1, 0x0000FFFF)
+        end
+    end
+
+    gpu:scissorMode(false)
+end

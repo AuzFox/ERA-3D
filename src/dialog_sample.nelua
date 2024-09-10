@@ -1,0 +1,38 @@
+require("statemachine")
+
+global function dialogSampleConfigReset(): void
+    print("reset sample dialog")
+end
+
+global function dialogSampleConfigUpdate(): void
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+        rl.unloadWave(core.sample_to_import)
+        core.has_loaded_sample = false
+
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    --[[
+    -- load sample data
+    local sample_start: uint32 = ((@uint32)(core.byte_buffer[1]) << 16) | ((@uint32)(core.byte_buffer[2]) << 8) | (@uint32)(core.byte_buffer[3])
+    local wavmap_id: uint16 = (((@uint16)(core.byte_buffer[4]) << 8) | (@uint16)(core.byte_buffer[5]))
+
+    soundchip:loadSampleData(soundchip.current_wavbank - SoundchipBank.WAVBANK0, sample_start)
+
+    -- create WMPBANK entry
+    -- ...
+
+    rl.unloadWave(core.sample_to_import)
+    core.has_loaded_sample = false
+    
+    core:log(LogEntryType.INFO, "sample loaded", true)
+
+    statemachine.queued_dialog = DialogID.NONE
+    return
+    ]]
+end
+
+global function dialogSampleConfigDraw(): void
+    -- ...
+end

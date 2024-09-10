@@ -30,7 +30,8 @@ For building instructions, see the [Building](https://auzfox.github.io/ERA-3D-Do
 - [Raylib.nelua](https://github.com/AuzFox/Raylib.nelua)
 - [BlipKit](https://github.com/detomon/BlipKit)
 - [zip](https://github.com/kuba--/zip)
-- fs and json from [nelua-batteries](https://github.com/edubart/nelua-batteries)
+- `json.nelua` from [nelua-batteries](https://github.com/edubart/nelua-batteries)
+- [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs/)
 
 ## License
 

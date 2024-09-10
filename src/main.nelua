@@ -1,7 +1,5 @@
 require("os")
 
-require("fs")
-
 require("definitions")
 require("compiler")
 require("evm")
@@ -12,7 +10,9 @@ require("state_texture")
 require("state_model")
 require("state_tracker")
 require("state_run")
-require("dialog")
+require("dialog_image")
+require("dialog_sample")
+require("dialog_model")
 require("input")
 require("docs")
 
@@ -33,8 +33,6 @@ local TriParticle = @record {
 	age_factor: float32
 }
 
-local vm: *EVM
-local sm: StateMachine
 local particles: [MAX_PARTICLES]TriParticle
 local log_level_names: [8]string = {
 	"all",
@@ -45,6 +43,13 @@ local log_level_names: [8]string = {
 	"error",
 	"fatal",
 	"none"
+}
+
+local load_cart_filters: []cstring = {
+    "*.e3d"
+}
+local save_cart_filters: []cstring = {
+    "*.e3d"
 }
 
 local function updateCursorColor(
@@ -72,6 +77,12 @@ local function updateCursorColor(
     local blue: uint32 = ((@uint32)(fblue) & 0xFF)
 
     core.cursor_color = (red << 24) | (green << 16) | (blue << 8) | 0xFF
+
+	red = red /// 2
+    green = green /// 2
+    blue = blue /// 2
+
+    core.cursor_color_dark = (red << 24) | (green << 16) | (blue << 8) | 0xFF
 end
 
 local function randomizeParticle(p: *TriParticle): void
@@ -100,43 +111,43 @@ end
 
 local function setupDirectories(): void
 	## if ccinfo.is_windows then
-		core.user_directory = os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH")
-		core.data_directory = core.user_directory .. "\\AppData\\Roaming\\era-3d"
-		core.carts_directory = core.data_directory .. "\\carts"
-		core.memcards_directory = core.data_directory .. "\\memcards"
+		core.user_directory = os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH") .. "\\"
+		core.data_directory = core.user_directory .. "AppData\\Roaming\\era-3d\\"
+		core.carts_directory = core.data_directory .. "carts\\"
+		core.memcards_directory = core.data_directory .. "memcards\\"
 	## elseif ccinfo.is_linux then
-		core.user_directory = os.getenv("HOME")
-		core.data_directory = core.user_directory .. "/.era-3d"
-		core.carts_directory = core.data_directory .. "/carts"
-		core.memcards_directory = core.data_directory .. "/memcards"
+		core.user_directory = os.getenv("HOME") .. "/"
+		core.data_directory = core.user_directory .. ".era-3d/"
+		core.carts_directory = core.data_directory .. "carts/"
+		core.memcards_directory = core.data_directory .. "memcards/"
 	## end
 
 	local succees: boolean
 	local errmsg: string
 	local errcode: integer
 
-	if not fs.isdir(core.data_directory) then
-		succees, errmsg, errcode = fs.mkdir(core.data_directory)
+	if not rl.directoryExists(core.data_directory) then
+		succees, errmsg, errcode = util.mkdir(core.data_directory)
 		print("mkdir", core.data_directory, succees, errmsg, errcode)
 	end
-	if not fs.isdir(core.carts_directory) then
-		succees, errmsg, errcode = fs.mkdir(core.carts_directory)
+	if not rl.directoryExists(core.carts_directory) then
+		succees, errmsg, errcode = util.mkdir(core.carts_directory)
 		print("mkdir", core.carts_directory, succees, errmsg, errcode)
 	end
-	if not fs.isdir(core.memcards_directory) then
-		succees, errmsg, errcode = fs.mkdir(core.memcards_directory)
+	if not rl.directoryExists(core.memcards_directory) then
+		succees, errmsg, errcode = util.mkdir(core.memcards_directory)
 		print("mkdir", core.memcards_directory, succees, errmsg, errcode)
 	end
 end
 
 local function handleConfigFile(): void
 	## if ccinfo.is_windows then
-		core.config_file_path = core.data_directory .. "\\config.json"
+		core.config_file_path = core.data_directory .. "config.json"
 	## elseif ccinfo.is_linux then
-		core.config_file_path = core.data_directory .. "/config.json"
+		core.config_file_path = core.data_directory .. "config.json"
 	## end
 
-	if fs.isfile(core.config_file_path) then
+	if rl.fileExists(core.config_file_path) then
 		core:loadConfigFile()
 	else
 		core:setDefaultConfig()
@@ -149,9 +160,11 @@ local function init(): void
 	handleConfigFile()
 
 	vm = newVM()
+	gpu = &vm.gpu
+	soundchip = &vm.soundchip
 	input.setDefaultButtonMap()
 
-	sm.states = {
+	statemachine.states = {
 		{
 			stateBootInit,
 			stateBootEnter,
@@ -202,34 +215,26 @@ local function init(): void
 		}
 	}
 
-	sm.dialogs = {
+	statemachine.dialogs = {
 		{
+			nilptr,
 			nilptr,
 			nilptr
 		},
 		{
-			dialogImportCodeUpdate,
-			dialogImportCodeDraw,
+			dialogImageConfigReset,
+			dialogImageConfigUpdate,
+			dialogImageConfigDraw,
 		},
 		{
-			dialogImportTextureUpdate,
-			dialogImportTextureDraw,
+			dialogSampleConfigReset,
+			dialogSampleConfigUpdate,
+			dialogSampleConfigDraw,
 		},
 		{
-			dialogImportModelUpdate,
-			dialogImportModelDraw,
-		},
-		{
-			dialogImportSampleUpdate,
-			dialogImportSampleDraw,
-		},
-		{
-			dialogLoadCartUpdate,
-			dialogLoadCartDraw,
-		},
-		{
-			dialogSaveCartUpdate,
-			dialogSaveCartDraw,
+			dialogModelConfigReset,
+			dialogModelConfigUpdate,
+			dialogModelConfigDraw,
 		}
 	}
 
@@ -257,7 +262,7 @@ local function init(): void
 		randomizeParticle(p)
 	end
 
-	sm:init(vm)
+	statemachine:init()
 
 	core:log(LogEntryType.INFO, "WELCOME TO ERA-3D v0.0.0!\nrun >help for a list of commands\n ", false)
 end
@@ -269,7 +274,7 @@ local function updateMenuAnimation(): void
                 core.anim_time = core.anim_time + rl.getFrameTime()
                 core.facing_angle = rle.quadOut(core.anim_time, core.anim_beginning, core.anim_target - core.anim_beginning, 0.5)
             else
-                switch sm.state_id do
+                switch statemachine.state_id do
                     case StateID.CODE then
                         core.facing_angle = 0.0
                     case StateID.TRACKER then
@@ -462,11 +467,11 @@ local function runConsoleCommand(): void
 			elseif setting == "vsync" then
 				if val == "true" then
 					core.config.vsync = true
-					vm.gpu:updateConfigFlags()
+					gpu:updateConfigFlags()
 					save_config = true
 				elseif val == "false" then
 					core.config.vsync = false
-					vm.gpu:updateConfigFlags()
+					gpu:updateConfigFlags()
 					save_config = true
 				else
 					core:log(LogEntryType.HOST_ERROR, "config: vsync setting must be set to true or false", false)
@@ -496,11 +501,11 @@ local function runConsoleCommand(): void
 			elseif setting == "crt_blur" then
 				if val == "true" then
 					core.config.crt_blur = true
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				elseif val == "false" then
 					core.config.crt_blur = false
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				else
 					core:log(LogEntryType.HOST_ERROR, "config: crt_blur setting must be set to true or false", false)
@@ -508,11 +513,11 @@ local function runConsoleCommand(): void
 			elseif setting == "crt_noise" then
 				if val == "true" then
 					core.config.crt_noise = true
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				elseif val == "false" then
 					core.config.crt_noise = false
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				else
 					core:log(LogEntryType.HOST_ERROR, "config: crt_noise setting must be set to true or false", false)
@@ -520,11 +525,11 @@ local function runConsoleCommand(): void
 			elseif setting == "crt_scanlines" then
 				if val == "true" then
 					core.config.crt_scanlines = true
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				elseif val == "false" then
 					core.config.crt_scanlines = false
-					vm.gpu:updateCRTShader()
+					gpu:updateCRTShader()
 					save_config = true
 				else
 					core:log(LogEntryType.HOST_ERROR, "config: crt_scanlines setting must be set to true or false", false)
@@ -584,16 +589,16 @@ function consoleDraw(log_y: int32): void
 				col = GPU_RED
 		end
 
-		vm.gpu:printCString2D(0, line_y, col, line_ptr)
+		gpu:printCString2D(0, line_y, col, line_ptr)
 		
 		line_index = util.wrapI(line_index + 1, 0, LOG_MAX_LINES)
 		line_y = line_y + 9
 		lines_drawn = lines_drawn + 1
 	end
 
-	vm.gpu:print2D(0, line_y, GPU_WHITE, ">")
-	vm.gpu:print2D(6, line_y, GPU_WHITE, core.log_command_str)
-	vm.gpu:drawRect2D(6 + (core.log_command_str.size * 6), line_y, 6, 9, core.cursor_color)
+	gpu:print2D(0, line_y, GPU_WHITE, ">")
+	gpu:print2D(6, line_y, GPU_WHITE, core.log_command_str)
+	gpu:drawRect2D(6 + (core.log_command_str.size * 6), line_y, 6, 9, core.cursor_color)
 end
 
 function apiListUpdate(): void
@@ -635,13 +640,13 @@ function apiListDraw(log_y: int32): void
 		"MISC"
 	}
 
-	vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 9, GPU_DGRAY)
-	vm.gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
+	gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, 9, GPU_DGRAY)
+	gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
 
 	local x: int32 = 0
 	for i = 0, < #tab_names do
 		local name: string = tab_names[i]
-		vm.gpu:print2D(x, log_y, i == core.api_list_catagory and core.cursor_color or GPU_LGRAY, name)
+		gpu:print2D(x, log_y, i == core.api_list_catagory and core.cursor_color or GPU_LGRAY, name)
 		x = x + (#name * 6) + 12
 	end
 	
@@ -650,14 +655,14 @@ function apiListDraw(log_y: int32): void
 		if i > #core.api_current_list then break end
 
 		if i == core.api_list_index then
-			vm.gpu:drawRect2D(0, log_y + ((i - start_index) * 9) + 9, GPU_VSCREEN_W, 9, GPU_DGRAY & 0xFFFFFFC0)
-			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, core.cursor_color, core.api_current_list[i])
+			gpu:drawRect2D(0, log_y + ((i - start_index) * 9) + 9, GPU_VSCREEN_W, 9, GPU_DGRAY & 0xFFFFFFC0)
+			gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, core.cursor_color, core.api_current_list[i])
 		else
-			vm.gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_LGRAY, core.api_current_list[i])
+			gpu:print2D(0, log_y + ((i - start_index) * 9) + 9, GPU_LGRAY, core.api_current_list[i])
 		end
 	end
 
-	vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: EXIT   [UP/DOWN]: NAVIGATE LIST   [ENTER]: VIEW FUNCTION DOCS")
+	gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: EXIT   [UP/DOWN]: NAVIGATE LIST   [ENTER]: VIEW FUNCTION DOCS")
 end
 
 function docStringUpdate(): void
@@ -668,12 +673,12 @@ function docStringUpdate(): void
 end
 
 function docStringDraw(log_y: int32): void
-	vm.gpu:print2D(0, log_y, GPU_GREEN, core.current_doc_str)
-	vm.gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
+	gpu:print2D(0, log_y, GPU_GREEN, core.current_doc_str)
+	gpu:drawRect2D(0, log_y + 20 * 9, GPU_VSCREEN_W, 10, GPU_DGRAY)
 	if core.log_prev_update_fn == consoleUpdate then
-		vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO CONSOLE")
+		gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO CONSOLE")
 	else
-		vm.gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO API LIST")
+		gpu:print2D(0, log_y + 1 + 20 * 9, GPU_LGRAY, "[ESCAPE]: RETURN TO API LIST")
 	end
 end
 
@@ -712,13 +717,14 @@ local function updatePopup(): void
 end
 
 local function run(): void
+	-- main loop
 	while not rl.windowShouldClose() do
-		vm.gpu:refreshScreenSize()
+		gpu:refreshScreenSize()
 		input.refresh(
-			(@int32)(vm.gpu.master_dest_rect.x),
-			(@int32)(vm.gpu.master_dest_rect.y),
-			vm.gpu.screen_w,
-			vm.gpu.screen_h
+			(@int32)(gpu.master_dest_rect.x),
+			(@int32)(gpu.master_dest_rect.y),
+			gpu.screen_w,
+			gpu.screen_h
 		)
 
 		updatePopup()
@@ -727,25 +733,25 @@ local function run(): void
 			updateMenuAnimation()
 		elseif core.log_state == LogState.SHOWN then
 			updateLog()
-		elseif sm.dialog_id ~= DialogID.NONE then
+		elseif statemachine.dialog_id ~= DialogID.NONE then
 			if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.ENTER) then
 				core.queued_log_state = LogState.SHOWN
 			else
-				sm:updateDialog()
+				statemachine:updateDialog()
 			end
 		else
 			local update_state: boolean = true
 
-			if sm.state_id ~= StateID.RUN then
+			if statemachine.state_id ~= StateID.RUN then
 				if input.clickedRect(0, false, GPU_VSCREEN_W - 48, 0, 48, 9) then
-					sm.queued_state = StateID.CODE + ((input.mouse_x - (GPU_VSCREEN_W - 48)) /// 12)
+					statemachine.queued_state = StateID.CODE + ((input.mouse_x - (GPU_VSCREEN_W - 48)) /// 12)
 					update_state = false
 				elseif input.is_ctrl_down then
 					if input.pressedRepeat(rl.keyboardKey.LEFT) then
-						sm.queued_state = StateID.STATE_LEFT
+						statemachine.queued_state = StateID.STATE_LEFT
 						update_state = false
 					elseif input.pressedRepeat(rl.keyboardKey.RIGHT) then
-						sm.queued_state = StateID.STATE_RIGHT
+						statemachine.queued_state = StateID.STATE_RIGHT
 						update_state = false
 					elseif rl.isKeyPressed(rl.keyboardKey.R) then
 						if vm:compile() then
@@ -753,7 +759,7 @@ local function run(): void
 							
 							vm.cycle_count = 0
 							if vm:callHook(Hook.INIT) then
-								sm.queued_state = StateID.RUN
+								statemachine.queued_state = StateID.RUN
 								--print("init()", vm.cycle_count)
 							else
 								core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
@@ -765,25 +771,57 @@ local function run(): void
 						end
 						update_state = false
 					elseif rl.isKeyPressed(rl.keyboardKey.S) then
-						if input.is_shift_down then
-							sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
-							sm.queued_dialog = DialogID.SAVE_CART
-						else
-							if core.current_cart_path == "" then
-								sm:resetFileBrowser(core.carts_directory, FileBrowserMode.SAVE)
-								sm.queued_dialog = DialogID.SAVE_CART
-							else
+						if input.is_shift_down or (core.current_cart_path == "") then
+							local cart_save_path: cstring = tinyfd.saveFileDialog(
+								"Save Cart",
+								core.carts_directory,
+								#save_cart_filters,
+								&save_cart_filters,
+								nilptr
+							)
+
+							if cart_save_path ~= nilptr then
+								local file_path: string = (@string)(cart_save_path)
+								core.current_cart_path = file_path:copy()
+								core.current_cart_name = (@string)(rl.getFileName(file_path)):copy()
+
 								if vm:saveCart(core.current_cart_path) then
 									core:log(LogEntryType.INFO, "cart saved", true)
 								else
 									core:log(LogEntryType.HOST_ERROR, vm.error, true)
 								end
 							end
+						else
+							if vm:saveCart(core.current_cart_path) then
+								core:log(LogEntryType.INFO, "cart saved", true)
+							else
+								core:log(LogEntryType.HOST_ERROR, vm.error, true)
+							end
 						end
+
 						update_state = false
 					elseif rl.isKeyPressed(rl.keyboardKey.O) then
-						sm:resetFileBrowser(core.carts_directory, FileBrowserMode.LOAD)
-						sm.queued_dialog = DialogID.LOAD_CART
+						local cart_load_path: cstring = tinyfd.openFileDialog(
+							"Load Cart",
+							core.carts_directory,
+							#load_cart_filters,
+							&load_cart_filters,
+							nilptr,
+							false
+						)
+
+						if cart_load_path ~= nilptr then
+							local file_path: string = (@string)(cart_load_path)
+							if vm:loadCart(file_path) then
+								core.current_cart_path = file_path:copy()
+								core.current_cart_name = (@string)(rl.getFileName(file_path)):copy()
+								core:log(LogEntryType.INFO, "cart loaded", true)
+								gpu.update_tex = true
+							else
+								core:log(LogEntryType.HOST_ERROR, vm.error, true)
+							end
+						end
+
 						update_state = false
 					end
 				end
@@ -795,51 +833,51 @@ local function run(): void
 			end
 			
 			if update_state then
-				sm:updateState()
+				statemachine:updateState()
 			end
 		end
 
-		vm.soundchip:updateAudio()
+		soundchip:updateAudio()
 
-		if vm.gpu.update_tex then
-			vm.gpu:updateTexture()
+		if gpu.update_tex then
+			gpu:updateTexture()
 		end
 
-		if vm.gpu.update_lights then
-			vm.gpu:updateLights()
+		if gpu.update_lights then
+			gpu:updateLights()
 		end
 
 		updateCursorColor(0.3, 0.3, 0.3, 0, 2, 4, 128.0, 127.0, 64.0)
 		local crt_time: float32 = (@float32)(rl.getTime())
-		rl.setShaderValue(vm.gpu.crt_shader, vm.gpu.crt_time_loc, &crt_time, rl.shaderUniformDataType.UNIFORM_FLOAT)
+		rl.setShaderValue(gpu.crt_shader, gpu.crt_time_loc, &crt_time, rl.shaderUniformDataType.UNIFORM_FLOAT)
 
 		-- draw to state render texture
 		if core.log_state ~= LogState.SHOWN then
-			vm.gpu:beginCurrentRenderTexture()
-				if sm.dialog_id ~= DialogID.NONE or core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
-					sm:drawDialog()
+			gpu:beginCurrentRenderTexture()
+				if statemachine.dialog_id ~= DialogID.NONE or core.animation_type == MenuAnimation.DIALOG_OPENCLOSE then
+					statemachine:drawDialog()
 				else
-					sm:drawState()
+					statemachine:drawState()
 				end
-			vm.gpu:endRenderTexture()
+			gpu:endRenderTexture()
 			
-			vm.gpu:resetMatrixStack()
+			gpu:resetMatrixStack()
 		end
 
 		-- draw to master render texture
-		vm.gpu:beginMasterRenderTexture()
-			vm.gpu:clearColor(GPU_BLACK)
-			vm.gpu:clear(GPU_CLEAR_ALL)
+		gpu:beginMasterRenderTexture()
+			gpu:clearColor(GPU_BLACK)
+			gpu:clear(GPU_CLEAR_ALL)
 
-			if sm.state_id == StateID.RUN then
-				vm.gpu:camera2D(-1)
-				vm.gpu:drawCurrentRenderTexture()
+			if statemachine.state_id == StateID.RUN then
+				gpu:camera2D(-1)
+				gpu:drawCurrentRenderTexture()
 			else
-				vm.gpu:camera3D(-1)
+				gpu:camera3D(-1)
 				
-				local aspect: float32 = (@float32)(vm.gpu.screen_w) / (@float32)(vm.gpu.screen_h)
+				local aspect: float32 = (@float32)(gpu.screen_w) / (@float32)(gpu.screen_h)
 				local distance: float32 = 1.0
-				local frustum_height: float32 = 2.0 * distance * math.tan(math.rad(vm.gpu.system_cam3d.fovy * 0.5))
+				local frustum_height: float32 = 2.0 * distance * math.tan(math.rad(gpu.system_cam3d.fovy * 0.5))
 				local frustum_width: float32 = frustum_height * aspect
 
 				local width: float32 = (frustum_width / 2)
@@ -848,7 +886,7 @@ local function run(): void
 				-- draw triangle particles
 				rlgl.pushMatrix()
 					rlgl.disableBackfaceCulling()
-					rl.beginShaderMode(vm.gpu.gfx_shader)
+					rl.beginShaderMode(gpu.gfx_shader)
 						rlgl.begin(rlgl.QUADS)
 							for i = 0, < MAX_PARTICLES do
 								local p: *TriParticle = &particles[i]
@@ -890,14 +928,14 @@ local function run(): void
 
 				if core.animation_type == MenuAnimation.STATE_SWITCH then
 					-- clear depth buffer to prevent triangles from clipping with rendertextures
-					vm.gpu:clear(GPU_CLEAR_DEPTH)
+					gpu:clear(GPU_CLEAR_DEPTH)
 
 					-- draw state rendertexture quads
 					rlgl.pushMatrix()
 						rlgl.rotatef(core.facing_angle, 0.0, 1.0, 0.0)
 						
 						-- code/run
-						vm.gpu:useRenderTexture(RenderTexture.CODE)
+						gpu:useRenderTexture(RenderTexture.CODE)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -911,7 +949,7 @@ local function run(): void
 						rlgl.ending()
 
 						-- tracker
-						vm.gpu:useRenderTexture(RenderTexture.TRACKER)
+						gpu:useRenderTexture(RenderTexture.TRACKER)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -925,7 +963,7 @@ local function run(): void
 						rlgl.ending()
 
 						-- model
-						vm.gpu:useRenderTexture(RenderTexture.MODEL)
+						gpu:useRenderTexture(RenderTexture.MODEL)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -939,7 +977,7 @@ local function run(): void
 						rlgl.ending()
 
 						-- texture
-						vm.gpu:useRenderTexture(RenderTexture.TEXTURE)
+						gpu:useRenderTexture(RenderTexture.TEXTURE)
 						rlgl.begin(rlgl.QUADS)
 							rlgl.color4ub(0xFF, 0xFF, 0xFF, 0xFF)
 							rlgl.texCoord2f(0.0, 1.0)
@@ -953,51 +991,45 @@ local function run(): void
 						rlgl.ending()
 					rlgl.popMatrix()
 
-					vm.gpu:camera2D(-1)
+					gpu:camera2D(-1)
 				else
-					vm.gpu:camera2D(-1)
-					vm.gpu:drawCurrentRenderTexture()
+					gpu:camera2D(-1)
+					gpu:drawCurrentRenderTexture()
 				end
 
-				vm.gpu:drawRect2D(0, 0, GPU_VSCREEN_W, 9, GPU_GRAY & 0xFFFFFFC0)
-				vm.gpu:print2D((GPU_VSCREEN_W /// 2) - ((#core.current_cart_name /// 2) * 6), 0, GPU_LGRAY, core.current_cart_name)
+				gpu:drawRect2D(0, 0, GPU_VSCREEN_W, 9, GPU_GRAY & 0xFFFFFFC0)
+				gpu:print2D((GPU_VSCREEN_W /// 2) - ((#core.current_cart_name /// 2) * 6), 0, GPU_LGRAY, core.current_cart_name)
 
-				if sm.dialog_id ~= DialogID.NONE then
+				if statemachine.dialog_id ~= DialogID.NONE then
 					if core.log_state == LogState.HIDDEN then
-						switch sm.dialog_id do
-							case DialogID.IMPORT_CODE then
-								vm.gpu:print2D(GPU_VSCREEN_W - 13 * 6, 0, GPU_WHITE, "IMPORT SCRIPT")
-							case DialogID.IMPORT_TEXTURE then
-								vm.gpu:print2D(GPU_VSCREEN_W - 14 * 6, 0, GPU_WHITE, "IMPORT TEXTURE")
-							case DialogID.IMPORT_MODEL then
-								vm.gpu:print2D(GPU_VSCREEN_W - 12 * 6, 0, GPU_WHITE, "IMPORT MODEL")
-							case DialogID.IMPORT_SAMPLE then
-								vm.gpu:print2D(GPU_VSCREEN_W - 13 * 6, 0, GPU_WHITE, "IMPORT SAMPLE")
-							case DialogID.LOAD_CART then
-								vm.gpu:print2D(GPU_VSCREEN_W - 9 * 6, 0, GPU_WHITE, "LOAD CART")
-							case DialogID.SAVE_CART then
-								vm.gpu:print2D(GPU_VSCREEN_W - 9 * 6, 0, GPU_WHITE, "SAVE CART")
+						switch statemachine.dialog_id do
+							case DialogID.IMAGE_CONFIG then
+								gpu:print2D(GPU_VSCREEN_W - 12 * 6, 0, GPU_WHITE, "CONFIG IMAGE")
+							case DialogID.SAMPLE_CONFIG then
+								gpu:print2D(GPU_VSCREEN_W - 13 * 6, 0, GPU_WHITE, "CONFIG SAMPLE")
+							case DialogID.MODEL_CONFIG then
+								gpu:print2D(GPU_VSCREEN_W - 12 * 6, 0, GPU_WHITE, "CONFIG MODEL")
 						end
 					end
 				else
-					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 48, 0, (sm.state_id == StateID.CODE) and core.cursor_color or GPU_LGRAY, Icon.STATE_CODE)
-					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 36, 0, (sm.state_id == StateID.TRACKER) and core.cursor_color or GPU_LGRAY, Icon.STATE_TRACKER)
-					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 24, 0, (sm.state_id == StateID.MODEL) and core.cursor_color or GPU_LGRAY, Icon.STATE_MODEL)
-					vm.gpu:drawIcon2D(GPU_VSCREEN_W - 12, 0, (sm.state_id == StateID.TEXTURE) and core.cursor_color or GPU_LGRAY, Icon.STATE_TEXTURE)
+					gpu:drawIcon2D(GPU_VSCREEN_W - 48, 0, (statemachine.state_id == StateID.CODE) and core.cursor_color or GPU_LGRAY, Icon.STATE_CODE)
+					gpu:drawIcon2D(GPU_VSCREEN_W - 36, 0, (statemachine.state_id == StateID.TRACKER) and core.cursor_color or GPU_LGRAY, Icon.STATE_TRACKER)
+					gpu:drawIcon2D(GPU_VSCREEN_W - 24, 0, (statemachine.state_id == StateID.MODEL) and core.cursor_color or GPU_LGRAY, Icon.STATE_MODEL)
+					gpu:drawIcon2D(GPU_VSCREEN_W - 12, 0, (statemachine.state_id == StateID.TEXTURE) and core.cursor_color or GPU_LGRAY, Icon.STATE_TEXTURE)
 				end
 			end
 
 			if core.log_state == LogState.SHOWN or core.animation_type == MenuAnimation.LOG_OPENCLOSE then
 				local log_y: int32 = -LOG_H + (@int32)(core.log_offset * (@float32)(LOG_H))
-				vm.gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, LOG_H + 1, GPU_BLACK & 0xFFFFFFE5)
-				vm.gpu:drawRect2D(0, log_y + LOG_H + 1, GPU_VSCREEN_W, 1, GPU_GRAY)
+				gpu:drawRect2D(0, log_y, GPU_VSCREEN_W, LOG_H + 1, GPU_BLACK & 0xFFFFFFE5)
+				gpu:drawRect2D(0, log_y + LOG_H + 1, GPU_VSCREEN_W, 1, GPU_GRAY)
 
 				core.log_draw_fn(log_y)
 			end
 
 			if core.popup_state ~= PopupState.HIDDEN then
-				vm.gpu:drawRect2D(0, GPU_VSCREEN_H - core.popup_offset, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
-				vm.gpu:print2D(6, GPU_VSCREEN_H - core.popup_offset, core.popup_color, core.popup_text)
+				gpu:drawRect2D(0, GPU_VSCREEN_H - core.popup_offset, GPU_VSCREEN_W, 9, GPU_BLACK & 0xFFFFFFC0)
+				gpu:print2D(6, GPU_VSCREEN_H - core.popup_offset, core.popup_color, core.popup_text)
 			end
 
 			if core.config.draw_fps then
@@ -1011,22 +1043,22 @@ local function run(): void
 				end
 				
 				local log_y: int32 = (core.log_state == LogState.SHOWN or core.animation_type == MenuAnimation.LOG_OPENCLOSE) and (-LOG_H + (@int32)(core.log_offset * (@float32)(LOG_H))) or -LOG_H - 2
-				local fps_len: int32 = vm.gpu:measureInt(fps)
-				vm.gpu:drawRect2D(0, log_y + LOG_H + 2, (fps_len + 4) * 6, 9, GPU_BLACK)
-				vm.gpu:printInt2D(0, log_y + LOG_H + 2, color, (@int32)(fps), nilptr)
-				vm.gpu:print2D(6 + fps_len * 6, log_y + LOG_H + 2, color, "FPS")
+				local fps_len: int32 = gpu:measureInt(fps)
+				gpu:drawRect2D(0, log_y + LOG_H + 2, (fps_len + 4) * 6, 9, GPU_BLACK)
+				gpu:printInt2D(0, log_y + LOG_H + 2, color, (@int32)(fps), nilptr)
+				gpu:print2D(6 + fps_len * 6, log_y + LOG_H + 2, color, "FPS")
 			end
-		vm.gpu:endRenderTexture()
+		gpu:endRenderTexture()
 
-		vm.gpu:resetMatrixStack()
+		gpu:resetMatrixStack()
 
 		-- render master render texture to the screen
 		rl.beginDrawing()
-			vm.gpu:clearColor(GPU_BLACK)
-			vm.gpu:clear(GPU_CLEAR_ALL)
+			gpu:clearColor(GPU_BLACK)
+			gpu:clear(GPU_CLEAR_ALL)
 
-			rl.beginShaderMode(vm.gpu.crt_shader)
-				vm.gpu:drawMasterRenderTexture()
+			rl.beginShaderMode(gpu.crt_shader)
+				gpu:drawMasterRenderTexture()
 			rl.endShaderMode()
 		rl.endDrawing()
 		
@@ -1047,14 +1079,17 @@ local function run(): void
 			core.queued_log_state = LogState.NONE
 		end
 
-		sm:update()
+		statemachine:update()
 	end
 
+	-- save any memcard data and cleanup
 	if vm.memcard_id ~= "" then
 		vm:saveMemCard()
 	end
 
-	sm:cleanup()
+	statemachine:cleanup()
+	soundchip:cleanup()
+	gpu:cleanup()
 end
 
 init()

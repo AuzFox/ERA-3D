@@ -1,5 +1,11 @@
 require("statemachine")
 
+local load_code_filters: []cstring = {
+    "*.txt",
+    "*.ec",
+    "*.c"
+}
+
 -- syntax highlighting variables
 local sh_line: sequence(uint8)
 local sh_line_index: uint32
@@ -24,7 +30,7 @@ local function getChar(): uint8
 	return sh_token
 end
 
-local function nextToken(vm: *EVM): void
+local function nextToken(): void
 	if sh_mlcomment_level > 0 then
 		while true do
 			getChar()
@@ -546,7 +552,7 @@ local function getIndentLevel(): (uint32, uint32)
 	return indent_level, brace_level
 end
 
-local function drawCode(vm: *EVM): void
+local function drawCode(): void
     -- scan src_lines for yet-unclosed multiline comments
 	local brace_level: uint64 = 0
     sh_mlcomment_level = 0
@@ -584,7 +590,7 @@ local function drawCode(vm: *EVM): void
     end
 
 	-- measure highest line number
-	local line_number_spacing: int32 = (vm.gpu:measureInt(#core.src_lines) + 1) * 6
+	local line_number_spacing: int32 = (gpu:measureInt(#core.src_lines) + 1) * 6
 
     -- draw code with syntax highlighting
 	sh_line_index = core.start_line
@@ -599,8 +605,8 @@ local function drawCode(vm: *EVM): void
     local line_y: int32 = 9
 
 	local cursor_y: int32 = 9 + ((core.line_index - core.start_line) * 9)
-	vm.gpu:drawRect2D(line_number_spacing - 1, cursor_y, GPU_VSCREEN_W, 9, GPU_ALPHA_GRAY)
-    vm.gpu:drawRect2D(line_number_spacing + horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
+	gpu:drawRect2D(line_number_spacing - 1, cursor_y, GPU_VSCREEN_W, 9, GPU_ALPHA_GRAY)
+    gpu:drawRect2D(line_number_spacing + horizontal_offset + ((core.char_index - 1) * 6), cursor_y, 6, 9, core.cursor_color)
 
 	local encountered_char: boolean = false
 	local brace_colors: [3]uint32 = {
@@ -610,7 +616,7 @@ local function drawCode(vm: *EVM): void
 	}
 	while true do
         -- get next token
-        nextToken(vm)
+        nextToken()
 		if sh_token == 0 then
 			break
 		end
@@ -695,10 +701,10 @@ local function drawCode(vm: *EVM): void
 						-- only line index matters
 						-- getting the indent level of the line will probably work?
 
-						vm.gpu:drawRect2D(char_x, line_y, 1, 9, 0xC3C3C3C0)
+						gpu:drawRect2D(char_x, line_y, 1, 9, 0xC3C3C3C0)
 						char_x = char_x + 6
 					else
-						vm.gpu:drawChar2D(c, &char_x, line_y, ray_col)
+						gpu:drawChar2D(c, &char_x, line_y, ray_col)
 					end
 				else
 					char_x = char_x + 6
@@ -708,18 +714,18 @@ local function drawCode(vm: *EVM): void
 		end
     end
 
-	vm.gpu:drawRect2D(0, 9, line_number_spacing - 1, 351, GPU_GRAY & 0xFFFFFFC0)
+	gpu:drawRect2D(0, 9, line_number_spacing - 1, 351, GPU_GRAY & 0xFFFFFFC0)
 	line_y = 9
 	for i = core.start_line, <= #core.src_lines do
 		if line_y >= 360 then break end
-		local number_size: int32 = vm.gpu:measureInt(i)
+		local number_size: int32 = gpu:measureInt(i)
 		local number_x: int32 = (((line_number_spacing - 6) /// 6) - (number_size)) * 6
-		vm.gpu:printInt2D(number_x, line_y, (i == core.line_index) and GPU_LGRAY or GPU_GRAY, i, nilptr)
+		gpu:printInt2D(number_x, line_y, (i == core.line_index) and GPU_LGRAY or GPU_GRAY, i, nilptr)
 		line_y = line_y + 9
 	end
 end
 
-global function stateCodeInit(sm: *StateMachine, vm: *EVM): void
+global function stateCodeInit(): void
     core:appendLine()
 
     core.start_line = 1
@@ -729,17 +735,38 @@ global function stateCodeInit(sm: *StateMachine, vm: *EVM): void
     core.current_line = core.src_lines[1]
 end
 
-global function stateCodeEnter(sm: *StateMachine, vm: *EVM): void
-    vm.gpu:setRenderTexture(RenderTexture.CODE)
+global function stateCodeEnter(): void
+    gpu:setRenderTexture(RenderTexture.CODE)
 end
 
-global function stateCodeExit(sm: *StateMachine, vm: *EVM): void
+global function stateCodeExit(): void
 end
 
-global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
+global function stateCodeUpdate(): void
     if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
-        sm:resetFileBrowser(core.user_directory, FileBrowserMode.LOAD)
-        sm.queued_dialog = DialogID.IMPORT_CODE
+        local code_load_path: cstring = tinyfd.openFileDialog(
+			"Load Source Code",
+			core.user_directory,
+			#load_code_filters,
+			&load_code_filters,
+			nilptr,
+			false
+		)
+
+		if code_load_path ~= nilptr then
+			local file_path: string = (@string)(code_load_path)
+			
+			if rl.getFileLength(code_load_path) <= EVM_SRC_SIZE then
+				if vm:loadSourceFile(file_path) then
+					core:log(LogEntryType.INFO, "source code loaded", true)
+				else
+					core:log(LogEntryType.HOST_ERROR, vm.error, true)
+				end
+			else
+				core:log(LogEntryType.HOST_ERROR, "failed to load source code: file is too large", true)
+			end
+		end
+
         return
     end
 
@@ -762,7 +789,7 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
 		core.start_line = math.clamp(core.start_line - (input.mouse_wheel_y * 3), 1, math.max(1, #core.src_lines - 37))
 	end
 	if input.left_clicked or (input.left_click_held and (math.abs(input.left_drag_x) > 6 or math.abs(input.left_drag_y) > 9)) then
-		local line_number_spacing: int32 = (vm.gpu:measureInt(#core.src_lines) + 1) * 6
+		local line_number_spacing: int32 = (gpu:measureInt(#core.src_lines) + 1) * 6
 
 		if input.isMouseInRect(line_number_spacing, 9, GPU_VSCREEN_W - line_number_spacing, GPU_VSCREEN_H - 9) then
 			local line_index: int32 = (input.mouse_y - 9) /// 9
@@ -934,17 +961,15 @@ global function stateCodeUpdate(sm: *StateMachine, vm: *EVM): void
     end
 end
 
-global function stateCodeDraw(sm: *StateMachine, vm: *EVM): void
-    --vm.gpu:clearColor(0)
-    --vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(GPU_COLOR_MASK_A)
-	vm.gpu:clearColor(0)
-	vm.gpu:clear(GPU_CLEAR_ALL)
-	vm.gpu:colorMask(GPU_COLOR_MASK_ALL)
-    vm.gpu:camera2D(-1)
+global function stateCodeDraw(): void
+    gpu:colorMask(GPU_COLOR_MASK_A)
+	gpu:clearColor(0)
+	gpu:clear(GPU_CLEAR_ALL)
+	gpu:colorMask(GPU_COLOR_MASK_ALL)
+    gpu:camera2D(-1)
 
-    drawCode(vm)
+    drawCode()
 end
 
-global function stateCodeCleanup(sm: *StateMachine, vm: *EVM): void
+global function stateCodeCleanup(): void
 end

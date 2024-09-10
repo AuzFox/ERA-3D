@@ -906,9 +906,9 @@ end
 function EVM:saveMemCard(): boolean
 	local filepath: string
 	## if ccinfo.is_windows then
-		filepath = core.memcards_directory .. "\\" .. self.memcard_id
+		filepath = core.memcards_directory .. self.memcard_id
 	## elseif ccinfo.is_linux then
-		filepath = core.memcards_directory .. "/" .. self.memcard_id
+		filepath = core.memcards_directory .. self.memcard_id
 	## end
 
 	local fp: *C.FILE = C.fopen(filepath, "wb")
@@ -924,9 +924,9 @@ end
 function EVM:loadMemCard(new_id: string): boolean
 	local new_card_filepath: string
 	## if ccinfo.is_windows then
-		new_card_filepath = core.memcards_directory .. "\\" .. new_id
+		new_card_filepath = core.memcards_directory .. new_id
 	## elseif ccinfo.is_linux then
-		new_card_filepath = core.memcards_directory .. "/" .. new_id
+		new_card_filepath = core.memcards_directory .. new_id
 	## end
 
 	if self.memcard_id ~= "" then
@@ -938,7 +938,7 @@ function EVM:loadMemCard(new_id: string): boolean
 		end
 	end
 
-	if fs.isfile(new_card_filepath) then
+	if rl.fileExists(new_card_filepath) then
 		local fp: *C.FILE = C.fopen(new_card_filepath, "rb")
 		if fp == nilptr then
 			self.memcard_id = ""
@@ -2264,7 +2264,7 @@ function EVM:run(max_cycles: uint64): boolean
 
 						self:pushArgs(index)
 						self:pushCallframe(index)
-						if not func(self) then
+						if not func() then
 							self:popCallframe()
 							return false
 						end
@@ -2320,7 +2320,7 @@ function EVM:run(max_cycles: uint64): boolean
 
 						self:pushArgs(index)
 						self:pushCallframe(index)
-						if not func(self) then
+						if not func() then
 							self:popCallframe()
 							return false
 						end
@@ -2385,7 +2385,7 @@ function EVM:run(max_cycles: uint64): boolean
 
 					self:pushArgs(argc)
 					self:pushCallframe(argc)
-					if not func(self) then
+					if not func() then
 						self:popCallframe()
 						return false
 					end
@@ -3076,25 +3076,20 @@ function EVM:printHeapBlocks(): void
 	end
 end
 
-function EVM:__gc(): void
-	self.soundchip:cleanup()
-	self.gpu:cleanup()
-end
-
 global function newVM(): *EVM
-	local vm: *EVM = new(@EVM)
+	local newvm: *EVM = new(@EVM)
 
-	vm:registerBuiltins()
-	vm:registerAPI()
+	newvm:registerBuiltins()
+	newvm:registerAPI()
 	
-	vm.gpu:init(&vm.sysmem, &vm.cart.texbank, &vm.cart.objbank, &vm.cart.ompbank)
-	vm.soundchip:init(&vm.sysmem, &vm.cart.wavbank, &vm.cart.seqbank, &vm.cart.wmpbank)
+	newvm.gpu:init(&newvm.sysmem, &newvm.cart.texbank, &newvm.cart.objbank, &newvm.cart.ompbank)
+	newvm.soundchip:init(&newvm.sysmem, &newvm.cart.wavbank, &newvm.cart.seqbank, &newvm.cart.wmpbank)
 
-	vm.heap_head = new(@HeapBlock)
+	newvm.heap_head = new(@HeapBlock)
 
-	vm:resetVM(false)
+	newvm:resetVM(false)
 
-	vm.memcard_id = ""
+	newvm.memcard_id = ""
 
-	return vm
+	return newvm
 end
