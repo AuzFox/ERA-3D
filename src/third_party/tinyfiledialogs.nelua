@@ -1,5 +1,9 @@
 ## cfile "tinyfiledialogs.c"
 ## cinclude "tinyfiledialogs.h"
+## if ccinfo.is_windows then
+    ## linklib "comdlg32"
+    ## linklib "ole32"
+## end
 
 global tinyfd = @record {}
 
