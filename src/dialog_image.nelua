@@ -394,10 +394,11 @@ global function dialogImageConfigReset(): void
 
     dragging_dest = false
     dragging_src = false
+    gui.edit_vb = nilptr
 end
 
 global function dialogImageConfigUpdate(): void
-    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) and gui.edit_vb == nilptr then
         rl.unloadTexture(core.import_texture)
         core.has_import_texture = false
 
@@ -406,6 +407,11 @@ global function dialogImageConfigUpdate(): void
         
         statemachine.queued_dialog = DialogID.NONE
         return
+    end
+
+    if input.left_clicked and gui.edit_vb ~= nilptr then
+        gui.edit_vb.state = gui.NORMAL
+        gui.edit_vb = nilptr
     end
 
     if input.left_click_released then

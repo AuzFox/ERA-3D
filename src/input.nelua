@@ -187,6 +187,19 @@ function input.clickedRect(button: cint, allow_hold: boolean, x: int32, y: int32
     return true
 end
 
+function input.getNumberKey(allow_hex: boolean): (boolean, uint8)
+    local limit: uint8 = allow_hex and input.HEX_KEYS_COUNT or 10
+
+    for i: uint8 = 0, < limit do
+        if rl.isKeyPressed(input.hex_keys[i]) then
+            return true, i
+			break
+        end
+    end
+
+    return false, 0
+end
+
 function input.hexEdit(byte_ptr: *[0]uint8, out_byte: *uint8, nibble_index: uinteger, handle_empty: boolean): boolean
     local pressed: boolean = false
     local nibble: uint8

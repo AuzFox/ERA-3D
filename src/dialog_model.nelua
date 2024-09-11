@@ -45,7 +45,8 @@ global function dialogModelConfigReset(): void
         format_string = "0x%05X",
         min = 0,
         max = ((65536 /// 2) * 3) - core.model_vertex_count - 1,
-        shift_step = 0x100
+        shift_step = 0x100,
+        hex_edit = true
     }
 
     end_index_vb = {
@@ -58,7 +59,8 @@ global function dialogModelConfigReset(): void
         min = 0,
         max = ((65536 /// 2) * 3) - 1,
         value = core.model_vertex_count,
-        shift_step = 0x100
+        shift_step = 0x100,
+        hex_edit = true
     }
 
     create_entry_checkbox = {
@@ -117,13 +119,19 @@ global function dialogModelConfigReset(): void
 	}
 
     unload_model = false
+    gui.edit_vb = nilptr
 end
 
 global function dialogModelConfigUpdate(): void
-    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) and gui.edit_vb == nilptr then
         unload_model = true
         statemachine.queued_dialog = DialogID.NONE
         return
+    end
+
+    if input.left_clicked and gui.edit_vb ~= nilptr then
+        gui.edit_vb.state = gui.NORMAL
+        gui.edit_vb = nilptr
     end
 
     if gui.updateButton(&ok_button) then

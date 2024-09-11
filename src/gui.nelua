@@ -1,6 +1,7 @@
 require("definitions")
 
 local MAX_ZOOM <comptime> = 12
+local MAX_EDIT_INDEX <comptime> = 10
 
 local zoom_table: []int32 = {
     1,
@@ -18,10 +19,81 @@ local zoom_table: []int32 = {
     64
 }
 
+local edit_buffer: [11]uint8
+local edit_index: int32
+
+local function clearEditBuffer(): void
+    for i = 0, < 11 do
+        edit_buffer[i] = 0
+    end
+    edit_index = 0
+end
+
+local function addEditDigit(hex_edit: boolean, value: uint8): void
+    local c: uint8
+
+    if value < 10 then
+        c = '0'_u8 + value
+    else
+        c = 'A'_u8 + (value - 0xA)
+    end
+
+    local max_index: int32 = MAX_EDIT_INDEX
+    if hex_edit then
+        max_index = 8 -- 8 hex digits in a uint32
+    end
+
+    if edit_index < max_index then
+        edit_buffer[edit_index] = c
+        edit_index = edit_index + 1
+    end
+end
+
+local function deleteEditDigit(): void
+    if edit_index > 0 then
+        edit_index = edit_index - 1
+    end
+
+    edit_buffer[edit_index] = '\0'_u8
+end
+
+local function getEditValue(parse_as_hex: boolean): int32
+    local value: int32 = 0
+
+    local max_index: int32 = MAX_EDIT_INDEX
+    if parse_as_hex then
+        max_index = 8 -- 8 hex digits in a uint32
+    end
+
+    max_index = math.min(max_index, edit_index)
+
+    if parse_as_hex then
+        for i = 0, < max_index do
+            value = value << 4
+            local c: int64 = edit_buffer[i]
+            if c >= 'A'_u8 then
+                c = (c - 'A'_u8) + 10
+            else
+                c = c - '0'_u8
+            end
+            value = value | c
+        end
+    else
+        for i = 0, < max_index do
+            value = value * 10
+            local c: int64 = edit_buffer[i] - '0'_u8
+            value = value + c
+        end
+    end
+
+    return value
+end
+
 global gui = @record {}
 
     -- state values
 global gui.LOCKED <comptime> = 0xFF
+global gui.EDITING <comptime> = 0xFE
 global gui.NORMAL <comptime> = 0
 global gui.FOCUSED <comptime> = 1
 global gui.FOCUSED_LEFT <comptime> = 2
@@ -60,6 +132,7 @@ global gui.ValueBox = @record {
     max: int32,
     shift_step: int32,
     value: int32,
+    hex_edit: boolean,
     state: uint8
 }
 
@@ -92,6 +165,7 @@ global gui.TextureView = @record {
 }
 
 global gui.locked: boolean = false
+global gui.edit_vb: *gui.ValueBox
 
 function gui.updateButton(button: *gui.Button): boolean
     if gui.locked then
@@ -224,43 +298,81 @@ function gui.updateValueBox(vb: *gui.ValueBox): void
 
     if gui.locked then
         vb.state = gui.LOCKED
+        
+        if gui.edit_vb == vb then
+            gui.edit_vb = nilptr
+        end
+
         return
     end
 
-    vb.state = gui.NORMAL
+    if vb.state == gui.EDITING then
+        if input.pressedRepeat(rl.keyboardKey.BACKSPACE) then
+            deleteEditDigit()
+            return
+        elseif rl.isKeyPressed(rl.keyboardKey.ENTER) then
+            vb:setValue(getEditValue(vb.hex_edit))
+            clearEditBuffer()
+            gui.edit_vb = nilptr
+            vb.state = gui.NORMAL
+            return
+        elseif input.pressedRepeat(rl.keyboardKey.ESCAPE) then
+            clearEditBuffer()
+            gui.edit_vb = nilptr
+            vb.state = gui.NORMAL
+            return
+        end
 
-    local step: int32 = 1
-    if input.is_shift_down then
-        step = vb.shift_step
-    end
+        local pressed: boolean
+        local value: uint8
+        pressed, value = input.getNumberKey(vb.hex_edit)
 
-    -- middle rect (value)
-    if input.isMouseInRect(vb.x, vb.y, vb.width, vb.height) then
-        vb.state = gui.FOCUSED
+        if pressed then
+            addEditDigit(vb.hex_edit, value)
+        end
+    else
+        vb.state = gui.NORMAL
 
-        vb.value = util.midI(vb.min, vb.value + input.mouse_wheel_y * step, vb.max)
-    elseif vb.button_width > 0 then
-        if input.isMouseInRect((vb.x - 1) - vb.button_width, vb.y, vb.button_width, vb.height) then
+        local step: int32 = 1
+        if input.is_shift_down then
+            step = vb.shift_step
+        end
+    
+        -- middle rect (value)
+        if input.isMouseInRect(vb.x, vb.y, vb.width, vb.height) then
+            vb.state = gui.FOCUSED
 
-            if input.left_click_held then
-                vb.state = gui.PRESSED_LEFT
-            else
-                vb.state = gui.FOCUSED_LEFT
+            if input.left_clicked and gui.edit_vb == nilptr then
+                vb.state = gui.EDITING
+                clearEditBuffer()
+                gui.edit_vb = vb
+                return
             end
     
-            if input.left_click_released then
-                vb.value = util.midI(vb.min, vb.value - step, vb.max)
-            end
-        elseif input.isMouseInRect(vb.x + vb.width + 1, vb.y, vb.button_width, vb.height) then
-
-            if input.left_click_held then
-                vb.state = gui.PRESSED_RIGHT
-            else
-                vb.state = gui.FOCUSED_RIGHT
-            end
+            vb.value = util.midI(vb.min, vb.value + input.mouse_wheel_y * step, vb.max)
+        elseif vb.button_width > 0 then
+            if input.isMouseInRect((vb.x - 1) - vb.button_width, vb.y, vb.button_width, vb.height) then
     
-            if input.left_click_released then
-                vb.value = util.midI(vb.min, vb.value + step, vb.max)
+                if input.left_click_held then
+                    vb.state = gui.PRESSED_LEFT
+                else
+                    vb.state = gui.FOCUSED_LEFT
+                end
+        
+                if input.left_click_released then
+                    vb.value = util.midI(vb.min, vb.value - step, vb.max)
+                end
+            elseif input.isMouseInRect(vb.x + vb.width + 1, vb.y, vb.button_width, vb.height) then
+    
+                if input.left_click_held then
+                    vb.state = gui.PRESSED_RIGHT
+                else
+                    vb.state = gui.FOCUSED_RIGHT
+                end
+        
+                if input.left_click_released then
+                    vb.value = util.midI(vb.min, vb.value + step, vb.max)
+                end
             end
         end
     end
@@ -303,6 +415,10 @@ function gui.drawValueBox(vb: *gui.ValueBox): void
             left_border_color = GPU_GRAY
             middle_border_color = GPU_GRAY
             right_border_color = core.cursor_color_dark
+        case gui.EDITING then
+            left_border_color = GPU_GRAY
+            middle_border_color = GPU_GRAY
+            right_border_color = GPU_GRAY
         case gui.LOCKED then
             left_border_color = GPU_DGRAY
             middle_border_color = GPU_DGRAY
@@ -310,6 +426,31 @@ function gui.drawValueBox(vb: *gui.ValueBox): void
             left_text_color = GPU_GRAY
             middle_text_color = GPU_GRAY
             right_text_color = GPU_GRAY
+    end
+
+    if vb.state == gui.EDITING then
+        gpu:scissorMode(true)
+        gpu:scissor(vb.x, vb.y, vb.width, vb.height)
+
+        gpu:drawRect2D(vb.x + 1, vb.y + 1, vb.width - 2, vb.height - 2, GPU_ALPHA_GRAY)
+
+        local text_y: int32 = vb.y + (vb.height /// 2) - 4
+        if vb.hex_edit then
+            local text_x: int32 = (vb.x + vb.width) - ((edit_index + 3) * 6) - 2
+            gpu:print2D(text_x, text_y, middle_text_color, "0x")
+            gpu:print2D(text_x + 12, text_y, middle_text_color, (@cstring)(&edit_buffer))
+            gpu:drawRect2D(text_x + 12 + edit_index * 6, text_y, 6, 9, core.cursor_color)
+        else
+            local text_x: int32 = (vb.x + vb.width) - ((edit_index + 1) * 6) - 2
+            gpu:print2D(text_x, text_y, middle_text_color, (@cstring)(&edit_buffer))
+            gpu:drawRect2D(text_x + edit_index * 6, text_y, 6, 9, core.cursor_color)
+        end
+
+        gpu:drawRectLines2D(vb.x, vb.y, vb.width, vb.height, middle_border_color)
+
+        gpu:scissorMode(false)
+
+        return
     end
 
     -- middle rect (value)
