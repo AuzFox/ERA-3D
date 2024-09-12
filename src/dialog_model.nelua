@@ -46,7 +46,7 @@ global function dialogModelConfigReset(): void
         min = 0,
         max = ((65536 /// 2) * 3) - core.model_vertex_count - 1,
         shift_step = 0x100,
-        hex_edit = true
+        edit_chars = gui.EDIT_HEX
     }
 
     end_index_vb = {
@@ -58,9 +58,9 @@ global function dialogModelConfigReset(): void
         format_string = "0x%05X",
         min = 0,
         max = ((65536 /// 2) * 3) - 1,
-        value = core.model_vertex_count,
         shift_step = 0x100,
-        hex_edit = true
+        edit_chars = gui.EDIT_HEX,
+        value = core.model_vertex_count
     }
 
     create_entry_checkbox = {
@@ -78,7 +78,8 @@ global function dialogModelConfigReset(): void
         format_string = "%-3d",
         min = 0,
         max = 511,
-        shift_step = 10
+        shift_step = 10,
+        edit_chars = 3
     }
 
     ok_button = {

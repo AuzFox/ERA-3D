@@ -152,6 +152,99 @@ function util.pokeI(ptr: *[0]uint8, x: int32): void
 	ptr[3] = (@uint8)(intf.u & 0x000000FF)
 end
 
+function util.toHSLA(rgba: uint32): (int32, float32, float32, uint32)
+	local h: int32
+	local s: float32
+	local l: float32
+
+	local r: float32 = (@float32)((rgba >> 24) & 0xFF) / 255.0
+	local g: float32 = (@float32)((rgba >> 16) & 0xFF) / 255.0
+	local b: float32 = (@float32)((rgba >> 8) & 0xFF) / 255.0
+	local a: uint32 = rgba & 0xFF
+
+	local min: float32 = math.min(math.min(r, g), b)
+	local max: float32 = math.max(math.max(r, g), b)
+	local delta: float32 = max - min
+
+	l = (max + min) / 2.0
+
+	if delta == 0.0 then
+		return 0, 0.0, l, a
+	else
+		s = (l <= 0.5) and (delta / (max + min)) or (delta / (2.0 - max - min))
+
+		local hue: float32
+
+		if r == max then
+			hue = ((g - b) / 6.0) / delta
+		elseif g == max then
+			hue = (1.0 / 3.0) + ((b - r) / 6.0) / delta
+		else
+			hue = (2.0 / 3.0) + ((r - g) / 6.0) / delta
+		end
+
+		if hue < 0.0 then
+			hue = hue + 1.0
+		end
+		if hue > 1.0 then
+			hue = hue - 1.0
+		end
+
+		h = (@int32)(hue * 360.0)
+	end
+
+	return h, s, l, a
+end
+
+local function hueToRGB(v1: float32, v2: float32, vh: float32): float32
+	if vh < 0.0 then
+		vh = vh + 1.0
+	end
+
+	if vh > 1.0 then
+		vh = vh - 1.0
+	end
+
+	if (6 * vh) < 1.0 then
+		return v1 + (v2 - v1) * 6.0 * vh
+	end
+
+	if (2 * vh) < 1.0 then
+		return v2
+	end
+
+	if (3 * vh) < 2.0 then
+		return v1 + (v2 - v1) * ((2.0 / 3.0) - vh) * 6.0
+	end
+
+	return v1
+end
+
+function util.toRGBA(h: int32, s: float32, l: float32, a: uint32): uint32
+	local r: uint32
+	local g: uint32
+	local b: uint32
+
+	if s == 0.0 then
+		r = (@uint32)(l * 255.0) & 0xFF
+		g = r
+		b = r
+	else
+		local v1: float32
+		local v2: float32
+		local hue: float32 = (@float32)(h / 360.0)
+
+		v2 = (l < 0.5) and (l * (1.0 + s)) or ((l + s) - (l * s))
+		v1 = 2.0 * l - v2
+
+		r = (@uint32)(255.0 * hueToRGB(v1, v2, hue + (1.0 / 3.0))) & 0xFF
+		g = (@uint32)(255.0 * hueToRGB(v1, v2, hue)) & 0xFF
+		b = (@uint32)(255.0 * hueToRGB(v1, v2, hue - (1.0 / 3.0))) & 0xFF
+	end
+
+	return (r << 24) | (g << 16) | (b << 8) | a
+end
+
 -- create a wrapper for mkdir() on linux and _mkdir() on windows
 -- taken from fs.nelua from nelua batteries (https://github.com/edubart/nelua-batteries)
 

@@ -306,7 +306,8 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 0,
         max = 0,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4
     }
 
     src_y_vb = {
@@ -318,7 +319,8 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 0,
         max = 0,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4
     }
 
     local max_src_w: int32 = math.min(1024, core.import_texture.width)
@@ -333,8 +335,9 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 1,
         max = max_src_w,
-        value = max_src_w,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4,
+        value = max_src_w
     }
 
     src_h_vb = {
@@ -346,8 +349,9 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 1,
         max = max_src_h,
-        value = max_src_h,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4,
+        value = max_src_h
     }
 
     dest_x_vb = {
@@ -359,7 +363,8 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 0,
         max = 1023,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4
     }
 
     dest_y_vb = {
@@ -371,7 +376,8 @@ global function dialogImageConfigReset(): void
         format_string = "%-4d",
         min = 0,
         max = 1023,
-        shift_step = 8
+        shift_step = 8,
+        edit_chars = 4
     }
 
     ok_button = {
