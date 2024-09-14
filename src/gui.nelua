@@ -187,6 +187,15 @@ global gui.TextureView = @record {
     draw_callback: function(): void
 }
 
+global gui.ColorBox = @record {
+    x: int32,
+    y: int32,
+    width: int32,
+    height: int32,
+    color: uint32,
+    state: uint8
+}
+
 global gui.locked: boolean = false
 global gui.edit_vb: *gui.ValueBox
 
@@ -659,4 +668,62 @@ function gui.drawTextureView(view: *gui.TextureView): void
     end
 
     gpu:scissorMode(false)
+end
+
+function gui.updateColorBox(box: *gui.ColorBox): boolean
+    if gui.locked then
+        box.state = gui.LOCKED
+        return false 
+    end
+
+    box.state = gui.NORMAL
+
+    if input.isMouseInRect(box.x, box.y, box.width, box.height) then
+        if input.left_click_held then
+            box.state = gui.PRESSED
+        else
+            box.state = gui.FOCUSED
+        end
+
+        if input.left_click_released then
+            return true
+        end
+    end
+
+    return false
+end
+
+function gui.drawColorBox(box: *gui.ColorBox): void
+    local contrast_color: uint32 = GPU_BLACK
+    local r: uint32 = (box.color >> 24) & 0xFF
+    local g: uint32 = (box.color >> 16) & 0xFF
+    local b: uint32 = (box.color >> 8) & 0xFF
+    local highest: uint32 = math.max(math.max(r, g), b)
+    if highest < 0x50 then
+        contrast_color = GPU_WHITE
+    end
+    local border_color: uint32
+
+    switch box.state do
+        case gui.NORMAL then
+            border_color = GPU_GRAY
+        case gui.FOCUSED then
+            border_color = core.cursor_color
+        case gui.PRESSED then
+            border_color = core.cursor_color_dark
+        case gui.LOCKED then
+            border_color = GPU_DGRAY
+    end
+
+    gpu:drawRectLines2D(box.x, box.y, box.width, box.height, border_color)
+    gpu:drawRect2D(box.x + 1, box.y + 1, box.width - 2, box.height - 2, box.color)
+    gpu:print2D(
+        box.x + (box.width /// 2) - 30,
+        box.y + (box.height /// 2) - 4,
+        contrast_color,
+        rl.textFormat(
+            "0x%08X",
+            (@cint)(box.color)
+        )
+    )
 end

@@ -1,13 +1,14 @@
 require("statemachine")
 
 local CANVAS_X <comptime> = 192
-local CANVAS_Y <comptime> = 9
+local CANVAS_Y <comptime> = 9 + 14
 local CANVAS_W <comptime> = GPU_VSCREEN_W - CANVAS_X
-local CANVAS_H <comptime> = GPU_VSCREEN_H - CANVAS_Y
-local TEXBANK_LIST_Y <comptime> = 18
-local COORDS_X <comptime> = 6
-local COORDS_Y <comptime> = 45
-local TOOL_LIST_Y <comptime> = 182
+local CANVAS_H <comptime> = GPU_VSCREEN_H - CANVAS_Y - 14
+local TEXBANK_LIST_Y <comptime> = 11
+local COORDS_X <comptime> = CANVAS_X + 6
+local COORDS_Y <comptime> = CANVAS_Y + CANVAS_H + 4
+local TOOL_LIST_X <comptime> = CANVAS_X + 2
+local TOOL_LIST_Y <comptime> = 11
 local PALETTE_Y <comptime> = 218
 
 local ToolType = @enum {
@@ -23,9 +24,6 @@ local load_image_filters: []cstring = {
     "*.png"
 }
 
-local primary_color: uint32 = GPU_BLACK
-local secondary_color: uint32 = 0
-
 local canvas: gui.TextureView = {
     x = CANVAS_X,
     y = CANVAS_Y,
@@ -34,6 +32,20 @@ local canvas: gui.TextureView = {
     texture = {0, CANVAS_X, CANVAS_Y, 1024, 1024},
     zoom_level = 0,
     pixel_size = 1
+}
+local primary_colorbox: gui.ColorBox = {
+    66,
+    128,
+    CANVAS_X - 69,
+    16,
+    color = GPU_BLACK
+}
+local secondary_colorbox: gui.ColorBox = {
+    66,
+    150,
+    CANVAS_X - 69,
+    16,
+    color = 0
 }
 
 local mouse_in_texbank_list: boolean
@@ -48,26 +60,26 @@ local function canvas_input_callback(): void
 
     if input.left_click_held then
         if input.is_alt_down then
-            primary_color = gpu:getPixel(canvas.pixel_x, canvas.pixel_y)
+            primary_colorbox.color = gpu:getPixel(canvas.pixel_x, canvas.pixel_y)
         else
             gpu:pixelLine(
                 canvas.prev_pixel_x,
                 canvas.prev_pixel_y,
                 canvas.pixel_x,
                 canvas.pixel_y,
-                primary_color
+                primary_colorbox.color
             )
         end
     elseif input.right_click_held then
         if input.is_alt_down then
-            secondary_color = gpu:getPixel(canvas.pixel_x, canvas.pixel_y)
+            secondary_colorbox.color = gpu:getPixel(canvas.pixel_x, canvas.pixel_y)
         else
             gpu:pixelLine(
                 canvas.prev_pixel_x,
                 canvas.prev_pixel_y,
                 canvas.pixel_x,
                 canvas.pixel_y,
-                secondary_color
+                secondary_colorbox.color
             )
         end
     end
@@ -77,7 +89,7 @@ local function drawCoords(): void
     gpu:printCString2D(
         COORDS_X,
         COORDS_Y,
-        GPU_WHITE,
+        GPU_GREEN,
         rl.textFormat(
             "X:%-4d Y:%-4d",
             (@cint)(canvas.pixel_x),
@@ -152,7 +164,7 @@ global function stateTextureUpdate(): void
     mouse_in_color_palette = input.isMouseInRect(6, PALETTE_Y, 96, 18)
 
     if rl.isKeyPressed(rl.keyboardKey.X) then
-        primary_color, secondary_color = secondary_color, primary_color
+        primary_colorbox.color, secondary_colorbox.color = secondary_colorbox.color, primary_colorbox.color
     end
 
     if mouse_in_texbank_list then
@@ -169,14 +181,17 @@ global function stateTextureUpdate(): void
             local x: int32 = (input.mouse_x - 6) /// 12
             local y: int32 = (input.mouse_y - PALETTE_Y) /// 9
             local index: int32 = y * 8 + x
-            primary_color = GPU_PALETTE[index]
+            primary_colorbox.color = GPU_PALETTE[index]
         elseif input.right_clicked then
             local x: int32 = (input.mouse_x - 6) /// 12
             local y: int32 = (input.mouse_y - PALETTE_Y) /// 9
             local index: int32 = y * 8 + x
-            secondary_color = GPU_PALETTE[index]
+            secondary_colorbox.color = GPU_PALETTE[index]
         end
     end
+
+    gui.updateColorBox(&primary_colorbox)
+    gui.updateColorBox(&secondary_colorbox)
 
     gui.updateTextureView(&canvas)
 end
@@ -188,11 +203,19 @@ global function stateTextureDraw(): void
 	gpu:colorMask(GPU_COLOR_MASK_ALL)
     gpu:camera2D(-1)
 
-    gpu:drawRect2D(CANVAS_X - 1, 9, 1, GPU_VSCREEN_H, GPU_GRAY)
-
-    gui.drawTextureView(&canvas)
+    -- top panel
+    gpu:drawRect2D(CANVAS_X, 9, CANVAS_W, 13, GPU_ALPHA_DGRAY)
     
+    -- left panel
+    gpu:drawRect2D(CANVAS_X - 1, 9, 1, GPU_VSCREEN_H, GPU_GRAY)
     gpu:drawRect2D(0, 9, CANVAS_X - 1, GPU_VSCREEN_H, GPU_ALPHA_DGRAY)
+    gpu:drawRect2D(0, CANVAS_Y - 1, GPU_VSCREEN_W, 1, GPU_GRAY)
+    
+    -- bottom panel
+    gpu:drawRect2D(CANVAS_X, CANVAS_Y + CANVAS_H, CANVAS_W, 1, GPU_GRAY)
+    gpu:drawRect2D(CANVAS_X, CANVAS_Y + CANVAS_H + 1, CANVAS_W, 18, GPU_ALPHA_DGRAY)
+    
+    gui.drawTextureView(&canvas)
 
     -- TEXBANK
     local text_y: int32 = TEXBANK_LIST_Y
@@ -209,23 +232,11 @@ global function stateTextureDraw(): void
     end
     text_y = text_y + 9
     
-    -- primary color
-    gpu:print2D(6, text_y, GPU_WHITE, "COLOR 1:")
-    gpu:printHexByte2D((9 * 6) +  6, text_y, GPU_RED, (@uint8)(primary_color >> 24))
-    gpu:printHexByte2D((9 * 6) + 18, text_y, GPU_GREEN, (@uint8)((primary_color >> 16) & 0xFF))
-    gpu:printHexByte2D((9 * 6) + 30, text_y, GPU_BLUE, (@uint8)((primary_color >> 8) & 0xFF))
-    gpu:printHexByte2D((9 * 6) + 42, text_y, GPU_LGRAY, (@uint8)(primary_color & 0xFF))
-    gpu:drawRect2D(    (9 * 6) + 60, text_y, 18, 7, primary_color)
-    text_y = text_y + 9
+    gpu:print2D(6, primary_colorbox.y + 4, GPU_WHITE, "PRIMARY  :")
+    gui.drawColorBox(&primary_colorbox)
 
-    -- secondary color
-    gpu:print2D( 6, text_y, GPU_WHITE, "COLOR 2:")
-    gpu:printHexByte2D((9 * 6) +  6, text_y, GPU_RED, (@uint8)(secondary_color >> 24))
-    gpu:printHexByte2D((9 * 6) + 18, text_y, GPU_GREEN, (@uint8)((secondary_color >> 16) & 0xFF))
-    gpu:printHexByte2D((9 * 6) + 30, text_y, GPU_BLUE, (@uint8)((secondary_color >> 8) & 0xFF))
-    gpu:printHexByte2D((9 * 6) + 42, text_y, GPU_LGRAY, (@uint8)(secondary_color & 0xFF))
-    gpu:drawRect2D(    (9 * 6) + 60, text_y, 18, 7, secondary_color)
-    text_y = text_y + 9
+    gpu:print2D(6, secondary_colorbox.y + 4, GPU_WHITE, "SECONDARY:")
+    gui.drawColorBox(&secondary_colorbox)
     
     if canvas.mouse_in_bounds then
         drawCoords()
@@ -233,7 +244,7 @@ global function stateTextureDraw(): void
 
     -- tool list
     for i = 0, < 6 do
-        gpu:drawIcon2D(6 + (i * 12), TOOL_LIST_Y, i == current_tool and core.cursor_color or GPU_LGRAY, Icon.TOOL_PENCIL + i)
+        gpu:drawIcon2D(TOOL_LIST_X + (i * 12), TOOL_LIST_Y, i == current_tool and core.cursor_color or GPU_LGRAY, Icon.TOOL_PENCIL + i)
     end
     
     -- color palette
