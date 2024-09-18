@@ -2455,7 +2455,13 @@ function EVM:loadSourceFile(filename: string): boolean
 		-- fill line
 		line:clear() -- remove terminator
 		for i = 1, <= #data do
-			line:push(data[i])
+			local c: uint8 = data[i]
+			if c == '\t'_u8 then
+				line:push(' '_u8)
+				line:push(' '_u8)
+			else
+				line:push(c)
+			end
 		end
 		line:push('\0'_u8)
 
@@ -2759,6 +2765,11 @@ function EVM:loadCart(filename: string): boolean
 						line = core:getNewLine()
 						line:clear() -- remove terminator
 					end
+				elseif c == '\r'_u8 then
+					continue -- skip any \r characters
+				elseif c == '\t'_u8 then
+					line:push(' '_u8)
+					line:push(' '_u8)
 				else
 					line:push(c)
 				end

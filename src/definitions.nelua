@@ -1220,7 +1220,6 @@ EVM = @record {
     prev_opcode: uint8,
     has_id: boolean,
     skip_next_id_lookup: boolean,
-    compile_err: boolean,
     current_id: *Identifier,
     current_id_name: string,
     current_func_id: *Identifier,
