@@ -3,7 +3,10 @@ require("string")
 require("definitions")
 require("util")
 
--- OpenGL constants and functions
+-- GLFW function used to load OpenGL function pointers
+local function glfwGetProcAddress(procname: cstring): function(): void <cimport> end
+
+-- OpenGL constants
 local GL_TEXTURE_2D <comptime> = 0x0DE1
 local GL_DEPTH24_STENCIL8 <comptime> = 0x88F0
 local GL_DEPTH_STENCIL <comptime> = 0x84F9
@@ -43,25 +46,26 @@ local GL_DECR <comptime> = 0x1E03
 local GL_DECR_WRAP <comptime> = 0x8508
 local GL_INVERT <comptime> = 0x150A
 
-local function glClear(mask: cuint): void <cimport> end
-local function glClearColor(r: float32, g: float32, b: float32, a: float32): void <cimport> end
-local function glClearDepth(depth: float64): void <cimport> end
-local function glClearStencil(s: cint): void <cimport> end
-local function glDepthFunc(func: cuint): void <cimport> end
-local function glEnable(flag: cint): void <cimport> end
-local function glDisable(flag: cint): void <cimport> end
-local function glColorMask(r: cint, g: cint, b: cint, a: cint): void <cimport> end
-local function glStencilMaskSeparate(face: cuint, mask: cuint): void <cimport> end
-local function glStencilFuncSeparate(face: cuint, func: cuint, ref: cint, mask: cuint): void <cimport> end
-local function glStencilOpSeparate(face: cuint, sfail: cuint, dpfail: cuint, dppass: cuint): void <cimport> end
-local function glPolygonMode(face: cuint, mode: cuint): void <cimport> end
-local function glGenTextures(n: cint, textures: *cuint): void <cimport> end
-local function glBindTexture(target: cuint, texture: cuint): void <cimport> end
-local function glTexImage2D(target: cuint, level: cint, internalFormat: cint, width: cint, height: cint, border: cint, format: cuint, type: cuint, data: pointer): void <cimport> end
-local function glBindFramebuffer(target: cuint, framebuffer: cuint): void <cimport> end
-local function glFramebufferTexture2D(target: cuint, attachment: cuint, textarget: cuint, texture: cuint, level: cint): void <cimport> end
-local function glDeleteTextures(n: cint, textures: *cuint): void <cimport> end
-local function glDeleteFramebuffers(n: cint, framebuffers: *cuint): void <cimport> end
+-- OpenGL function pointers
+local glClear: function(cuint): void
+local glClearColor: function(float32, float32, float32, float32): void
+local glClearDepth: function(float64): void
+local glClearStencil: function(cint): void
+local glDepthFunc: function(cuint): void
+local glEnable: function(cint): void
+local glDisable: function(cint): void
+local glColorMask: function(cint, cint, cint, cint): void
+local glStencilMaskSeparate: function(cuint, cuint): void
+local glStencilFuncSeparate: function(cuint, cuint, cint, cuint): void
+local glStencilOpSeparate: function(cuint, cuint, cuint, cuint): void
+local glPolygonMode: function(cuint, cuint): void
+local glGenTextures: function(cint, *cuint): void
+local glBindTexture: function(cuint, cuint): void
+local glTexImage2D: function(cuint, cint, cint, cint, cint, cint, cuint, cuint, pointer): void
+local glBindFramebuffer: function(cuint, cuint): void
+local glFramebufferTexture2D: function(cuint, cuint, cuint, cuint, cint): void
+local glDeleteTextures: function(cint, *cuint): void
+local glDeleteFramebuffers: function(cint, *cuint): void
 
 local GPU_VERT_SRC <const> = [[
 #version 330
@@ -376,6 +380,28 @@ local icon_table: [Icon.COUNT]rl.rectangle = {
 	{210, 18, 12, 9}, -- TOOL_BUCKET
 	{198, 18, 12, 9}, -- TOOL_SELECT
 }
+
+local function loadOpenGLFunctions(): void
+	glClear = (@function(cuint): void)(glfwGetProcAddress("glClear"))
+	glClearColor = (@function(float32, float32, float32, float32): void)(glfwGetProcAddress("glClearColor"))
+	glClearDepth = (@function(float64): void)(glfwGetProcAddress("glClearDepth"))
+	glClearStencil = (@function(cint): void)(glfwGetProcAddress("glClearStencil"))
+	glDepthFunc = (@function(cuint): void)(glfwGetProcAddress("glDepthFunc"))
+	glEnable = (@function(cint): void)(glfwGetProcAddress("glEnable"))
+	glDisable = (@function(cint): void)(glfwGetProcAddress("glDisable"))
+	glColorMask = (@function(cint, cint, cint, cint): void)(glfwGetProcAddress("glColorMask"))
+	glStencilMaskSeparate = (@function(cuint, cuint): void)(glfwGetProcAddress("glStencilMaskSeparate"))
+	glStencilFuncSeparate = (@function(cuint, cuint, cint, cuint): void)(glfwGetProcAddress("glStencilFuncSeparate"))
+	glStencilOpSeparate = (@function(cuint, cuint, cuint, cuint): void)(glfwGetProcAddress("glStencilOpSeparate"))
+	glPolygonMode = (@function(cuint, cuint): void)(glfwGetProcAddress("glPolygonMode"))
+	glGenTextures = (@function(cint, *cuint): void)(glfwGetProcAddress("glGenTextures"))
+	glBindTexture = (@function(cuint, cuint): void)(glfwGetProcAddress("glBindTexture"))
+	glTexImage2D = (@function(cuint, cint, cint, cint, cint, cint, cuint, cuint, pointer): void)(glfwGetProcAddress("glTexImage2D"))
+	glBindFramebuffer = (@function(cuint, cuint): void)(glfwGetProcAddress("glBindFramebuffer"))
+	glFramebufferTexture2D = (@function(cuint, cuint, cuint, cuint, cint): void)(glfwGetProcAddress("glFramebufferTexture2D"))
+	glDeleteTextures = (@function(cint, *cuint): void)(glfwGetProcAddress("glDeleteTextures"))
+	glDeleteFramebuffers = (@function(cint, *cuint): void)(glfwGetProcAddress("glDeleteFramebuffers"))
+end
 
 function GPU:flush(): void
 	if self.enable_flush then
@@ -2057,6 +2083,8 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 
 	rl.setTargetFPS(60)
 	rl.setExitKey(rl.keyboardKey.NULL)
+
+	loadOpenGLFunctions()
 
 	self.gfx_master_rendertexture = loadRenderTextureCustom(GPU_VSCREEN_W, GPU_VSCREEN_H)
 
