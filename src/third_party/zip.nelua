@@ -1,6 +1,6 @@
 ## cinclude "zip.h"
 
-## linklib "zip"
+## cfile "zip.c"
 
 global ZIP_DEFAULT_COMPRESSION_LEVEL <comptime> = 6
 global ZIP_OK <comptime> = 0

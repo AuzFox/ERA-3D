@@ -1,3 +1,5 @@
+-- bindings for E3DBlipKit, a modified fork of blipkit
+
 ## cinclude "blipkit/BlipKit.h"
 
 ## linklib "blipkit"
@@ -532,28 +534,6 @@ BKTrack = @record{
   arpeggio: BKArpeggioState,
   instrState: BKInstrumentState
 }
-global BKWaveFileReader: type <cimport,nodecl,forwarddecl> = @record{}
-BKWaveFileReader = @record{
-  object: BKObject,
-  file: *FILE,
-  sampleRate: BKInt,
-  numChannels: BKInt,
-  numBits: BKInt,
-  numFrames: BKInt,
-  dataSize: BKSize
-}
-global BKWaveFileWriter: type <cimport,nodecl,forwarddecl> = @record{}
-BKWaveFileWriter = @record{
-  object: BKObject,
-  file: *FILE,
-  initOffset: BKSize,
-  sampleRate: BKInt,
-  numChannels: BKInt,
-  numBits: BKInt,
-  fileSize: BKSize,
-  dataSize: BKSize,
-  reverseEndian: BKInt
-}
 global BKVersion: cstring <cimport,nodecl>
 global function BKStatusGetName(status: BKEnum): cstring <cimport,nodecl> end
 global BKBufferPulseKernels: [0]*BKBufferPulse <cimport,nodecl>
@@ -627,7 +607,6 @@ global function BKDataGetAttr(data: *BKData, attr: BKEnum, outValue: *BKInt): BK
 global function BKDataSetFrames(data: *BKData, frames: *BKFrame, numFrames: BKUInt, numChannels: BKUInt, copy: BKInt): BKInt <cimport,nodecl> end
 global function BKDataSetData(data: *BKData, frameData: pointer, dataSize: BKUInt, numChannels: BKUInt, params: BKEnum): BKInt <cimport,nodecl> end
 global function BKDataLoadRaw(data: *BKData, file: *FILE, numChannels: BKUInt, params: BKEnum): BKInt <cimport,nodecl> end
-global function BKDataLoadWAVE(data: *BKData, file: *FILE): BKInt <cimport,nodecl> end
 global function BKDataNormalize(data: *BKData): BKInt <cimport,nodecl> end
 global function BKDataConvert(data: *BKData, info: *BKDataConvertInfo): BKInt <cimport,nodecl> end
 global BKSequenceFuncsSimple: BKSequenceFuncs <cimport,nodecl>
@@ -681,13 +660,6 @@ global function BKTrackSetPtr(track: *BKTrack, attr: BKEnum, ptr: pointer): BKIn
 global function BKTrackGetPtr(track: *BKTrack, attr: BKEnum, outPtr: pointer): BKInt <cimport,nodecl> end
 global function BKTrackSetEffect(track: *BKTrack, effect: BKEnum, ptr: pointer, size: BKUInt): BKInt <cimport,nodecl> end
 global function BKTrackGetEffect(track: *BKTrack, effect: BKEnum, outValues: pointer, size: BKUInt): BKInt <cimport,nodecl> end
-global function BKWaveFileReaderInit(reader: *BKWaveFileReader, file: *FILE): BKInt <cimport,nodecl> end
-global function BKWaveFileReaderReadHeader(reader: *BKWaveFileReader, outNumChannels: *BKInt, outSampleRate: *BKInt, outNumFrames: *BKInt): BKInt <cimport,nodecl> end
-global function BKWaveFileReaderReadFrames(reader: *BKWaveFileReader, outFrames: *[0]BKFrame): BKInt <cimport,nodecl> end
-global function BKWaveFileWriterInit(writer: *BKWaveFileWriter, file: *FILE, numChannels: BKInt, sampleRate: BKInt, numBits: BKInt): BKInt <cimport,nodecl> end
-global function BKWaveFileWriterAppendFrames(writer: *BKWaveFileWriter, frames: *BKFrame, numFrames: BKInt): BKInt <cimport,nodecl> end
-global function BKWaveFileWriterTerminate(writer: *BKWaveFileWriter): BKInt <cimport,nodecl> end
-global function BKWaveFileWriteData(file: *FILE, data: *BKData, sampleRate: BKInt, numBits: BKInt): BKInt <cimport,nodecl> end
 global BK_VERSION: cstring <comptime> = "0.17.6"
 global BK_IS_64_BIT: cint <comptime> = 1
 global BK_INT_SHIFT: cint <comptime> = 32

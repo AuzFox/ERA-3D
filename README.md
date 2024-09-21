@@ -28,7 +28,7 @@ For building instructions, see the [Building](https://auzfox.github.io/ERA-3D-Do
 ## Libraries Used
 - [raylib v5.0](https://github.com/raysan5/raylib)
 - [Raylib.nelua](https://github.com/AuzFox/Raylib.nelua)
-- [BlipKit](https://github.com/detomon/BlipKit)
+- [E3DBlipKit](https://github.com/AuzFox/E3DBlipKit)
 - [zip](https://github.com/kuba--/zip)
 - `json.nelua` from [nelua-batteries](https://github.com/edubart/nelua-batteries)
 - [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs/)
