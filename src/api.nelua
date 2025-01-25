@@ -1023,6 +1023,19 @@ local function apiGetMouseWheel(): boolean
 	return true
 end
 
+local function apiGetObjEntry(): boolean
+	local index: uint32 = vm:getArgU(0)
+
+	if index > 511 then
+		vm.error = string.format("attempt to load invalid OBJMAP entry `%d`", index)
+		return false
+	end
+
+	vm:pushU(MEMORY_SYSMEM_START_ADDR + 84 + (index * 12))
+
+	return true
+end
+
 local function apiGetProjectionMatrix(): boolean
 	-- signature:
 	-- matrix getProjectionMatrix();
@@ -1089,6 +1102,19 @@ local function apiGetTrackVolume(): boolean
 
 	vm:pushU(soundchip:getTrackVolume(track))
 	
+	return true
+end
+
+local function apiGetWavEntry(): boolean
+	local index: uint32 = vm:getArgU(0)
+
+	if index > 511 then
+		vm.error = string.format("attempt to load invalid WAVMAP entry `%d`", index)
+		return false
+	end
+
+	vm:pushU(MEMORY_SYSMEM_START_ADDR + 84 + MEMORY_OBJMAP_SIZE + (index * 16))
+
 	return true
 end
 
@@ -1791,6 +1817,22 @@ local function apiPauseTracks(): boolean
 	return true
 end
 
+local function apiPeek8(): boolean
+	-- signature:
+	-- int peek8(int addr);
+
+	local addr: uint32 = vm:getArgU(0)
+
+	if addr > MEMORY_MAX_ADDR then
+		vm.error = string.format("invalid byte read address 0x%08X", addr)
+		return false
+	end
+
+	vm:pushU(vm:getMem8(addr))
+
+	return true
+end
+
 local function apiPeek32(): boolean
 	-- signature:
 	-- int peek32(int addr);
@@ -1810,18 +1852,22 @@ local function apiPeek32(): boolean
 	return true
 end
 
-local function apiPeek8(): boolean
+local function apiPeekf(): boolean
 	-- signature:
-	-- int peek8(int addr);
+	-- float peekf(int addr);
 
 	local addr: uint32 = vm:getArgU(0)
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("invalid byte read address 0x%08X", addr)
+		vm.error = string.format("invalid word read address 0x%08X", addr)
+		return false
+	elseif (addr & 0b11) ~= 0 then
+		vm.error = string.format("misaligned word read address 0x%08X", addr)
 		return false
 	end
 
-	vm:pushU(vm:getMem8(addr))
+	local intf: IntFloat = {u=vm:getMem32(addr)}
+	vm:pushF(intf.f)
 
 	return true
 end
@@ -1922,6 +1968,26 @@ local function apiPlayWavEx(): boolean
 	return true
 end
 
+local function apiPoke8(): boolean
+	-- signature:
+	-- void poke8(int addr, int val);
+
+	local addr: uint32 = vm:getArgU(0)
+	local val: uint8 = (@uint8)(vm:getArgU(1) & 0xFF)
+
+	if addr > MEMORY_MAX_ADDR then
+		vm.error = string.format("invalid byte write address 0x%08X", addr)
+		return false
+	end
+
+	if not vm:setMem8(addr, val) then
+		vm.error = string.format("cannot write byte to ROM address 0x%08X", addr)
+		return false
+	end
+
+	return true
+end
+
 local function apiPoke32(): boolean
 	-- signature:
 	-- void poke32(int addr, int val);
@@ -1945,20 +2011,24 @@ local function apiPoke32(): boolean
 	return true
 end
 
-local function apiPoke8(): boolean
+local function apiPokef(): boolean
 	-- signature:
-	-- void poke8(int addr, int val);
+	-- void pokef(int addr, float val);
 
 	local addr: uint32 = vm:getArgU(0)
-	local val: uint8 = (@uint8)(vm:getArgU(1) & 0xFF)
+	local val: float32 = vm:getArgF(1)
+	local intf: IntFloat = {f=val}
 
 	if addr > MEMORY_MAX_ADDR then
-		vm.error = string.format("invalid byte write address 0x%08X", addr)
+		vm.error = string.format("invalid word write address 0x%08X", addr)
+		return false
+	elseif (addr & 0b11) ~= 0 then
+		vm.error = string.format("misaligned word write address 0x%08X", addr)
 		return false
 	end
 
-	if not vm:setMem8(addr, val) then
-		vm.error = string.format("cannot write byte to ROM address 0x%08X", addr)
+	if not vm:setMem32(addr, intf.u) then
+		vm.error = string.format("cannot write word to ROM address 0x%08X", addr)
 		return false
 	end
 
@@ -3853,12 +3923,45 @@ function EVM:registerBuiltins(): void
 	coltriangle_struct:addMember(coltriangle_point3)
 	coltriangle_struct.is_complete = true
 
+	-- define objentry struct
+	local objentry_struct: *Struct = new(@Struct)
+	local objentry_type: *Identifier = new(@Identifier)
+	local objentry_start: *Identifier = new(@Identifier)
+	local objentry_count: *Identifier = new(@Identifier)
+	objentry_struct.name = "objentry"
+	$objentry_type = {name="type", index=0, type_info={EVMType.INT}}
+	$objentry_start = {name="start", index=1, type_info={EVMType.INT}}
+	$objentry_count = {name="count", index=2, type_info={EVMType.INT}}
+	objentry_struct:addMember(objentry_type)
+	objentry_struct:addMember(objentry_start)
+	objentry_struct:addMember(objentry_count)
+	objentry_struct.is_complete = true
+
+	-- define waventry struct
+	local waventry_struct: *Struct = new(@Struct)
+	local waventry_sample_start: *Identifier = new(@Identifier)
+	local waventry_sample_end: *Identifier = new(@Identifier)
+	local waventry_loop_start: *Identifier = new(@Identifier)
+	local waventry_loop_end: *Identifier = new(@Identifier)
+	waventry_struct.name = "waventry"
+	$waventry_sample_start = {name="sample_start", index=0, type_info={EVMType.INT}}
+	$waventry_sample_end = {name="sample_end", index=1, type_info={EVMType.INT}}
+	$waventry_loop_start = {name="loop_start", index=2, type_info={EVMType.INT}}
+	$waventry_loop_end = {name="loop_end", index=3, type_info={EVMType.INT}}
+	waventry_struct:addMember(waventry_sample_start)
+	waventry_struct:addMember(waventry_sample_end)
+	waventry_struct:addMember(waventry_loop_start)
+	waventry_struct:addMember(waventry_loop_end)
+	waventry_struct.is_complete = true
+
 	local builtin_structs: []Identifier = {
 		{name="matrix",      type_info={EVMType.STRUCT, matrix_struct}},
 		{name="vertex",      type_info={EVMType.STRUCT, vertex_struct}},
 		{name="cam2d",       type_info={EVMType.STRUCT, cam2d_struct}},
 		{name="cam3d",       type_info={EVMType.STRUCT, cam3d_struct}},
 		{name="light",       type_info={EVMType.STRUCT, light_struct}},
+		{name="objentry",    type_info={EVMType.STRUCT, objentry_struct}},
+		{name="waventry",    type_info={EVMType.STRUCT, waventry_struct}},
 		{name="colpoint",    type_info={EVMType.STRUCT, colpoint_struct}},
 		{name="colaabb",     type_info={EVMType.STRUCT, colaabb_struct}},
 		{name="colsphere",   type_info={EVMType.STRUCT, colsphere_struct}},
@@ -4087,6 +4190,8 @@ function EVM:registerAPI(): void
 	local cam2d_struct: *Struct = self.builtin_struct_ids["cam2d"].type_info.structref
 	local cam3d_struct: *Struct = self.builtin_struct_ids["cam3d"].type_info.structref
 	local light_struct: *Struct = self.builtin_struct_ids["light"].type_info.structref
+	local objentry_struct: *Struct = self.builtin_struct_ids["objentry"].type_info.structref
+	local waventry_struct: *Struct = self.builtin_struct_ids["waventry"].type_info.structref
 
 	local api_ids: []Identifier = {
 		{
@@ -4374,6 +4479,12 @@ function EVM:registerAPI(): void
 			type_info={EVMType.INT},
 			func=apiGetMouseWheel
 		},
+		{
+			name="getObjEntry",
+			type_info={EVMType.STRUCT + EVMType.POINTER, objentry_struct},
+			argdata={{EVMType.INT}},
+			func=apiGetObjEntry
+		},
         {
 			name="getProjectionMatrix",
 			type_info={EVMType.STRUCT, matrix_struct},
@@ -4411,6 +4522,12 @@ function EVM:registerAPI(): void
 			type_info={EVMType.INT},
 			argdata={{EVMType.INT}},
 			func=apiGetTrackVolume
+		},
+		{
+			name="getWavEntry",
+			type_info={EVMType.STRUCT + EVMType.POINTER, waventry_struct},
+			argdata={{EVMType.INT}},
+			func=apiGetWavEntry
 		},
         {
 			name="held",
@@ -4735,16 +4852,22 @@ function EVM:registerAPI(): void
 			func=apiPauseTracks
 		},
 		{
+			name="peek8",
+			type_info={EVMType.INT},
+			argdata={{EVMType.INT}},
+			func=apiPeek8
+		},
+		{
 			name="peek32",
 			type_info={EVMType.INT},
 			argdata={{EVMType.INT}},
 			func=apiPeek32
 		},
 		{
-			name="peek8",
-			type_info={EVMType.INT},
+			name="peekf",
+			type_info={EVMType.FLOAT},
 			argdata={{EVMType.INT}},
-			func=apiPeek8
+			func=apiPeekf
 		},
 		{
 			name="playPattern",
@@ -4798,6 +4921,15 @@ function EVM:registerAPI(): void
 			func=apiPlayWavEx
 		},
 		{
+			name="poke8",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiPoke8
+		},
+		{
 			name="poke32",
 			type_info={EVMType.VOID},
 			argdata={
@@ -4807,13 +4939,13 @@ function EVM:registerAPI(): void
 			func=apiPoke32
 		},
 		{
-			name="poke8",
+			name="pokef",
 			type_info={EVMType.VOID},
 			argdata={
 				{EVMType.INT},
-				{EVMType.INT}
+				{EVMType.FLOAT}
 			},
-			func=apiPoke8
+			func=apiPokef
 		},
 		{
 			name="polygonMode",

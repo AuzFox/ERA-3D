@@ -1,11 +1,146 @@
 require("statemachine")
 
+local SAMPLE_VIEW_X <comptime> = 0
+local SAMPLE_VIEW_Y <comptime> = 9
+local SAMPLE_VIEW_W <comptime> = GPU_VSCREEN_W - 218
+local SAMPLE_VIEW_H <comptime> = GPU_VSCREEN_H
+local UI_PANEL_X <comptime> = SAMPLE_VIEW_X + SAMPLE_VIEW_W + 1
+local UI_PANEL_Y <comptime> = 9
+local UI_PANEL_W <comptime> = GPU_VSCREEN_W - UI_PANEL_X
+local UI_PANEL_H <comptime> = GPU_VSCREEN_H
+
+local create_entry_checkbox: gui.CheckBox
+local ok_button: gui.Button
+local cancel_button: gui.Button
+local start_index_vb: gui.ValueBox
+local end_index_vb: gui.ValueBox
+local entry_index_vb: gui.ValueBox
+
+local function normalizeFrame(frame: BKFrame): int32
+    local normalized: float32 = 0.0
+    if frame > 0 then
+        normalized = (@float32)(frame) / 32767.0
+    elseif frame < 0 then
+        normalized = (@float32)(frame) / 32768.0
+    end
+    return (@int32)(normalized * 64.0)
+end
+
+local function drawSample(): void
+    gpu:scissorMode(true)
+    gpu:scissor(SAMPLE_VIEW_X, SAMPLE_VIEW_Y, SAMPLE_VIEW_W, SAMPLE_VIEW_H)
+
+    local frames: *[0]BKFrame = (@*[0]BKFrame)(core.sample_to_import.data)
+	local frame_count: uint64 = core.sample_to_import.frameCount * 2
+
+    local y_l: int32 = SAMPLE_VIEW_Y + (SAMPLE_VIEW_H /// 2) - 64
+    local y_r: int32 = SAMPLE_VIEW_Y + (SAMPLE_VIEW_H /// 2) + 64
+
+    gpu:drawRect2D(SAMPLE_VIEW_X, y_l, SAMPLE_VIEW_W, 1, GPU_GRAY)
+    gpu:drawRect2D(SAMPLE_VIEW_X, y_r, SAMPLE_VIEW_W, 1, GPU_GRAY)
+
+    gpu:beginMeshWithTexture(GPU_LINES, gpu.gfx_ui_texture.id)
+        gpu:vertColor(GPU_GREEN)
+        gpu:vertUV({0.0, 0.0})
+
+        local x: int32 = SAMPLE_VIEW_X
+        local prev_x: int32 = x
+        local frame_l: int32 = normalizeFrame(frames[0])
+        local frame_r: int32 = normalizeFrame(frames[1])
+        local prev_frame_l: int32 = frame_l
+        local prev_frame_r: int32 = frame_r
+        for i: uint64 = 0, < frame_count, 2 do -- i = first scroll sample
+            if x > SAMPLE_VIEW_X + SAMPLE_VIEW_W then break end
+            
+            frame_l = normalizeFrame(frames[i])
+            frame_r = normalizeFrame(frames[i + 1])
+            
+            gpu:vertex2D({(@float32)(prev_x), (@float32)(y_l + prev_frame_l)})
+            gpu:vertex2D({(@float32)(x), (@float32)(y_l + frame_l)})
+
+            gpu:vertex2D({(@float32)(prev_x), (@float32)(y_r + prev_frame_r)})
+            gpu:vertex2D({(@float32)(x), (@float32)(y_r + frame_r)})
+
+            prev_frame_l = frame_l
+            prev_frame_r = frame_r
+            prev_x = x
+            x = x + 1 -- x = x + zoom_level (1 = each sample is 1 pixel apart)
+        end
+    gpu:endMeshWithTexture()
+
+    gpu:scissorMode(false)
+end
+
 global function dialogSampleConfigReset(): void
-    print("reset sample dialog")
+    start_index_vb = {
+        x = UI_PANEL_X + 6 + 13 * 6,
+        y = UI_PANEL_Y + 67,
+        width = 8 * 6 + 4,
+        height = 16,
+        text_color = GPU_WHITE,
+        format_string = "0x%06X",
+        min = 0,
+        max = (MEMORY_WAVMEM_SIZE_ELEMENTS /// 2) - (@uint32)(core.sample_to_import.frameCount),
+        shift_step = 0x100,
+        edit_chars = gui.EDIT_HEX
+    }
+
+    end_index_vb = {
+        x = start_index_vb.x,
+        y = start_index_vb.y + start_index_vb.height + 2,
+        width = start_index_vb.width,
+        height = start_index_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "0x%06X",
+        min = 0,
+        max = (MEMORY_WAVMEM_SIZE_ELEMENTS /// 2) - 1,
+        shift_step = 0x100,
+        edit_chars = gui.EDIT_HEX,
+        value = core.sample_to_import.frameCount
+    }
+
+    create_entry_checkbox = {
+        x = UI_PANEL_X + 6,
+        y = end_index_vb.y + end_index_vb.height + 18,
+        text = "CREATE WMPBANK ENTRY"
+    }
+
+    entry_index_vb = {
+        x = UI_PANEL_X + 18 + 9 * 6,
+        y = create_entry_checkbox.y + 20,
+        width = 3 * 6 + 4,
+        height = start_index_vb.height,
+        text_color = GPU_WHITE,
+        format_string = "%-3d",
+        min = 0,
+        max = 511,
+        shift_step = 10,
+        edit_chars = 3
+    }
+
+    ok_button = {
+        x = GPU_VSCREEN_W - 6 - 48 - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_GREEN,
+        text = "OK"
+    }
+
+    cancel_button = {
+        x = GPU_VSCREEN_W - 6 - 48,
+        y = GPU_VSCREEN_H - 16 - 9,
+        width = 48,
+        height = 16,
+        text_color = GPU_RED,
+        text = "CANCEL"
+    }
+
+    gui.edit_vb = nilptr
 end
 
 global function dialogSampleConfigUpdate(): void
-    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) then
+    if rl.isKeyPressed(rl.keyboardKey.ESCAPE) and gui.edit_vb == nilptr then
         rl.unloadWave(core.sample_to_import)
         core.has_loaded_sample = false
 
@@ -13,26 +148,206 @@ global function dialogSampleConfigUpdate(): void
         return
     end
 
-    --[[
-    -- load sample data
-    local sample_start: uint32 = ((@uint32)(core.byte_buffer[1]) << 16) | ((@uint32)(core.byte_buffer[2]) << 8) | (@uint32)(core.byte_buffer[3])
-    local wavmap_id: uint16 = (((@uint16)(core.byte_buffer[4]) << 8) | (@uint16)(core.byte_buffer[5]))
+    if input.left_clicked and gui.edit_vb ~= nilptr then
+        gui.edit_vb.state = gui.NORMAL
+        gui.edit_vb = nilptr
+    end
 
-    soundchip:loadSampleData(soundchip.current_wavbank - SoundchipBank.WAVBANK0, sample_start)
+    if gui.updateButton(&ok_button) then
+        -- load sample data
+        --soundchip:loadSampleData(soundchip.current_wavbank - SoundchipBank.WAVBANK0, start_index_vb.value)
+        print("load sample data...")
 
-    -- create WMPBANK entry
-    -- ...
+        if create_entry_checkbox.enabled then
+            -- create WMPBANK entry
+            print("create WMPBANK entry...")
+        end
 
-    rl.unloadWave(core.sample_to_import)
-    core.has_loaded_sample = false
-    
-    core:log(LogEntryType.INFO, "sample loaded", true)
+        --core:log(LogEntryType.INFO, "sample data loaded", true)
 
-    statemachine.queued_dialog = DialogID.NONE
-    return
-    ]]
+        --rl.unloadWave(core.sample_to_import)
+        --core.has_loaded_sample = false
+
+        --statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    if gui.updateButton(&cancel_button) then
+        rl.unloadWave(core.sample_to_import)
+        core.has_loaded_sample = false
+
+        statemachine.queued_dialog = DialogID.NONE
+        return
+    end
+
+    gui.updateValueBox(&start_index_vb)
+
+    end_index_vb:setValue(start_index_vb.value + core.sample_to_import.frameCount - 1)
+
+    gui.locked = true
+    gui.updateValueBox(&end_index_vb)
+    gui.locked = false
+
+    gui.updateCheckBox(&create_entry_checkbox)
+    gui.locked = not create_entry_checkbox.enabled
+
+    gui.updateValueBox(&entry_index_vb)
+    gui.locked = false
 end
 
 global function dialogSampleConfigDraw(): void
-    -- ...
+    drawSample()
+
+    gpu:drawRect2D(UI_PANEL_X - 1, UI_PANEL_Y, 1, UI_PANEL_H, GPU_GRAY)
+    gpu:drawRect2D(UI_PANEL_X, UI_PANEL_Y, UI_PANEL_W, UI_PANEL_H, GPU_ALPHA_DGRAY)
+
+    gpu:print2D(
+        UI_PANEL_X + 6,
+        UI_PANEL_Y + 9,
+        GPU_WHITE,
+        rl.textFormat(
+            "LOADING SAMPLE INTO WAVBANK %d",
+            (@cint)(soundchip.current_wavbank - SoundchipBank.WAVBANK0)
+        )
+    )
+    gpu:print2D(
+        UI_PANEL_X + 6,
+        UI_PANEL_Y + 36,
+        GPU_GREEN,
+        rl.textFormat(
+            "FRAME COUNT: %d",
+            (@cint)(core.sample_to_import.frameCount)
+        )
+    )
+
+    gpu:print2D(UI_PANEL_X + 6, start_index_vb.y + 4, GPU_WHITE, "SAMPLE START:")
+    gui.drawValueBox(&start_index_vb)
+    gpu:print2D(
+        start_index_vb.x + start_index_vb.width + 6,
+        start_index_vb.y + 4,
+        GPU_GRAY,
+        rl.textFormat(
+            "(%d)",
+            (@cint)(start_index_vb.value)
+        )
+    )
+
+    gpu:print2D(UI_PANEL_X + 6, end_index_vb.y + 4, GPU_GRAY, "SAMPLE END:")
+    gui.drawValueBox(&end_index_vb)
+    gpu:print2D(
+        end_index_vb.x + end_index_vb.width + 6,
+        end_index_vb.y + 4,
+        GPU_GRAY,
+        rl.textFormat(
+            "(%d)",
+            (@cint)(end_index_vb.value)
+        )
+    )
+
+    gui.drawCheckBox(&create_entry_checkbox)
+
+    if create_entry_checkbox.enabled then
+        gpu:print2D(UI_PANEL_X + 18, entry_index_vb.y + 4, GPU_WHITE, "ENTRY ID:")
+        gui.drawValueBox(&entry_index_vb)
+
+        -- get WMPBANK entry values
+        local sample_start: uint32
+        local sample_end: uint32
+        local loop_start: uint32
+        local loop_end: uint32
+        sample_start, sample_end, loop_start, loop_end = soundchip:getWavMapEntryValues(entry_index_vb.value)
+
+        --[[
+        local prev_end: uint32 = 0
+        switch mode do
+            case GPU_LINES then
+                prev_end = start + n * 2
+            case GPU_TRIANGLES then
+                prev_end = start + n * 3
+            case GPU_QUADS then
+                prev_end = start + n * 4
+        end
+        --]]
+
+        --[[
+
+        local text_y: int32 = entry_index_vb.y + entry_index_vb.height + 11
+        local prev_x: int32 = UI_PANEL_X + 30 + (7 * 6)
+        local arrow_x: int32 = UI_PANEL_X + 30 + (17 * 6)
+        local new_x: int32 = UI_PANEL_X + 30 + (20 * 6)
+        gpu:print2D(UI_PANEL_X + 18, text_y, GPU_WHITE, "ENTRY PREVIEW:")
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 18, GPU_WHITE, "TYPE :")
+        gpu:print2D(prev_x, text_y + 18, GPU_RED, getPrimitiveName(mode))
+        gpu:print2D(arrow_x, text_y + 18, GPU_WHITE, "->")
+        gpu:print2D(new_x, text_y + 18, GPU_GREEN, "TRIANGLES")
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 36, GPU_WHITE, "START:")
+        gpu:print2D(
+            prev_x,
+            text_y + 36,
+            GPU_RED,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(start)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 36, GPU_WHITE, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 36,
+            GPU_GREEN,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(start_index_vb.value)
+            )
+        )
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 54, GPU_GRAY, "END  :")
+        gpu:print2D(
+            prev_x,
+            text_y + 54,
+            0x803434FF,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(prev_end)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 54, GPU_GRAY, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 54,
+            0x47803CFF,
+            rl.textFormat(
+                "0x%05X",
+                (@cint)(end_index_vb.value)
+            )
+        )
+
+        gpu:print2D(UI_PANEL_X + 30, text_y + 72, GPU_WHITE, "COUNT:")
+        gpu:print2D(
+            prev_x,
+            text_y + 72,
+            GPU_RED,
+            rl.textFormat(
+                "%-5d",
+                (@cint)(n)
+            )
+        )
+        gpu:print2D(arrow_x, text_y + 72, GPU_WHITE, "->")
+        gpu:print2D(
+            new_x,
+            text_y + 72,
+            GPU_GREEN,
+            rl.textFormat(
+                "%-5d",
+                (@cint)(core.model_vertex_count /// 3)
+            )
+        )
+
+        ]]
+    end
+
+    gui.drawButton(&ok_button)
+    gui.drawButton(&cancel_button)
 end

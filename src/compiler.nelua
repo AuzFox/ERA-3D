@@ -198,7 +198,7 @@ function EVM:incScopeLocalsSize(size: uinteger): void
 	self.scope_sizes[#self.scope_sizes] = total
 end
 
-function EVM:pushLoop(start: uint16): void
+function EVM:pushLoop(start: uint32): void
 	self.loop_info_stack:push((@LoopInfo){loop_start = start})
 end
 
@@ -207,27 +207,29 @@ function EVM:popLoop(): void
 
 	-- patch break jumps
 	while info.break_count > 0 do
-		local index: uint16 = self.loop_break_stack:pop()
+		local index: uint32 = self.loop_break_stack:pop()
 
-		self.bytecode[index] = (info.loop_end >> 8)
-		self.bytecode[index + 1] = (info.loop_end & 0xFF)
+		self.bytecode[index] = ((info.loop_end & 0xFF0000) >> 16)
+		self.bytecode[index + 1] = ((info.loop_end & 0xFF00) >> 8)
+		self.bytecode[index + 2] = (info.loop_end & 0xFF)
 
 		info.break_count = info.break_count - 1
 	end
 
 	-- patch step jumps
 	while info.step_count > 0 do
-		local index: uint16 = self.loop_step_stack:pop()
+		local index: uint32 = self.loop_step_stack:pop()
 
-		self.bytecode[index] = (info.loop_step >> 8)
-		self.bytecode[index + 1] = (info.loop_step & 0xFF)
+		self.bytecode[index] = ((info.loop_step & 0xFF0000) >> 16)
+		self.bytecode[index + 1] = ((info.loop_step & 0xFF00) >> 8)
+		self.bytecode[index + 2] = (info.loop_step & 0xFF)
 
 		info.step_count = info.step_count - 1
 	end
 
 	local size: uint16 = self.prev_scope_size
 	while info.del_l_count > 0 do
-		local index: uint16 = self.loop_del_l_stack:pop()
+		local index: uint32 = self.loop_del_l_stack:pop()
 		
 		if size > 0 then
 			self.bytecode[index] = (size >> 8)
@@ -246,15 +248,15 @@ function EVM:loopHasStep(): boolean
 	return self.loop_info_stack[#self.loop_info_stack].has_step
 end
 
-function EVM:getLoopStart(): uint16
+function EVM:getLoopStart(): uint32
 	return self.loop_info_stack[#self.loop_info_stack].loop_start
 end
 
-function EVM:getLoopStep(): uint16
+function EVM:getLoopStep(): uint32
 	return self.loop_info_stack[#self.loop_info_stack].loop_step
 end
 
-function EVM:getLoopEnd(): uint16
+function EVM:getLoopEnd(): uint32
 	return self.loop_info_stack[#self.loop_info_stack].loop_end
 end
 
@@ -262,17 +264,17 @@ function EVM:setLoopHasStep(): void
 	self.loop_info_stack[#self.loop_info_stack].has_step = true
 end
 
-function EVM:setLoopStep(index: uint16): void
+function EVM:setLoopStep(index: uint32): void
 	local info: LoopInfo = self.loop_info_stack:pop()
 	info.loop_step = index
 	self.loop_info_stack:push(info)
 end
 
-function EVM:setLoopEnd(index: uint16): void
+function EVM:setLoopEnd(index: uint32): void
 	self.loop_info_stack[#self.loop_info_stack].loop_end = index
 end
 
-function EVM:addBreak(index: uint16): void
+function EVM:addBreak(index: uint32): void
 	self.loop_break_stack:push(index)
 
 	local info: LoopInfo = self.loop_info_stack:pop()
@@ -280,7 +282,7 @@ function EVM:addBreak(index: uint16): void
 	self.loop_info_stack:push(info)
 end
 
-function EVM:addJumpToStep(index: uint16): void
+function EVM:addJumpToStep(index: uint32): void
 	self.loop_step_stack:push(index)
 
 	local info: LoopInfo = self.loop_info_stack:pop()
@@ -288,7 +290,7 @@ function EVM:addJumpToStep(index: uint16): void
 	self.loop_info_stack:push(info)
 end
 
-function EVM:addDelL(index: uint16): void
+function EVM:addDelL(index: uint32): void
 	self.loop_del_l_stack:push(index)
 
 	local info: LoopInfo = self.loop_info_stack:pop()
@@ -365,6 +367,14 @@ function EVM:emit16(val: uint16): void
 	self.bytecode[self.bytecode_len + 1] = val & 0xFF
 
 	self.bytecode_len = self.bytecode_len + 2
+end
+
+function EVM:emit24(val: uint32): void
+	self.bytecode[self.bytecode_len] = (val & 0xFF0000) >> 16
+	self.bytecode[self.bytecode_len + 1] = (val & 0x00FF00) >> 8
+	self.bytecode[self.bytecode_len + 2] = val & 0xFF
+
+	self.bytecode_len = self.bytecode_len + 3
 end
 
 function EVM:emit32(val: uint32): void
@@ -1526,7 +1536,7 @@ local function expression(level: integer): void
 					end
 				elseif id.class == Class.FUNCTION then
 					vm:emitOp(Opcode.CALL)
-					vm:emit16(id.index)
+					vm:emit24(id.index)
 					vm:emit16(size)
 				end
 			end
@@ -1732,7 +1742,7 @@ local function expression(level: integer): void
 
 				vm.expr_type = id.type_info
 			elseif id.class == Class.FUNCTION then
-				-- push bytecode function pointer (0x1000XXXX)
+				-- push bytecode function pointer (0x10XXXXXX)
 				vm:emitOp(Opcode.PUSH_INT)
 				vm:emit32(0x10000000 | id.index)
 
@@ -2567,21 +2577,21 @@ local function expression(level: integer): void
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id >= EVMType.POINTER then
 				-- short circuit evaluation
 				vm:emitOp(Opcode.JUMP_NNULLD)
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id == EVMType.FUNC_POINTER then
 				-- short circuit evaluation
 				vm:emitOp(Opcode.JUMP_FPNNULLD)
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			else
 				compileError!(string.format(
 					"line %d:\ninvalid lvalue type for operator '||', expected `int` or pointer, got `%s`",
@@ -2607,8 +2617,9 @@ local function expression(level: integer): void
 			end
 			
 			-- patch JUMP_NZD/JUMP_NNULLD/JUMP_FPNNULLD address
-			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)
-			vm.bytecode[addr + 1] = ((vm.bytecode_len) & 0xFF)
+			vm.bytecode[addr] = ((vm.bytecode_len & 0xFF0000) >> 16)
+			vm.bytecode[addr + 1] = ((vm.bytecode_len & 0xFF00) >> 8)
+			vm.bytecode[addr + 2] = ((vm.bytecode_len) & 0xFF)
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.LAND then
@@ -2630,21 +2641,21 @@ local function expression(level: integer): void
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id >= EVMType.POINTER then
 				-- short circuit evaluation
 				vm:emitOp(Opcode.JUMP_NULLD)
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id == EVMType.FUNC_POINTER then
 				-- short circuit evaluation
 				vm:emitOp(Opcode.JUMP_FPNULLD)
 				
 				addr = vm.bytecode_len
 				
-				vm:emit16(0)
+				vm:emit24(0)
 			else
 				compileError!(string.format(
 					"line %d:\ninvalid lvalue type for operator '&&', expected `int` or pointer, got `%s`",
@@ -2670,8 +2681,9 @@ local function expression(level: integer): void
 			end
 
 			-- patch JUMP_ZD/JUMP_NULLD/JUMP_FPNULLD address
-			vm.bytecode[addr] = ((vm.bytecode_len) >> 8)
-			vm.bytecode[addr + 1] = ((vm.bytecode_len) & 0xFF)
+			vm.bytecode[addr] = ((vm.bytecode_len & 0xFF0000) >> 16)
+			vm.bytecode[addr + 1] = ((vm.bytecode_len & 0xFF00) >> 8)
+			vm.bytecode[addr + 2] = ((vm.bytecode_len) & 0xFF)
 			
 			vm.expr_type = {EVMType.INT}
 		elseif vm.token == Token.OR then
@@ -3877,19 +3889,19 @@ local function statement(): void
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		elseif vm.expr_type.type_id >= EVMType.POINTER then
 			vm:emitOp(Opcode.JUMP_NULL)
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		elseif vm.expr_type.type_id == EVMType.FUNC_POINTER then
 			vm:emitOp(Opcode.JUMP_FPNULL)
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		else
 			compileError!(string.format(
 				"line %d:\ninvalid type for if statement condition. expected `int` or pointer, got `%s`",
@@ -3906,19 +3918,21 @@ local function statement(): void
 			try!(match(Token.ELSE))
 
 			-- write jump_z address
-			vm.bytecode[b] = ((vm.bytecode_len + 3) >> 8)
-			vm.bytecode[b + 1] = ((vm.bytecode_len + 3) & 0xFF)
+			vm.bytecode[b] = (((vm.bytecode_len + 4) & 0xFF0000) >> 16)
+			vm.bytecode[b + 1] = (((vm.bytecode_len + 4) & 0xFF00) >> 8)
+			vm.bytecode[b + 2] = ((vm.bytecode_len + 4) & 0xFF)
 
 			-- emit bytecode for JUMP b
 			vm:emitOp(Opcode.JUMP)
 			b = vm.bytecode_len
-			vm:emit16(0)
+			vm:emit24(0)
 
 			try!(statement())
 		end
-		
-		vm.bytecode[b] = ((vm.bytecode_len) >> 8)
-		vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
+
+		vm.bytecode[b] = ((vm.bytecode_len & 0xFF0000) >> 16)
+		vm.bytecode[b + 1] = ((vm.bytecode_len & 0xFF00) >> 8)
+		vm.bytecode[b + 2] = ((vm.bytecode_len) & 0xFF)
 	elseif vm.token == Token.FOR then
 		--[[
 			ERA-C:                        | BYTECODE:
@@ -4184,19 +4198,19 @@ local function statement(): void
 	
 				b = vm.bytecode_len
 			
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id >= EVMType.POINTER then
 				vm:emitOp(Opcode.JUMP_NULL)
 	
 				b = vm.bytecode_len
 			
-				vm:emit16(0)
+				vm:emit24(0)
 			elseif vm.expr_type.type_id == EVMType.FUNC_POINTER then
 				vm:emitOp(Opcode.JUMP_FPNULL)
 	
 				b = vm.bytecode_len
 			
-				vm:emit16(0)
+				vm:emit24(0)
 			else
 				compileError!(string.format(
 					"line %d:\ninvalid type for loop condition. expected `int` or pointer, got `%s`",
@@ -4260,13 +4274,14 @@ local function statement(): void
 
 		-- time to wrap up the loop with a jump
 		vm:emitOp(Opcode.JUMP)
-		vm:emit16(a)
+		vm:emit24(a)
 
 		vm:setLoopEnd(vm.bytecode_len)
 		
 		if has_condition then
-			vm.bytecode[b] = ((vm.bytecode_len) >> 8)
-			vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
+			vm.bytecode[b] = ((vm.bytecode_len & 0xFF0000) >> 16)
+			vm.bytecode[b + 1] = ((vm.bytecode_len & 0xFF00) >> 8)
+			vm.bytecode[b + 2] = ((vm.bytecode_len) & 0xFF)
 		end
 
 		vm:popLoop()
@@ -4330,19 +4345,19 @@ local function statement(): void
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		elseif vm.expr_type.type_id >= EVMType.POINTER then
 			vm:emitOp(Opcode.JUMP_NULL)
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		elseif vm.expr_type.type_id == EVMType.FUNC_POINTER then
 			vm:emitOp(Opcode.JUMP_FPNULL)
 
 			b = vm.bytecode_len
 		
-			vm:emit16(0)
+			vm:emit24(0)
 		else
 			compileError!(string.format(
 				"line %d:\ninvalid type for loop condition. expected `int` or pointer, got `%s`",
@@ -4356,12 +4371,13 @@ local function statement(): void
 		try!(statement())
 
 		vm:emitOp(Opcode.JUMP)
-		vm:emit16(a)
+		vm:emit24(a)
 
 		vm:setLoopEnd(vm.bytecode_len)
 
-		vm.bytecode[b] = ((vm.bytecode_len) >> 8)
-		vm.bytecode[b + 1] = ((vm.bytecode_len) & 0xFF)
+		vm.bytecode[b] = ((vm.bytecode_len & 0xFF0000) >> 16)
+		vm.bytecode[b + 1] = ((vm.bytecode_len & 0xFF00) >> 8)
+		vm.bytecode[b + 2] = ((vm.bytecode_len) & 0xFF)
 
 		vm:popLoop()
 	elseif vm.token == Token.RETURN then
@@ -4446,7 +4462,7 @@ local function statement(): void
 		
 		vm:emitOp(Opcode.JUMP)
 		vm:addBreak(vm.bytecode_len)
-		vm:emit16(0)
+		vm:emit24(0)
 		
 		try!(match(';'_u8))
 	elseif vm.token == Token.CONTINUE then
@@ -4464,9 +4480,9 @@ local function statement(): void
 
 		if vm:loopHasStep() then
 			vm:addJumpToStep(vm.bytecode_len)
-			vm:emit16(0)
+			vm:emit24(0)
 		else
-			vm:emit16(vm:getLoopStart())
+			vm:emit24(vm:getLoopStart())
 		end
 
 		try!(match(';'_u8))

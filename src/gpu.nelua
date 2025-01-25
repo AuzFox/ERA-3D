@@ -2,6 +2,7 @@ require("string")
 
 require("definitions")
 require("util")
+require("textures")
 
 -- GLFW function used to load OpenGL function pointers
 local function glfwGetProcAddress(procname: cstring): function(): void <cimport> end
@@ -2101,9 +2102,23 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.gfx_texture = rl.loadTextureFromImage(img)
 	rl.unloadImage(img)
 
-	self.gfx_ui_texture = rl.loadTexture("assets/ui.png")
+	local checker_img: rl.image = {
+		data = &CHECKER_DATA[0],
+		width = CHECKER_WIDTH,
+		height = CHECKER_HEIGHT,
+		mipmaps = 1,
+		format = CHECKER_FORMAT
+	}
+	local ui_img: rl.image = {
+		data = &UI_DATA[0],
+		width = UI_WIDTH,
+		height = UI_HEIGHT,
+		mipmaps = 1,
+		format = UI_FORMAT
+	}
 
-	self.gfx_checker_texture = rl.loadTexture("assets/checker.png")
+	self.gfx_ui_texture = rl.loadTextureFromImage(ui_img)
+	self.gfx_checker_texture = rl.loadTextureFromImage(checker_img)
 	rlgl.textureParameters(self.gfx_checker_texture.id, rlgl.TEXTURE_WRAP_S, rlgl.TEXTURE_WRAP_REPEAT)
     rlgl.textureParameters(self.gfx_checker_texture.id, rlgl.TEXTURE_WRAP_T, rlgl.TEXTURE_WRAP_REPEAT)
 	

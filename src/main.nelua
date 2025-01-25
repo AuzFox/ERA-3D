@@ -754,20 +754,31 @@ local function run(): void
 						statemachine.queued_state = StateID.STATE_RIGHT
 						update_state = false
 					elseif rl.isKeyPressed(rl.keyboardKey.R) then
-						if vm:compile() then
-							vm:resetVM(true)
-							
-							vm.cycle_count = 0
-							if vm:callHook(Hook.INIT) then
-								statemachine.queued_state = StateID.RUN
-								--print("init()", vm.cycle_count)
+						if input.is_alt_down then
+							if vm:compile() then
+								vm:resetVM(true)
+								vm:dumpBytecode()
+								core:popup(LogEntryType.INFO, "bytecode dumped")
 							else
-								core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
-								core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
+								core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
+								core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [CTRL+ENTER] to view log")
 							end
 						else
-							core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
-							core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [CTRL+ENTER] to view log")
+							if vm:compile() then
+								vm:resetVM(true)
+								
+								vm.cycle_count = 0
+								if vm:callHook(Hook.INIT) then
+									statemachine.queued_state = StateID.RUN
+									--print("init()", vm.cycle_count)
+								else
+									core:log(LogEntryType.RUNTIME_ERROR, vm.error, false)
+									core:popup(LogEntryType.RUNTIME_ERROR, "a runtime error occurred. press [CTRL+ENTER] to view log")
+								end
+							else
+								core:log(LogEntryType.COMPILE_ERROR, vm.error, false)
+								core:popup(LogEntryType.COMPILE_ERROR, "a compiler error occurred. press [CTRL+ENTER] to view log")
+							end
 						end
 						update_state = false
 					elseif rl.isKeyPressed(rl.keyboardKey.S) then

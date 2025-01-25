@@ -23,7 +23,7 @@ global ERA_VER_PATCH <comptime> = 0
 -- EVM internal memory constants
 global EVM_SRC_SIZE       <comptime> = 1024 * 1024
 global EVM_OPSTACK_SIZE   <comptime> = 65536 -- 256KiB (65536 words)
-global EVM_BYTECODE_SIZE  <comptime> = 65536 -- 64KiB (65536 bytes)
+global EVM_BYTECODE_SIZE  <comptime> = 131072 -- 128KiB (131072 bytes)
 global EVM_CALLSTACK_SIZE <comptime> = 256
 global EVM_API_FUNCS_SIZE <comptime> = 65536
 
@@ -275,7 +275,7 @@ global SOUNDCHIP_PATTERN_DATA_START <comptime> = SOUNDCHIP_SONG_SIZE
 global SOUNDCHIP_INSTRUMENT_DATA_START <comptime> = SOUNDCHIP_PATTERN_DATA_START + (SOUNDCHIP_PATTERN_COUNT * SOUNDCHIP_PATTERN_SIZE)
 global SOUNDCHIP_GROOVE_DATA_START <comptime> = SOUNDCHIP_INSTRUMENT_DATA_START + (SOUNDCHIP_INSTRUMENT_COUNT * SOUNDCHIP_INSTRUMENT_SIZE)
 
-global VM_MAX_CYCLES <comptime> = 133333 -- ~8 million cycles per second
+global VM_MAX_CYCLES <comptime> = 1066666 -- 1066666 cycles per frame (~64 million cycles per second)
 
 global LOG_MAX_LINES <comptime> = 20
 global LOG_H <comptime> = ((LOG_MAX_LINES + 1) * 9)
@@ -1195,7 +1195,7 @@ EVM = @record {
     osp: uinteger,
     csp: uinteger,
 	saved_fptr: uint32, -- temporary register for function pointers (used when calling a fptr from an expression)
-    hook_addresses: [3]uint16,
+    hook_addresses: [3]uint32,
     hook_flags: [3]boolean,
     current_hook: uinteger,
     objmap_ptr: *[0]uint8,
@@ -1235,9 +1235,9 @@ EVM = @record {
     sym_tables: sequence(*hashmap(string, *Identifier)),
     scope_sizes: sequence(uinteger),
     loop_info_stack: sequence(LoopInfo),
-    loop_break_stack: sequence(uint16),
-    loop_step_stack: sequence(uint16),
-    loop_del_l_stack: sequence(uint16),
+    loop_break_stack: sequence(uint32),
+    loop_step_stack: sequence(uint32),
+    loop_del_l_stack: sequence(uint32),
 	funcmap: hashmap(uint32, boolean), -- used to determine if bytecode function pointers are legit
     
     -- general vars

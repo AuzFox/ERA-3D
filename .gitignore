@@ -1,2 +1,6 @@
 test_data/
+build/
+src/third_party/blipkit/E3DBlipKit/
+src/third_party/raylib/raylib/
 *.e3d
+era-3d

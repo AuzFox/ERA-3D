@@ -115,15 +115,17 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "ortho",
     "pauseTrack",
     "pauseTracks",
-    "peek32",
     "peek8",
+    "peek32",
+    "peekf",
     "playPattern",
     "playSong",
     "playTrack",
     "playWav",
     "playWavEx",
-    "poke32",
     "poke8",
+    "poke32",
+    "pokef",
     "polygonMode",
     "popMatrix",
     "powf",
@@ -428,8 +430,10 @@ global docs.api_lists: [docs.APICatagory.COUNT]sequence(string) = {
     "memset",
     "peek8",
     "peek32",
+    "peekf",
     "poke8",
     "poke32",
+    "pokef",
     "realloc",
     "strcat",
     "strdup",
@@ -1186,15 +1190,6 @@ docs.doc_strings["muteTracks"] = [[]]
 docs.doc_strings["ortho"] = [[]]
 docs.doc_strings["pauseTrack"] = [[]]
 docs.doc_strings["pauseTracks"] = [[]]
-docs.doc_strings["peek32"] =
-[[
-  int peek32(void* address)
-
-  ARGUMENTS:
-    void* address: memory pointer to read from
-  DESCRIPTION:
-    returns the 32-bit integer value starting at the given memory address.
-]]
 docs.doc_strings["peek8"] =
 [[
   int peek8(void* address)
@@ -1204,11 +1199,39 @@ docs.doc_strings["peek8"] =
   DESCRIPTION:
     returns the value of the byte at the given memory address.
 ]]
+docs.doc_strings["peek32"] =
+[[
+  int peek32(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the 32-bit integer value starting at the given memory address.
+]]
+docs.doc_strings["peekf"] =
+[[
+  float peekf(void* address)
+
+  ARGUMENTS:
+    void* address: memory pointer to read from
+  DESCRIPTION:
+    returns the float value starting at the given memory address.
+]]
 docs.doc_strings["playPattern"] = [[]]
 docs.doc_strings["playSong"] = [[]]
 docs.doc_strings["playTrack"] = [[]]
 docs.doc_strings["playWav"] = [[]]
 docs.doc_strings["playWavEx"] = [[]]
+docs.doc_strings["poke8"] =
+[[
+  void poke8(void* address, int value)
+
+  ARGUMENTS:
+    void* address: memory pointer to write to
+    int value    : byte value to write
+  DESCRIPTION:
+    writes the given byte to the given memory address.
+]]
 docs.doc_strings["poke32"] =
 [[
   void poke32(void* address, int value)
@@ -1219,15 +1242,15 @@ docs.doc_strings["poke32"] =
   DESCRIPTION:
     writes the 32-bit integer to the given memory address.
 ]]
-docs.doc_strings["poke8"] =
+docs.doc_strings["pokef"] =
 [[
-  void poke8(void* address, int value)
+  void pokef(void* address, float value)
 
   ARGUMENTS:
     void* address: memory pointer to write to
-    int value    : byte value to write
+    float value  : float value to write
   DESCRIPTION:
-    writes the given byte to the given memory address.
+    writes the float to the given memory address.
 ]]
 docs.doc_strings["polygonMode"] =
 [[

@@ -882,6 +882,16 @@ function EVM:next16(): uint16
 	return v
 end
 
+function EVM:next24(): uint32
+	local v: uint32 = self.bytecode[self.cf.pc]
+	v = (v << 8) | self.bytecode[self.cf.pc + 1]
+	v = (v << 8) | self.bytecode[self.cf.pc + 2]
+
+	self.cf.pc = self.cf.pc + 3
+
+	return v
+end
+
 function EVM:next32(): uint32
 	local v: uint32 = self.bytecode[self.cf.pc]
 	v = (v << 8) | self.bytecode[self.cf.pc + 1]
@@ -966,7 +976,7 @@ function EVM:dumpBytecode(): void
 	while self.cf.pc < self.bytecode_len do
 		local op: uint8 = self:next8()
 
-		io.printf("0x%04X: ", self.cf.pc - 1)
+		io.printf("0x%06X: ", self.cf.pc - 1)
 		
 		switch op do
 			case Opcode.GET_G then
@@ -1061,6 +1071,8 @@ function EVM:dumpBytecode(): void
 				io.printf("PUSH_FLOAT %f\n", self:nextF())
 			case Opcode.PUSH_VEC2_ZERO then
 				io.printf("PUSH_VEC2_ZERO\n")
+			case Opcode.PUSH_VEC2_ONE then
+				io.printf("PUSH_VEC2_ONE\n")
 			case Opcode.PUSH_VEC2_UP then
 				io.printf("PUSH_VEC2_UP\n")
 			case Opcode.PUSH_VEC2_DOWN then
@@ -1071,6 +1083,8 @@ function EVM:dumpBytecode(): void
 				io.printf("PUSH_VEC2_RIGHT\n")
 			case Opcode.PUSH_VEC3_ZERO then
 				io.printf("PUSH_VEC3_ZERO\n")
+			case Opcode.PUSH_VEC3_ONE then
+				io.printf("PUSH_VEC3_ONE\n")
 			case Opcode.PUSH_VEC3_UP then
 				io.printf("PUSH_VEC3_UP\n")
 			case Opcode.PUSH_VEC3_DOWN then
@@ -1202,29 +1216,29 @@ function EVM:dumpBytecode(): void
 			case Opcode.GEV then
 				io.printf("GEV %d\n", self:next8())
 			case Opcode.JUMP then
-				io.printf("JUMP 0x%04X\n", self:next16())
+				io.printf("JUMP 0x%06X\n", self:next24())
 			case Opcode.JUMP_Z then
-				io.printf("JUMP_Z 0x%04X\n", self:next16())
+				io.printf("JUMP_Z 0x%06X\n", self:next24())
 			case Opcode.JUMP_ZD then
-				io.printf("JUMP_ZD 0x%04X\n", self:next16())
+				io.printf("JUMP_ZD 0x%06X\n", self:next24())
 			case Opcode.JUMP_NZD then
-				io.printf("JUMP_NZD 0x%04X\n", self:next16())
+				io.printf("JUMP_NZD 0x%06X\n", self:next24())
 			case Opcode.JUMP_NULL then
-				io.printf("JUMP_NULL 0x%04X\n", self:next16())
+				io.printf("JUMP_NULL 0x%06X\n", self:next24())
 			case Opcode.JUMP_NULLD then
-				io.printf("JUMP_NULLD 0x%04X\n", self:next16())
+				io.printf("JUMP_NULLD 0x%06X\n", self:next24())
 			case Opcode.JUMP_NNULLD then
-				io.printf("JUMP_NNULLD 0x%04X\n", self:next16())
+				io.printf("JUMP_NNULLD 0x%06X\n", self:next24())
 			case Opcode.JUMP_FPNULL then
-				io.printf("JUMP_FPNULL 0x%04X\n", self:next16())
+				io.printf("JUMP_FPNULL 0x%06X\n", self:next24())
 			case Opcode.JUMP_FPNULLD then
-				io.printf("JUMP_FPNULLD 0x%04X\n", self:next16())
+				io.printf("JUMP_FPNULLD 0x%06X\n", self:next24())
 			case Opcode.JUMP_FPNNULLD then
-				io.printf("JUMP_FPNNULLD 0x%04X\n", self:next16())
+				io.printf("JUMP_FPNNULLD 0x%06X\n", self:next24())
 			case Opcode.CALL then
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local argc: uint16 = self:next16()
-				io.printf("CALL 0x%04X %d\n", index, argc)
+				io.printf("CALL 0x%06X %d\n", addr, argc)
 			case Opcode.CALL_FPTR then
 				index = self:next16()
 				io.printf("CALL_FPTR %d\n", index)
@@ -1252,7 +1266,7 @@ function EVM:dumpBytecode(): void
 				io.printf("API 0x%04X %d\n", index, argc)
 			else
 				-- invalid opcode
-				io.printf("!!! INVALID OPCODE !!!\n")
+				io.printf("!!! INVALID OPCODE %d !!!\n", op)
 				self.cf = prev_cf
 				return
 		end
@@ -1265,8 +1279,12 @@ function EVM:run(max_cycles: uint64): boolean
 	local index: uint16
 	local running: boolean = true
 
+	--print("\n")
+
 	while running do
 		local op: uint8 = self:next8()
+
+		--io.printf("RUNNING OPCODE %d at index 0x%06X\n", op, self.cf.pc - 1)
 
 		switch op do
 			case Opcode.GET_G then
@@ -1786,12 +1804,10 @@ function EVM:run(max_cycles: uint64): boolean
 				local addr: uint32 = v & 0x0FFFFFFF
 				local valid: boolean = false
 
-				if addr <= 0xFFFF then
-					if tag == 0x10000000 and self.funcmap:has(addr) then
-						valid = true
-					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
-						valid = true
-					end
+				if tag == 0x10000000 and addr <= 0xFFFFFF and self.funcmap:has(addr) then
+					valid = true
+				elseif tag == 0x20000000 and addr <= 0xFFFF and self.api_funcs[addr] ~= nilptr then
+					valid = true
 				end
 
 				self:pushU(not valid and 1 or 0)
@@ -2076,23 +2092,24 @@ function EVM:run(max_cycles: uint64): boolean
 						end
 				end
 			case Opcode.JUMP then
-				index = self:next16()
-				self.cf.pc = index
+				local addr: uint32 = self:next24()
+				self.cf.pc = addr
 			case Opcode.JUMP_Z then
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self:popU()
-
+				
 				if v == 0 then
-					self.cf.pc = index
+					self.cf.pc = addr
+				else
 				end
 			case Opcode.JUMP_ZD then
 				-- jump if zero but only discard value if branch is not taken
 				-- used by && operator
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 
 				if v == 0 then
-					self.cf.pc = index
+					self.cf.pc = addr
 					self.opstack[self.osp - 1].u = 0
 				else
 					self.osp = self.osp - 1
@@ -2100,30 +2117,30 @@ function EVM:run(max_cycles: uint64): boolean
 			case Opcode.JUMP_NZD then
 				-- jump if not zero but only discard value if branch is not taken
 				-- used by || operator
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 				
 				if v ~= 0 then
-					self.cf.pc = index
+					self.cf.pc = addr
 					self.opstack[self.osp - 1].u = 1
 				else
 					self.osp = self.osp - 1
 				end
 			case Opcode.JUMP_NULL then
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self:popU()
 
 				if v > MEMORY_MAX_ADDR then
-					self.cf.pc = index
+					self.cf.pc = addr
 				end
 			case Opcode.JUMP_NULLD then
 				-- jump if null but only discard value if branch is not taken
 				-- used by && operator
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 
 				if v > MEMORY_MAX_ADDR then
-					self.cf.pc = index
+					self.cf.pc = addr
 					self.opstack[self.osp - 1].u = 0
 				else
 					self.osp = self.osp - 1
@@ -2131,52 +2148,48 @@ function EVM:run(max_cycles: uint64): boolean
 			case Opcode.JUMP_NNULLD then
 				-- jump if not null but only discard value if branch is not taken
 				-- used by || operator
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 				
 				if v <= MEMORY_MAX_ADDR then
-					self.cf.pc = index
+					self.cf.pc = addr
 					self.opstack[self.osp - 1].u = 1
 				else
 					self.osp = self.osp - 1
 				end
 			case Opcode.JUMP_FPNULL then
-				index = self:next16()
+				local codeaddr: uint32 = self:next24()
 				local v: uint32 = self:popU()
 				local tag: uint32 = v & 0xF0000000
 				local addr: uint32 = v & 0x0FFFFFFF
 				local valid: boolean = false
 
-				if addr <= 0xFFFF then
-					if tag == 0x10000000 and self.funcmap:has(addr) then
-						valid = true
-					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
-						valid = true
-					end
+				if tag == 0x10000000 and addr <= 0xFFFFFF and self.funcmap:has(addr) then
+					valid = true
+				elseif tag == 0x20000000 and addr <= 0xFFFF and self.api_funcs[addr] ~= nilptr then
+					valid = true
 				end
 
 				if not valid then
-					self.cf.pc = index
+					self.cf.pc = codeaddr
 				end
 			case Opcode.JUMP_FPNULLD then
 				-- jump if fptr null but only discard value if branch is not taken
 				-- used by && operator
-				index = self:next16()
+				local codeaddr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 				local tag: uint32 = v & 0xF0000000
 				local addr: uint32 = v & 0x0FFFFFFF
 				local valid: boolean = false
 
-				if addr <= 0xFFFF then
-					if tag == 0x10000000 and self.funcmap:has(addr) then
-						valid = true
-					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
-						valid = true
-					end
+				if tag == 0x10000000 and addr <= 0xFFFFFF and self.funcmap:has(addr) then
+					valid = true
+				elseif tag == 0x20000000 and addr <= 0xFFFF and self.api_funcs[addr] ~= nilptr then
+					valid = true
 				end
 
 				if not valid then
-					self.cf.pc = index
+					self.cf.pc = codeaddr
 					self.opstack[self.osp - 1].u = 0
 				else
 					self.osp = self.osp - 1
@@ -2184,22 +2197,20 @@ function EVM:run(max_cycles: uint64): boolean
 			case Opcode.JUMP_FPNNULLD then
 				-- jump if fptr not null but only discard value if branch is not taken
 				-- used by || operator
-				index = self:next16()
+				local codeaddr: uint32 = self:next24()
 				local v: uint32 = self.opstack[self.osp - 1].u
 				local tag: uint32 = v & 0xF0000000
 				local addr: uint32 = v & 0x0FFFFFFF
 				local valid: boolean = false
 
-				if addr <= 0xFFFF then
-					if tag == 0x10000000 and self.funcmap:has(addr) then
-						valid = true
-					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
-						valid = true
-					end
+				if tag == 0x10000000 and addr <= 0xFFFFFF and self.funcmap:has(addr) then
+					valid = true
+				elseif tag == 0x20000000 and addr <= 0xFFFF and self.api_funcs[addr] ~= nilptr then
+					valid = true
 				end
 
 				if valid then
-					self.cf.pc = index
+					self.cf.pc = codeaddr
 					self.opstack[self.osp - 1].u = 1
 				else
 					self.osp = self.osp - 1
@@ -2210,7 +2221,7 @@ function EVM:run(max_cycles: uint64): boolean
 					return false
 				end
 
-				index = self:next16()
+				local addr: uint32 = self:next24()
 				local argc: uint16 = self:next16()
 
 				if self.asp + argc >= MEMORY_ARGS_SIZE_ELEMENTS then
@@ -2220,12 +2231,12 @@ function EVM:run(max_cycles: uint64): boolean
 
 				self:pushArgs(argc)
 				self:pushCallframe(argc)
-				self.cf.pc = index
+				self.cf.pc = addr
 			case Opcode.CALL_FPTR then
 				index = self:next16()
 				local addr: uint32 = self:popU()
 
-				if addr & 0x0FFFFFFF > 0xFFFF then
+				if addr & 0x0FFFFFFF > 0xFFFFFF then
 					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
 					return false
 				end
@@ -2241,14 +2252,14 @@ function EVM:run(max_cycles: uint64): boolean
 						return false
 					end
 
-					if not self.funcmap:has(addr & 0xFFFF) then
+					if not self.funcmap:has(addr & 0xFFFFFF) then
 						self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
 						return false
 					end
 	
 					self:pushArgs(index)
 					self:pushCallframe(index)
-					self.cf.pc = addr & 0xFFFF
+					self.cf.pc = addr & 0xFFFFFF
 				elseif addr & 0xF0000000 == 0x20000000 then
 					local func: APIFunction = self.api_funcs[addr & 0xFFFF]
 					if func ~= nilptr then
@@ -2281,7 +2292,7 @@ function EVM:run(max_cycles: uint64): boolean
 				index = self:next16()
 				local addr: uint32 = self.saved_fptr
 
-				if addr & 0x0FFFFFFF > 0xFFFF then
+				if addr & 0x0FFFFFFF > 0xFFFFFF then
 					self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
 					return false
 				end
@@ -2297,14 +2308,14 @@ function EVM:run(max_cycles: uint64): boolean
 						return false
 					end
 
-					if not self.funcmap:has(addr & 0xFFFF) then
+					if not self.funcmap:has(addr & 0xFFFFFF) then
 						self.error = string.format("attempt to call invalid function pointer 0x%08X", addr)
 						return false
 					end
 	
 					self:pushArgs(index)
 					self:pushCallframe(index)
-					self.cf.pc = addr & 0xFFFF
+					self.cf.pc = addr & 0xFFFFFF
 				elseif addr & 0xF0000000 == 0x20000000 then
 					local func: APIFunction = self.api_funcs[addr & 0xFFFF]
 					if func ~= nilptr then
@@ -2359,12 +2370,10 @@ function EVM:run(max_cycles: uint64): boolean
 				local addr: uint32 = raw_addr & 0x0FFFFFFF
 				local result: uint32 = 0
 
-				if addr <= 0xFFFF then
-					if tag == 0x10000000 and self.funcmap:has(addr) then
-						result = 1
-					elseif tag == 0x20000000 and self.api_funcs[addr] ~= nilptr then
-						result = 1
-					end
+				if tag == 0x10000000 and addr <= 0xFFFFFF and self.funcmap:has(addr) then
+					result = 1
+				elseif tag == 0x20000000 and addr <= 0xFFFF and self.api_funcs[addr] ~= nilptr then
+					result = 1
 				end
 
 				self:pushU(result)
@@ -2396,7 +2405,7 @@ function EVM:run(max_cycles: uint64): boolean
 				end
 			else
 				-- invalid opcode
-				self.error = string.format("attempt to execute invalid opcode %d", op)
+				self.error = string.format("attempt to execute invalid opcode %d at index 0x%06X", op, self.cf.pc - 1)
 				return false
 		end
 
