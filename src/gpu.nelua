@@ -15,6 +15,7 @@ local GL_UNSIGNED_INT_24_8 <comptime> = 0x84FA
 local GL_FRAMEBUFFER <comptime> = 0x8D40
 local GL_DEPTH_STENCIL_ATTACHMENT <comptime> = 0x821A
 
+local GL_BLEND <comptime> = 0xBE2
 local GL_STENCIL_TEST <comptime> = 0xB90
 
 local GL_COLOR_BUFFER_BIT <comptime> = 0x00004000
@@ -47,6 +48,30 @@ local GL_DECR <comptime> = 0x1E03
 local GL_DECR_WRAP <comptime> = 0x8508
 local GL_INVERT <comptime> = 0x150A
 
+-- blend factors
+-- (GL_ZERO defined above)
+global GL_ONE <comptime> = 1
+global GL_SRC_COLOR <comptime> = 0x300
+global GL_ONE_MINUS_SRC_COLOR <comptime> = 0x301
+global GL_DST_COLOR <comptime> = 0x306
+global GL_ONE_MINUS_DST_COLOR <comptime> = 0x307
+global GL_SRC_ALPHA <comptime> = 0x302
+global GL_ONE_MINUS_SRC_ALPHA <comptime> = 0x303
+global GL_DST_ALPHA <comptime> = 0x304
+global GL_ONE_MINUS_DST_ALPHA <comptime> = 0x305
+global GL_CONSTANT_COLOR <comptime> = 0x8001
+global GL_ONE_MINUS_CONSTANT_COLOR <comptime> = 0x8002
+global GL_CONSTANT_ALPHA <comptime> = 0x8003
+global GL_ONE_MINUS_CONSTANT_ALPHA <comptime> = 0x8004
+global GL_SRC_ALPHA_SATURATE <comptime> = 0x308
+
+-- blend equations
+global GL_FUNC_ADD <comptime> = 0x8006
+global GL_FUNC_SUBTRACT <comptime> = 0x800A
+global GL_FUNC_REVERSE_SUBTRACT <comptime> = 0x800B
+global GL_MIN <comptime> = 0x8007
+global GL_MAX <comptime> = 0x8008
+
 -- OpenGL function pointers
 local glClear: function(cuint): void
 local glClearColor: function(float32, float32, float32, float32): void
@@ -56,6 +81,11 @@ local glDepthFunc: function(cuint): void
 local glEnable: function(cint): void
 local glDisable: function(cint): void
 local glColorMask: function(cint, cint, cint, cint): void
+local glBlendColor: function(float32, float32, float32, float32): void
+local glBlendFunc: function(cuint, cuint): void
+local glBlendFuncSeparate: function(cuint, cuint, cuint, cuint): void
+local glBlendEquation: function(cuint): void
+local glBlendEquationSeparate: function(cuint, cuint): void
 local glStencilMaskSeparate: function(cuint, cuint): void
 local glStencilFuncSeparate: function(cuint, cuint, cint, cuint): void
 local glStencilOpSeparate: function(cuint, cuint, cuint, cuint): void
@@ -74,7 +104,7 @@ local GPU_VERT_SRC <const> = [[
 // Input vertex attributes
 in vec3 vertexPosition;
 in vec2 vertexTexCoord;
-//in vec3 vertexNormal;
+in vec3 vertexNormal;
 in vec4 vertexColor;
 
 // Input uniform values
@@ -106,24 +136,20 @@ uniform vec3 ambientColor;
 uniform Light lights[MAX_LIGHTS];
 
 vec4 calculateLighting() {
-	// when lighting is enabled, use the vertex color xyz values as the normal
-	vec3 rawNormal = vertexColor.xyz;
-
 	// get vertex in world space
 	vec3 vertex = vec3(matModel * vec4(vertexPosition, 1.0f));
 
 	// get normal in world space?
-	vec3 normal = normalize(vec3(matNormal * vec4(rawNormal, 1.0f)));
+	vec3 normal = normalize(vec3(matNormal * vec4(vertexNormal, 1.0f)));
 
 	vec3 lightDirection;
 	float diffuseFactor;
 	float attenuation;
 	vec3 diffuseColor = vec3(0.0f);
-	vec3 lightPos;
 
 	for (int i = 0; i < MAX_LIGHTS; i++) {
 		if (lights[i].enabled == 1) {
-			lightPos = lights[i].position;
+			vec3 lightPos = vec3(matModel * vec4(lights[i].position, 1.0f));
 
 			if (lights[i].type == LIGHT_POINT) {
 				// get direction to light
@@ -152,7 +178,6 @@ vec4 calculateLighting() {
 	// get ambient color
 	vec3 ambientColorFinal = ambientFactor * ambientColor;
 
-	//return min(vec4(diffuseColor + ambientColorFinal, 1.0f), vec4(1.0));
 	return vec4(diffuseColor + ambientColorFinal, 1.0f);
 }
 
@@ -190,39 +215,77 @@ uniform int texX;
 uniform int texY;
 uniform int texW;
 uniform int texH;
+uniform int texFilter;
 
 uniform int fogMode;
 uniform float fogStart;
 uniform float fogEnd;
 uniform vec4 fogColor;
 
-vec4 getTexColor(vec2 coord) {
+vec2 getMappedCoords(vec2 coord) {
+	vec2 tempCoord;
+
+	if (texMode == 0) {
+		tempCoord = mod(coord, vec2(1.0f, 1.0f));
+	}
+	else if (texMode == 1) {
+		tempCoord = clamp(coord, vec2(0.0f, 0.0f), vec2(0.99f, 0.99f));
+	}
+
 	// create vectors
 	vec2 tMin = vec2(float(texX), float(texY));
 	vec2 tMax = vec2(float(texX + texW), float((texY) + texH));
 	vec2 tSize = vec2(1024.0f, 1024.0f);
 
 	// get mapped uv coords
-	vec2 mappedCoord = mix(tMin, tMax, coord) / tSize;
-	
-	// sample color from texture
-	vec4 rawColor = texture(texture0, mappedCoord) * fragColor;
-
-	return rawColor;
+	return mix(tMin, tMax, tempCoord) / tSize;
 }
 
 void main()
 {
 	vec4 rawColor;
 
-	if (texMode == 0) {
-		rawColor = getTexColor(mod(fragTexCoord, vec2(1.0f, 1.0f)));
-	}
-	else if (texMode == 1) {
-		rawColor = getTexColor(clamp(fragTexCoord, vec2(0.0f, 0.0f), vec2(0.99f, 0.99f)));
+	if (texMode == 2) {
+		rawColor = vec4(1.0f, 1.0f, 1.0f, 1.0f) * fragColor;
 	}
 	else {
-		rawColor = vec4(1.0f, 1.0f, 1.0f, 1.0f) * fragColor;
+		if (texFilter == 1) {
+			// do filtering
+			vec2 texPixA = vec2(1.0f / texW, 0.0f);
+			vec2 texPixB = vec2(0.0f, 1.0f / texH);
+			vec2 texPixC = vec2(texPixA.x, texPixB.y);
+			vec2 halfTex = vec2(texPixA.x * 0.5, texPixB.y * 0.5);
+			vec2 uvCentered = fragTexCoord - halfTex;
+			
+			vec4 diffuseColor = texture(texture0, getMappedCoords(uvCentered));
+			vec4 sampleA = texture(texture0, getMappedCoords(uvCentered + texPixA));
+			vec4 sampleB = texture(texture0, getMappedCoords(uvCentered + texPixB));
+			vec4 sampleC = texture(texture0, getMappedCoords(uvCentered + texPixC));
+			
+			float dummy;
+			float interpX = modf(uvCentered.x * texW, dummy);
+			float interpY = modf(uvCentered.y * texH, dummy);
+		
+			if (uvCentered.x < 0)
+			{
+				interpX = 1.0f - interpX * (-1.0f);
+			}
+			if (uvCentered.y < 0)
+			{
+				interpY = 1.0f - interpY * (-1.0f);
+			}
+			
+			diffuseColor = (diffuseColor + interpX * (sampleA - diffuseColor) + interpY * (sampleB - diffuseColor))*(1-step(1, interpX + interpY));
+			diffuseColor += (sampleC + (1-interpX) * (sampleB - sampleC) + (1-interpY) * (sampleA - sampleC))*step(1, interpX + interpY);
+		
+			rawColor = diffuseColor * fragColor;
+		}
+		else {
+			vec2 mappedCoord = getMappedCoords(fragTexCoord);
+	
+			// sample color from texture
+			rawColor = texture(texture0, mappedCoord) * fragColor;
+		}
 	}
 
 	if (rawColor.a == 0) {
@@ -327,29 +390,29 @@ local comparison_functions: []cuint = {
 	GL_ALWAYS,
 	GL_NEVER
 }
-local blend_factors: []cint = {
-	rlgl.ZERO,
-	rlgl.ONE,
-	rlgl.SRC_COLOR,
-	rlgl.ONE_MINUS_SRC_COLOR,
-	rlgl.DST_COLOR,
-	rlgl.ONE_MINUS_DST_COLOR,
-	rlgl.SRC_ALPHA,
-	rlgl.ONE_MINUS_SRC_ALPHA,
-	rlgl.DST_ALPHA,
-	rlgl.ONE_MINUS_DST_ALPHA,
-	rlgl.CONSTANT_COLOR,
-	rlgl.ONE_MINUS_CONSTANT_COLOR,
-	rlgl.CONSTANT_ALPHA,
-	rlgl.ONE_MINUS_CONSTANT_ALPHA,
-	rlgl.SRC_ALPHA_SATURATE
+local blend_factors: []cuint = {
+	GL_ZERO,
+	GL_ONE,
+	GL_SRC_COLOR,
+	GL_ONE_MINUS_SRC_COLOR,
+	GL_DST_COLOR,
+	GL_ONE_MINUS_DST_COLOR,
+	GL_SRC_ALPHA,
+	GL_ONE_MINUS_SRC_ALPHA,
+	GL_DST_ALPHA,
+	GL_ONE_MINUS_DST_ALPHA,
+	GL_CONSTANT_COLOR,
+	GL_ONE_MINUS_CONSTANT_COLOR,
+	GL_CONSTANT_ALPHA,
+	GL_ONE_MINUS_CONSTANT_ALPHA,
+	GL_SRC_ALPHA_SATURATE
 }
-local blend_equations: []cint = {
-	rlgl.FUNC_ADD,
-	rlgl.FUNC_SUBTRACT,
-	rlgl.FUNC_REVERSE_SUBTRACT,
-	rlgl.MIN,
-	rlgl.MAX
+local blend_equations: []cuint = {
+	GL_FUNC_ADD,
+	GL_FUNC_SUBTRACT,
+	GL_FUNC_REVERSE_SUBTRACT,
+	GL_MIN,
+	GL_MAX
 }
 local stencil_actions: []cuint = {
 	GL_KEEP,
@@ -391,6 +454,11 @@ local function loadOpenGLFunctions(): void
 	glEnable = (@function(cint): void)(glfwGetProcAddress("glEnable"))
 	glDisable = (@function(cint): void)(glfwGetProcAddress("glDisable"))
 	glColorMask = (@function(cint, cint, cint, cint): void)(glfwGetProcAddress("glColorMask"))
+	glBlendColor = (@function(float32, float32, float32, float32): void)(glfwGetProcAddress("glBlendColor"))
+	glBlendFunc = (@function(cuint, cuint): void)(glfwGetProcAddress("glBlendFunc"))
+	glBlendFuncSeparate = (@function(cuint, cuint, cuint, cuint): void)(glfwGetProcAddress("glBlendFuncSeparate"))
+	glBlendEquation = (@function(cuint): void)(glfwGetProcAddress("glBlendEquation"))
+	glBlendEquationSeparate = (@function(cuint, cuint): void)(glfwGetProcAddress("glBlendEquationSeparate"))
 	glStencilMaskSeparate = (@function(cuint, cuint): void)(glfwGetProcAddress("glStencilMaskSeparate"))
 	glStencilFuncSeparate = (@function(cuint, cuint, cint, cuint): void)(glfwGetProcAddress("glStencilFuncSeparate"))
 	glStencilOpSeparate = (@function(cuint, cuint, cuint, cuint): void)(glfwGetProcAddress("glStencilOpSeparate"))
@@ -406,14 +474,6 @@ end
 
 function GPU:flush(): void
 	if self.enable_flush then
-		-- get required matrices
-		local matModel: rl.matrix = rlgl.getMatrixTransform()
-		local matNormal: rl.matrix = rl.matrix.transpose(rl.matrix.invert(matModel))
-
-		-- upload to vertex shader
-		rl.setShaderValueMatrix(self.gfx_shader, self.mat_model_loc, matModel)
-		rl.setShaderValueMatrix(self.gfx_shader, self.mat_normal_loc, matNormal)
-
 		rlgl.drawRenderBatchActive()
 	end
 end
@@ -559,6 +619,8 @@ function GPU:camera3D(id: int32): void
 	local target: rl.vector3
 	local up: rl.vector3
 	local fov: float32
+	local near: float32
+	local far: float32
 	local projection: int32
 	local viewport_w: int32
 	local viewport_h: int32
@@ -582,6 +644,8 @@ function GPU:camera3D(id: int32): void
 			util.peekF(&cam3d.up_z0)
 		}
 		fov = util.peekF(&cam3d.fov0)
+		near = util.peekF(&cam3d.near0)
+		far = util.peekF(&cam3d.far0)
 		projection = util.peekI(&cam3d.projection0)
 
 		viewport_w = math.clamp(util.peekI(&self.render_state.viewport_width0), 1, GPU_VSCREEN_W)
@@ -591,6 +655,8 @@ function GPU:camera3D(id: int32): void
 		target = self.system_cam3d.target
 		up = self.system_cam3d.up
 		fov = self.system_cam3d.fovy
+		near = 0.01
+		far = 1000.0
 		projection = self.system_cam3d.projection
 
 		viewport_w = self.system_viewport_w
@@ -607,19 +673,16 @@ function GPU:camera3D(id: int32): void
 
 	local aspect: float32 = (@float32)(viewport_w) / (@float32)(viewport_h)
 
-	-- 0.01 is the near clipping value
-	-- 1000.0 is the far clipping value
-	-- TODO: allow setting near/far?
 	if projection == rl.cameraProjection.PERSPECTIVE then
-		local top: float64 = 0.01 * math.tan(fov * 0.5 * (math.pi / 180.0))
+		local top: float64 = near * math.tan(fov * 0.5 * (math.pi / 180.0))
 		local right: float64 = top * aspect
 
-		rlgl.frustum(-right, right, -top, top, 0.01, 1000.0)
+		rlgl.frustum(-right, right, -top, top, near, far)
 	else
 		local top: float64 = fov / 2.0
 		local right: float64 = top * aspect
 
-		rlgl.ortho(-right, right, -top, top, 0.01, 1000.0)
+		rlgl.ortho(-right, right, -top, top, near, far)
 	end
 
 	rlgl.matrixMode(rlgl.MODELVIEW)
@@ -634,7 +697,7 @@ function GPU:camera3D(id: int32): void
 	self.matrix_mode = rlgl.MODELVIEW
 end
 
-function GPU:beginMesh(mode: uint32): void
+function GPU:begin(mode: uint32): void
 	switch mode do
 		case GPU_LINES then
 			self.triangle_mode = false
@@ -655,7 +718,7 @@ function GPU:beginMesh(mode: uint32): void
 	rlgl.begin(mode)
 end
 
-function GPU:beginMeshWithTexture(mode: uint32, tex_id: cint): void
+function GPU:beginWithTexture(mode: uint32, tex_id: cint): void
 	switch mode do
 		case GPU_LINES then
 			self.triangle_mode = false
@@ -674,13 +737,13 @@ function GPU:beginMeshWithTexture(mode: uint32, tex_id: cint): void
 	rlgl.begin(mode)
 end
 
-function GPU:endMesh(): void
+function GPU:ending(): void
 	rlgl.ending()
 
 	rl.endShaderMode()
 end
 
-function GPU:endMeshWithTexture(): void
+function GPU:endingWithTexture(): void
 	rlgl.ending()
 
 	rlgl.setTexture(0)
@@ -729,25 +792,15 @@ function GPU:vertex2D(v: rl.vector2): void
 	end
 end
 
-function GPU:vertNormal(v: rl.vector3): void
-	-- only set vertex "normal" if lighting is enabled
-	if self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT == 0 then
-		return
-	end
-
-	rlgl.color3f(v.x, v.y, v.z)
+function GPU:normal(v: rl.vector3): void
+	rlgl.normal3f(v.x, v.y, v.z)
 end
 
-function GPU:vertUV(v: rl.vector2): void
+function GPU:uv(v: rl.vector2): void
 	rlgl.texCoord2f(v.x, v.y)
 end
 
-function GPU:vertColor(col: uint32): void
-	-- only set vertex color if lighting is disabled
-	if self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT ~= 0 then
-		return
-	end
-
+function GPU:color(col: uint32): void
 	local r: cuchar = (@cuchar)(col >> 24)
 	local g: cuchar = (@cuchar)((col & 0xFF0000) >> 16)
 	local b: cuchar = (@cuchar)((col & 0x00FF00) >> 8)
@@ -1024,10 +1077,6 @@ function GPU:drawIcon2D(x: int32, y: int32, col: uint32, icon_index: uint32): vo
 end
 
 function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
-	local fx0: float32 = (@float32)(x)
-	local fy0: float32 = (@float32)(y)
-	local fx1: float32 = (@float32)(x + w)
-	local fy1: float32 = (@float32)(y + h)
 	local ray_col: rl.color = {
 		(@cuchar)(col >> 24),
 		(@cuchar)((col & 0xFF0000) >> 16),
@@ -1039,10 +1088,8 @@ function GPU:drawRect2D(x: int32, y: int32, w: int32, h: int32, col: uint32): vo
 end
 
 function GPU:drawRectLines2D(x: int32, y: int32, w: int32, h: int32, col: uint32): void
-	local fx0: float32 = (@float32)(x)
-	local fy0: float32 = (@float32)(y)
-	local fx1: float32 = (@float32)(x + w)
-	local fy1: float32 = (@float32)(y + h)
+	w = w - 1
+	h = h - 1
 	local ray_col: rl.color = {
 		(@cuchar)(col >> 24),
 		(@cuchar)((col & 0xFF0000) >> 16),
@@ -1050,15 +1097,18 @@ function GPU:drawRectLines2D(x: int32, y: int32, w: int32, h: int32, col: uint32
 		(@cuchar)(col & 0xFF)
 	}
 
-	rl.drawRectangleLines(x, y, w, h, ray_col)
+	rl.drawRectangle(x, y, w, 1, ray_col)         -- top
+	rl.drawRectangle(x, y, 1, h + 1, ray_col)     -- left
+	rl.drawRectangle(x + w, y, 1, h + 1, ray_col) -- right
+	rl.drawRectangle(x, y + h, w, 1, ray_col)     -- bottom
 end
 
 function GPU:uploadMemVertex(index: uint32): void
 	local word_index: uinteger = index * 9
 
-	self:vertColor(self.model_data[word_index + 8].u)
-	self:vertUV({self.model_data[word_index + 6].f, self.model_data[word_index + 7].f})
-	self:vertNormal({self.model_data[word_index + 3].f, self.model_data[word_index + 4].f, self.model_data[word_index + 5].f})
+	self:color(self.model_data[word_index + 8].u)
+	self:uv({self.model_data[word_index + 6].f, self.model_data[word_index + 7].f})
+	self:normal({self.model_data[word_index + 3].f, self.model_data[word_index + 4].f, self.model_data[word_index + 5].f})
 	self:vertex({self.model_data[word_index].f, self.model_data[word_index + 1].f, self.model_data[word_index + 2].f})
 end
 
@@ -1067,7 +1117,7 @@ function GPU:drawObjEx(mode: uint32, start: uint32, n: uint32): void
 		return
 	end
 
-	self:beginMesh(mode)
+	self:begin(mode)
 		switch mode do
 			case GPU_LINES then
 				for i = 0, < n do
@@ -1092,7 +1142,7 @@ function GPU:drawObjEx(mode: uint32, start: uint32, n: uint32): void
 					self:uploadMemVertex(quad_start + 3)
 				end
 		end
-	self:endMesh()
+	self:ending()
 end
 
 function GPU:drawObj(id: uint32): void
@@ -1128,6 +1178,13 @@ function GPU:textureMode(mode: uint32): void
 
 	local cmode: cint = (@cint)(mode)
 	rl.setShaderValue(self.gfx_shader, self.tex_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
+end
+
+function GPU:textureFilter(mode: uint8): void
+	--self:flush()
+
+	local cmode: cint = (@cint)(mode)
+	rl.setShaderValue(self.gfx_shader, self.tex_filter_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
 end
 
 function GPU:texture(x: int32, y: int32, w: int32, h: int32): void
@@ -1194,50 +1251,63 @@ function GPU:depthFunc(fn: uint32): void
 	glDepthFunc(comparison_functions[fn])
 end
 
-function GPU:blendMode(mode: uint32): void
+function GPU:blendMode(mode: boolean): void
 	self:flush()
 
-	--self.blend_mode = mode
-	rlgl.setBlendMode(mode)
+	if mode then
+		glEnable(GL_BLEND)
+	else
+		glDisable(GL_BLEND)
+	end
 end
 
-function GPU:blendFactors(src_factor: uint32, dest_factor: uint32, equation: uint32): void
+function GPU:blendColor(col: uint32): void
 	self:flush()
 
-	--self.blend_src_rgb = src_factor
-	--self.blend_dest_rgb = dest_factor
-	--self.blend_src_alpha = src_factor
-	--self.blend_dest_alpha = dest_factor
-	--self.blend_eq_rgb = equation
-	--self.blend_eq_alpha = equation
-	rlgl.setBlendFactors(
+	local fr: float32 = (@float32)(col >> 24) / 255.0
+	local fg: float32 = (@float32)((col & 0xFF0000) >> 16) / 255.0
+	local fb: float32 = (@float32)((col & 0x00FF00) >> 8) / 255.0
+	local fa: float32 = (@float32)(col & 0xFF) / 255.0
+
+	glBlendColor(fr, fg, fb, fa)
+end
+
+function GPU:blendFunc(src_factor: uint32, dest_factor: uint32): void
+	self:flush()
+
+	glBlendFunc(
 		blend_factors[src_factor],
-		blend_factors[dest_factor],
-		blend_equations[equation]
+		blend_factors[dest_factor]
 	)
 end
 
-function GPU:blendFactorsEx(
+function GPU:blendFuncSeparate(
 	src_rgb_factor: uint32,
 	dest_rgb_factor: uint32,
 	src_alpha_factor: uint32,
-	dest_alpha_factor: uint32,
-	equation_rgb: uint32,
-	equation_alpha: uint32): void
+	dest_alpha_factor: uint32): void
 	self:flush()
-	--self.blend_src_rgb = src_rgb_factor
-	--self.blend_dest_rgb = dest_rgb_factor
-	--self.blend_src_alpha = src_alpha_factor
-	--self.blend_dest_alpha = dest_alpha_factor
-	--self.blend_eq_rgb = equation_rgb
-	--self.blend_eq_alpha = equation_alpha
-	rlgl.setBlendFactorsSeparate(
+
+	glBlendFuncSeparate(
 		blend_factors[src_rgb_factor],
 		blend_factors[dest_rgb_factor],
 		blend_factors[src_alpha_factor],
-		blend_factors[dest_alpha_factor],
-		blend_equations[equation_rgb],
-		blend_equations[equation_alpha]
+		blend_factors[dest_alpha_factor]
+	)
+end
+
+function GPU:blendEquation(mode: uint32): void
+	self:flush()
+
+	glBlendEquation(blend_equations[mode])
+end
+
+function GPU:blendEquationSeparate(mode_rgb: uint32, mode_alpha: uint32): void
+	self:flush()
+
+	glBlendEquationSeparate(
+		blend_equations[mode_rgb],
+		blend_equations[mode_alpha]
 	)
 end
 
@@ -1319,12 +1389,6 @@ function GPU:lightingMode(enabled: boolean): void
 
 	local cmode: cint = enabled and 1 or 0
 	rl.setShaderValue(self.gfx_shader, self.lighting_mode_loc, &cmode, rl.shaderUniformDataType.UNIFORM_INT)
-
-	if enabled then
-		self.render_state.flags_tmccs0fl = self.render_state.flags_tmccs0fl | GPU_LIGHTING_BIT
-	else
-		self.render_state.flags_tmccs0fl = self.render_state.flags_tmccs0fl & ~GPU_LIGHTING_BIT
-	end
 end
 
 function GPU:ambientFactor(factor: float32): void
@@ -1412,6 +1476,8 @@ function GPU:updateLights(): void
 		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.POSITION], &pos, rl.shaderUniformDataType.UNIFORM_VEC3)
 		rl.setShaderValue(self.gfx_shader, light_attrib_locs[i][LightAttribute.DIRECTION], &dir, rl.shaderUniformDataType.UNIFORM_VEC3)
 	end
+
+	self.update_lights = false
 end
 
 function GPU:setPixel(x: int32, y: int32, col: uint32): void
@@ -1574,11 +1640,18 @@ function GPU:loadModelData(bank_index: uint32, start_index: uint32): void
 					local posindex: uinteger = idx * 3
 					local uvindex: uinteger = idx * 2
 					local colindex: uinteger = idx * 4
+					local normindex: uinteger = idx * 3
 					
 					local pos: rl.vector3 = {
 						posptr[posindex],
 						posptr[posindex + 1],
 						posptr[posindex + 2]
+					}
+
+					local norm: rl.vector3 = {
+						normptr[normindex],
+						normptr[normindex + 1],
+						normptr[normindex + 2]
 					}
 					
 					local uv: rl.vector2 = {
@@ -1597,8 +1670,14 @@ function GPU:loadModelData(bank_index: uint32, start_index: uint32): void
 					bank_ptr[objmemindex].f = pos.x
 					bank_ptr[objmemindex + 1].f = pos.y
 					bank_ptr[objmemindex + 2].f = pos.z
+
+					bank_ptr[objmemindex + 3].f = norm.x
+					bank_ptr[objmemindex + 4].f = norm.y
+					bank_ptr[objmemindex + 5].f = norm.z
+
 					bank_ptr[objmemindex + 6].f = uv.x
 					bank_ptr[objmemindex + 7].f = uv.y
+
 					bank_ptr[objmemindex + 8].u = col
 
 					vertex_count = vertex_count + 1
@@ -1646,6 +1725,7 @@ function GPU:loadModelData(bank_index: uint32, start_index: uint32): void
 
 				bank_ptr[objmemindex + 6].f = uv.x
 				bank_ptr[objmemindex + 7].f = uv.y
+
 				bank_ptr[objmemindex + 8].u = col
 
 				vertex_count = vertex_count + 1
@@ -1782,12 +1862,12 @@ function GPU:enableRenderState(): void
 	self:colorMask(self.render_state.flags_00ppcccc & GPU_COLOR_MASK_MASK)
 
 	self:clearDepth(util.peekF(&self.render_state.clear_depth0))
-	self:depthTest(self.render_state.flags_tmccs0fl & GPU_DEPTH_TEST_BIT ~= 0)
-	self:depthMask(self.render_state.flags_tmccs0fl & GPU_DEPTH_MASK_BIT ~= 0)
+	self:depthTest(self.render_state.flags_tmccsbfl & GPU_DEPTH_TEST_BIT ~= 0)
+	self:depthMask(self.render_state.flags_tmccsbfl & GPU_DEPTH_MASK_BIT ~= 0)
 	self:depthFunc(self.render_state.depth_function)
 	
 	self:clearStencil(self.render_state.clear_stencil)
-	self:stencilMode(self.render_state.flags_tmccs0fl & GPU_STENCIL_BIT ~= 0)
+	self:stencilMode(self.render_state.flags_tmccsbfl & GPU_STENCIL_BIT ~= 0)
 	self:stencilMask(GPU_FRONT, self.render_state.stencil_mask_front)
 	self:stencilMask(GPU_BACK, self.render_state.stencil_mask_back)
 	self:stencilFunc(
@@ -1815,33 +1895,37 @@ function GPU:enableRenderState(): void
 		self.render_state.stencil_dppasses & 0b1111
 	)
 	
-	self:cullMode((self.render_state.flags_tmccs0fl & GPU_CULL_MODE_MASK) >> 4)
+	self:cullMode((self.render_state.flags_tmccsbfl & GPU_CULL_MODE_MASK) >> 4)
 	self:polygonMode(
 		(self.render_state.flags_00ppcccc & GPU_POLYGON_MODE_MASK) >> 4
 	)
 
-	self:fogMode(self.render_state.flags_tmccs0fl & GPU_FOG_BIT ~= 0)
+	self:fogMode(self.render_state.flags_tmccsbfl & GPU_FOG_BIT ~= 0)
 	self:fogStart(util.peekF(&self.render_state.fog_start0))
 	self:fogEnd(util.peekF(&self.render_state.fog_end0))
 	self:fogColor(util.peekU(&self.render_state.fog_color_r))
 
-	self:lightingMode(self.render_state.flags_tmccs0fl & GPU_LIGHTING_BIT ~= 0)
+	self:lightingMode(self.render_state.flags_tmccsbfl & GPU_LIGHTING_BIT ~= 0)
 	-- lights...
 
 	self:ambientFactor(util.peekF(&self.render_state.ambient_factor0))
 	self:ambientColor(util.peekU(&self.render_state.ambient_color_r))
 
-	self:blendFactorsEx(
+	self:blendMode(self.render_state.flags_tmccsbfl & GPU_BLENDING_BIT ~= 0)
+	self:blendColor(util.peekU(&self.render_state.blend_color_r))
+	self:blendFuncSeparate(
 		self.render_state.rgb_factors >> 4,
 		self.render_state.rgb_factors & 0xF,
 		self.render_state.alpha_factors >> 4,
-		self.render_state.alpha_factors & 0xF,
+		self.render_state.alpha_factors & 0xF
+	)
+	self:blendEquationSeparate(
 		self.render_state.blend_equations >> 4,
 		self.render_state.blend_equations & 0xF
 	)
-	self:blendMode(self.render_state.flags_00sttbbb & GPU_BLEND_MODE_MASK)
 
-	self:textureMode((self.render_state.flags_00sttbbb & GPU_TEXTURE_MODE_MASK) >> 3)
+	self:textureMode((self.render_state.flags_f0stt000 & GPU_TEXTURE_MODE_MASK) >> 3)
+	self:textureFilter((self.render_state.flags_f0stt000 & GPU_TEXTURE_FILTER_MASK) >> 7)
 	self:texture(
 		util.peekI(&self.render_state.texture_x0),
 		util.peekI(&self.render_state.texture_y0),
@@ -1855,7 +1939,7 @@ function GPU:enableRenderState(): void
 		util.peekI(&self.render_state.viewport_height0),
 		false
 	)
-	self:scissorMode(self.render_state.flags_00sttbbb & GPU_SCISSOR_BIT ~= 0)
+	self:scissorMode(self.render_state.flags_f0stt000 & GPU_SCISSOR_BIT ~= 0)
 	self:scissor(
 		util.peekI(&self.render_state.scissor_x0),
 		util.peekI(&self.render_state.scissor_y0),
@@ -1886,7 +1970,7 @@ function GPU:disableRenderState(): void
 	self:stencilOp(GPU_FRONT_AND_BACK, GPU_KEEP, GPU_KEEP, GPU_KEEP)
 	
 	self:cullMode(0)
-	self:polygonMode(GPU_FILL)
+	self:polygonMode(GPU_POLY_FILL)
 
 	self:fogMode(false)
 	self:fogStart(700.0)
@@ -1899,9 +1983,13 @@ function GPU:disableRenderState(): void
 	self:ambientFactor(0.0)
 	self:ambientColor(GPU_RED)
 
-	self:blendMode(0)
+	self:blendMode(true)
+	self:blendColor(0)
+	self:blendFunc(GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA)
+	self:blendEquation(GPU_ADD)
 
 	self:textureMode(2)
+	self:textureFilter(GPU_NEAREST)
 	self:texture(0, 0, 64, 64)
 	self:viewport(0, 0, GPU_VSCREEN_W, GPU_VSCREEN_H, true)
 	self:scissorMode(false)
@@ -1926,6 +2014,12 @@ function GPU:resetGPU(): void
 		-- cam3d.fov = 45.0
 		util.pokeF(&cam3d.fov0, 45.0)
 
+		-- cam3d.near = 0.01
+		util.pokeF(&cam3d.near0, 0.01)
+
+		-- cam3d.far = 1000.0
+		util.pokeF(&cam3d.far0, 1000.0)
+
 		-- cam2d.zoom = 1.0
 		util.pokeF(&cam2d.zoom0, 1.0)
 	end
@@ -1938,6 +2032,8 @@ function GPU:resetGPU(): void
 		-- light.direction.y = -1.0
 		util.pokeF(&light.direction_y0, -1.0)
 	end
+
+	self.update_lights = true
 
 	-- reset render state
 	memory.set(self.render_state, 0, #RenderState) -- clear everything
@@ -1957,7 +2053,7 @@ function GPU:resetGPU(): void
 	util.pokeF(&self.render_state.fog_end0, 1000.0)
 
 	-- render state byte values
-	self.render_state.flags_tmccs0fl = GPU_DEPTH_TEST_BIT | GPU_DEPTH_MASK_BIT
+	self.render_state.flags_tmccsbfl = GPU_DEPTH_TEST_BIT | GPU_DEPTH_MASK_BIT | GPU_BLENDING_BIT
 	self.render_state.flags_00ppcccc = 0b00100000 | GPU_COLOR_MASK_ALL -- fill polygon mode, full color mask
 	self.render_state.rgb_factors = 0x67 -- SRC_ALPHA, ONE_MINUS_SRC_ALPHA
 	self.render_state.alpha_factors = 0x67 -- SRC_ALPHA, ONE_MINUS_SRC_ALPHA
@@ -2132,6 +2228,7 @@ function GPU:init(sysmem_ptr: *[0]uint8, texbank_ptr: *[0]rl.color, objbank_ptr:
 	self.tex_y_loc = rl.getShaderLocation(self.gfx_shader, "texY")
 	self.tex_w_loc = rl.getShaderLocation(self.gfx_shader, "texW")
 	self.tex_h_loc = rl.getShaderLocation(self.gfx_shader, "texH")
+	self.tex_filter_loc = rl.getShaderLocation(self.gfx_shader, "texFilter")
 	self.fog_mode_loc = rl.getShaderLocation(self.gfx_shader, "fogMode")
 	self.fog_start_loc = rl.getShaderLocation(self.gfx_shader, "fogStart")
 	self.fog_end_loc = rl.getShaderLocation(self.gfx_shader, "fogEnd")

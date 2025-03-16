@@ -9,9 +9,9 @@ buildSetup() {
     git clone https://github.com/AuzFox/E3DBlipKit.git src/third_party/blipkit/E3DBlipKit
     echo "done"
 
-    # download raylib 5.0 repo
-    echo "cloning raylib 5.0..."
-    git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git src/third_party/raylib/raylib
+    # download raylib 5.5 repo
+    echo "cloning raylib 5.5..."
+    git clone --depth 1 --branch 5.5 https://github.com/raysan5/raylib.git src/third_party/raylib/raylib
     echo "done"
 
     # create ERA-3D build folders
@@ -73,7 +73,7 @@ buildRaylib() {
 }
 
 buildERA3D() {
-    nelua -C -V --cflags="-Ibuild/include -Lbuild/lib" --release src/main.nelua -o era-3d
+    nelua -C -V --cflags="-I build/include -L build/lib" --release src/main.nelua -o era-3d
 }
 
 cleanBuildDirs() {

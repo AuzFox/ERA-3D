@@ -41,10 +41,10 @@ SYSTEM MEMORY:
     padding         (3B            )                         (unused)
     objmem map      (6KiB          )                         (OBJMEM map (512 entries; 3 words each (type, start, n)))
     wavmem map      (8KiB          )                         (WAVMEM map (512 entries; 4 words each (sample start, sample end, sustain start, sustain end)))
-	3D cameras      (176B          ) 0x00F65854 - 0x00F65903 (3D camera data (4 cameras; 11 words each (pos, target, up, fov, projection)))
-	2D cameras      (96B           ) 0x00F65904 - 0x00F65963 (2D camera data (4 cameras; 6 words each (offset, target, rotation, zoom)))
-	lights          (320B          ) 0x00F65964 - 0x00F65AA3 (light data (8 lights; 10 words each (enabled, type, radius, color, position, direction)))
-	render state    (???B          ) 0x00F65AA4 - 0x00FFFFFF (system render state registers; see RenderState record)
+	3D cameras      (208B          ) 0x00F65854 - 0x00F65923 (3D camera data (4 cameras; 13 words each (pos, target, up, fov, near, far, projection)))
+	2D cameras      (96B           ) 0x00F65924 - 0x00F65983 (2D camera data (4 cameras; 6 words each (offset, target, rotation, zoom)))
+	lights          (320B          ) 0x00F65984 - 0x00F65AC3 (light data (8 lights; 10 words each (enabled, type, radius, color, position, direction)))
+	render state    (???B          ) 0x00F65AC4 - 0x00FFFFFF (system render state registers; see RenderState record)
   WAVMEM            (7MiB          ) 0x01000000 - 0x016FFFFF (~1min 23s of audio wave data (22050hz, 16bit, stereo))
   SEQMEM            (256KiB        ) 0x01700000 - 0x0173FFFF (audio sequencer data)
     song data       (2KiB          )                         (256 * 8 bytes)
@@ -110,9 +110,9 @@ local mem_regions = {
 
 global MEMORY_OBJMAP_SIZE <comptime> = (512 * 12) -- 6KiB
 global MEMORY_WAVMAP_SIZE <comptime> = (512 * 16) -- 8KiB
-global MEMORY_CAMERAS3D_SIZE <comptime> = 176
-global MEMORY_CAMERAS2D_SIZE <comptime> = 96
-global MEMORY_LIGHTS_SIZE <comptime> = 320
+global MEMORY_CAMERAS3D_SIZE <comptime> = 208 -- 4 cameras * 13 words * 4 bytes
+global MEMORY_CAMERAS2D_SIZE <comptime> = 96 -- 4 cameras * 6 words * 4 bytes
+global MEMORY_LIGHTS_SIZE <comptime> = 320 -- 8 lights * 10 words * 4 bytes
 global MEMORY_CAMERAS3D_INDEX <comptime> = (84 + MEMORY_OBJMAP_SIZE + MEMORY_WAVMAP_SIZE)
 global MEMORY_CAMERAS2D_INDEX <comptime> = (MEMORY_CAMERAS3D_INDEX + MEMORY_CAMERAS3D_SIZE)
 global MEMORY_LIGHTS_INDEX <comptime> = (MEMORY_CAMERAS2D_INDEX + MEMORY_CAMERAS2D_SIZE)
@@ -175,9 +175,9 @@ global GPU_BACK <comptime> = 1
 global GPU_FRONT_AND_BACK <comptime> = 2
 
 -- polygon modes
-global GPU_POINT <comptime> = 0
-global GPU_LINE <comptime> = 1
-global GPU_FILL <comptime> = 2
+global GPU_POLY_POINTS <comptime> = 0
+global GPU_POLY_LINES <comptime> = 1
+global GPU_POLY_FILL <comptime> = 2
 
 -- depth/stencil comparison functions
 global GPU_LESS <comptime> = 0
@@ -223,19 +223,30 @@ global GPU_DECR_WRAP <comptime> = 5
 global GPU_STENCIL_ZERO <comptime> = 6
 global GPU_INVERT <comptime> = 7
 
+-- texture filter modes
+global GPU_NEAREST <comptime> = 0
+global GPU_LINEAR <comptime> = 1
+
 -- render state masks and constants
-global GPU_DEPTH_TEST_BIT <comptime>     = 0b10000000
-global GPU_DEPTH_MASK_BIT <comptime>     = 0b01000000
-global GPU_CULL_MODE_MASK <comptime>     = 0b00110000
-global GPU_STENCIL_BIT <comptime>        = 0b00001000
-global GPU_UNUSED_BIT <comptime>         = 0b00000100
-global GPU_FOG_BIT <comptime>            = 0b00000010
-global GPU_LIGHTING_BIT <comptime>       = 0b00000001
-global GPU_SCISSOR_BIT <comptime>        = 0b00100000
-global GPU_TEXTURE_MODE_MASK <comptime>  = 0b00011000
-global GPU_BLEND_MODE_MASK <comptime>    = 0b00000111
-global GPU_POLYGON_MODE_MASK <comptime>  = 0b00110000
-global GPU_COLOR_MASK_MASK <comptime>    = 0b00001111
+
+-- flags byte 1 (flags_tmccsbfl)
+global GPU_DEPTH_TEST_BIT <comptime> = 0b10000000
+global GPU_DEPTH_MASK_BIT <comptime> = 0b01000000
+global GPU_CULL_MODE_MASK <comptime> = 0b00110000
+global GPU_STENCIL_BIT <comptime>    = 0b00001000
+global GPU_BLENDING_BIT <comptime>   = 0b00000100
+global GPU_FOG_BIT <comptime>        = 0b00000010
+global GPU_LIGHTING_BIT <comptime>   = 0b00000001
+
+-- flags byte 2 (flags_f0stt000)
+global GPU_TEXTURE_FILTER_MASK <comptime> = 0b10000000
+global GPU_SCISSOR_BIT <comptime>         = 0b00100000
+global GPU_TEXTURE_MODE_MASK <comptime>   = 0b00011000
+
+-- flags byte 3 (flags_00ppcccc)
+global GPU_POLYGON_MODE_MASK <comptime> = 0b00110000
+global GPU_COLOR_MASK_MASK <comptime>   = 0b00001111
+
 global GPU_CLEAR_COLOR <comptime>   = 0b100
 global GPU_CLEAR_DEPTH <comptime>   = 0b010
 global GPU_CLEAR_STENCIL <comptime> = 0b001
@@ -254,7 +265,7 @@ global GPU_CAMERAS_COUNT <comptime> = 4
 
 global SOUNDCHIP_TRACK_COUNT <comptime> = 8
 global SOUNDCHIP_SAMPLE_RATE <comptime> = 22050 -- 22050hz sample rate
-global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 2048
+global SOUNDCHIP_FRAMES_PER_UPDATE <comptime> = 896
 global SOUNDCHIP_EMPTY_VALUE <comptime> = 0xFF
 global SOUNDCHIP_NOTE_MUTE <comptime> = 0xFE
 global SOUNDCHIP_NOTE_RELEASE <comptime> = 0xFD
@@ -838,6 +849,18 @@ global EVMCam3D = @record {
 	fov2: uint8,
 	fov3: uint8,
 
+	-- float near
+	near0: uint8,
+	near1: uint8,
+	near2: uint8,
+	near3: uint8,
+
+	-- float far
+	far0: uint8,
+	far1: uint8,
+	far2: uint8,
+	far3: uint8,
+
 	-- int projection
 	projection0: uint8,
 	projection1: uint8,
@@ -945,6 +968,10 @@ global RenderState = @record {
 	clear_color_g: uint8,
 	clear_color_b: uint8,
 	clear_color_a: uint8,
+	blend_color_r: uint8,
+	blend_color_g: uint8,
+	blend_color_b: uint8,
+	blend_color_a: uint8,
 	fog_color_r: uint8,
 	fog_color_g: uint8,
 	fog_color_b: uint8,
@@ -1013,9 +1040,9 @@ global RenderState = @record {
 	ambient_factor3: uint8,
 
 	-- single-byte state
-	flags_tmccs0fl: uint8, -- TMCCS0FL (depth test, depth mask, cull, stencil, 0, fog, lighting)
-	flags_00sttbbb: uint8, -- 00STTBBB (scissor test, texture, blend)
-	flags_00ppcccc: uint8, -- 00PPCCCC (polygon mode, color mask)
+	flags_tmccsbfl: uint8, -- TMCCSBFL (depth test, depth mask, cull, stencil, blending, fog, lighting)
+	flags_f0stt000: uint8, -- F0STT000 (texture filter, 0, scissor test, texture mode, 0, 0, 0)
+	flags_00ppcccc: uint8, -- 00PPCCCC (0, 0, polygon mode, color mask)
 	stencil_functions: uint8, -- FFFFBBBB (front, back)
 
 	stencil_mask_front: uint8,
@@ -1075,6 +1102,7 @@ global GPU = @record {
 	tex_y_loc: cint,
 	tex_w_loc: cint,
 	tex_h_loc: cint,
+	tex_filter_loc: cint,
 	fog_mode_loc: cint,
 	fog_start_loc: cint,
 	fog_end_loc: cint,
@@ -1350,7 +1378,7 @@ global CoreData = @record {
 	popup_color: uint32,
 	image_to_import: rl.image,
 	import_texture: rl.texture,
-	sample_to_import: rl.wave,
+	sample_frame_count: uint64,
 	model_to_import: rl.model,
 	model_vertex_count: uint32,
 	log_index: integer,
@@ -1360,7 +1388,6 @@ global CoreData = @record {
 	queued_log_state: integer,
 	has_loaded_image: boolean,
 	has_import_texture: boolean,
-	has_loaded_sample: boolean,
 	has_loaded_model: boolean,
 
 	cursor_color: uint32,

@@ -298,7 +298,7 @@ end
 local function vargv(offset: uint32): uint32
 	vm.cf.vargc = vm.cf.vargc - offset
 	
-	-- get adress vargp currently points to
+	-- get address vargp currently points to
 	local addr: uint32 = MEMORY_ARGS_START_ADDR + (vm.cf.vargp * 4)
 
 	-- offset vararg pointer
@@ -375,9 +375,40 @@ local function apiAmbientFactor(): boolean
 	return true
 end
 
-local function apiBeginMesh(): boolean
+local function apiAxis(): boolean
 	-- signature:
-	-- void beginMesh(int mode);
+	-- int axis(int player, int low_btn, int high_btn);
+
+	local p: uint32 = vm:getArgU(0)
+	local low: uint32 = vm:getArgU(1)
+	local high: uint32 = vm:getArgU(2)
+
+	p = math.clamp(p, 0, input.PLAYER_COUNT - 1)
+	low = (p * input.Button.COUNT) + low
+	high = (p * input.Button.COUNT) + high
+
+	local low_code: cint = input.button_map[low]
+	local high_code: cint = input.button_map[high]
+
+	if low_code == 0 or high_code == 0 then
+		vm:pushI(0)
+	else
+		local axis: int32 = 0
+		local low_held: boolean = rl.isKeyDown(low_code)
+		local high_held: boolean = rl.isKeyDown(high_code)
+
+		if low_held then axis = axis - 1 end
+		if high_held then axis = axis + 1 end
+
+		vm:pushI(axis)
+	end
+	
+	return true
+end
+
+local function apiBegin(): boolean
+	-- signature:
+	-- void begin(int mode);
 
 	local mode: uint32 = vm:getArgU(0)
 
@@ -386,109 +417,145 @@ local function apiBeginMesh(): boolean
 		return false
 	end
 
-	gpu:beginMesh(mode)
+	gpu:begin(mode)
 	
 	return true
 end
 
-local function apiBlendFactors(): boolean
+local function apiBlendColor(): boolean
 	-- signature:
-	-- void blendFactors(int src, int dest, int eq);
+	-- void blendColor(int col);
 
-	local src: uint32 = vm:getArgU(0)
-	local dest: uint32 = vm:getArgU(1)
-	local eq: uint32 = vm:getArgU(2)
+	local col: uint32 = vm:getArgU(0)
 
-	if src > GPU_ONE_MINUS_CONSTANT_ALPHA then
-		vm.error = string.format("attempt to set invalid blend source factor `%d`", src)
-		return false
-	end
+	gpu:blendColor(col)
 
-	if dest > GPU_ONE_MINUS_CONSTANT_ALPHA then
-		vm.error = string.format("attempt to set invalid blend destination factor `%d`", dest)
-		return false
-	end
-
-	if eq > GPU_MAX then
-		vm.error = string.format("attempt to set invalid blend equation `%d`", eq)
-		return false
-	end
-
-	gpu:blendFactors(src, dest, eq)
-
-	-- update render state
-	gpu.render_state.rgb_factors = (@uint8)((src << 4) | dest)
-	gpu.render_state.alpha_factors = (@uint8)((src << 4) | dest)
-	gpu.render_state.blend_equations = (@uint8)((eq << 4) | eq)
+	util.pokeU(&gpu.render_state.blend_color_r, col)
 
 	return true
 end
 
-local function apiBlendFactorsEx(): boolean
+local function apiBlendEquation(): boolean
 	-- signature:
-	-- void blendFactorsEx(int src_rgb, int dest_rgb, int src_alpha, int dest_alpha, int eq_rgb, int eq_alpha);
+	-- void blendEquation(int mode);
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode > GPU_MAX then
+		vm.error = string.format("attempt to set invalid blend equation `%d`", mode)
+		return false
+	end
+
+	gpu:blendEquation(mode)
+
+	-- update render state
+	gpu.render_state.blend_equations = (@uint8)((mode << 4) | mode)
+
+	return true
+end
+
+local function apiBlendEquationSeparate(): boolean
+	-- signature:
+	-- void blendEquationSeparate(int mode);
+
+	local mode_rgb: uint32 = vm:getArgU(0)
+	local mode_alpha: uint32 = vm:getArgU(1)
+
+	if mode_rgb > GPU_MAX then
+		vm.error = string.format("attempt to set invalid blend RGB equation `%d`", mode_rgb)
+		return false
+	end
+
+	if mode_alpha > GPU_MAX then
+		vm.error = string.format("attempt to set invalid blend alpha equation `%d`", mode_alpha)
+		return false
+	end
+
+	gpu:blendEquationSeparate(mode_rgb, mode_alpha)
+
+	-- update render state
+	gpu.render_state.blend_equations = (@uint8)((mode_rgb << 4) | mode_alpha)
+
+	return true
+end
+
+local function apiBlendFunc(): boolean
+	-- signature:
+	-- void blendFunc(int src, int dest);
+
+	local src: uint32 = vm:getArgU(0)
+	local dest: uint32 = vm:getArgU(1)
+
+	if src > GPU_SRC_ALPHA_SATURATE then
+		vm.error = string.format("attempt to set invalid blend source factor `%d`", src)
+		return false
+	end
+
+	if dest > GPU_SRC_ALPHA_SATURATE then
+		vm.error = string.format("attempt to set invalid blend destination factor `%d`", dest)
+		return false
+	end
+
+	gpu:blendFunc(src, dest)
+
+	-- update render state
+	gpu.render_state.rgb_factors = (@uint8)((src << 4) | dest)
+	gpu.render_state.alpha_factors = (@uint8)((src << 4) | dest)
+
+	return true
+end
+
+local function apiBlendFuncSeparate(): boolean
+	-- signature:
+	-- void blendFuncSeparate(int src_rgb, int dest_rgb, int src_alpha, int dest_alpha);
 
 	local src_rgb: uint32 = vm:getArgU(0)
 	local dest_rgb: uint32 = vm:getArgU(1)
 	local src_alpha: uint32 = vm:getArgU(2)
 	local dest_alpha: uint32 = vm:getArgU(3)
-	local eq_rgb: uint32 = vm:getArgU(4)
-	local eq_alpha: uint32 = vm:getArgU(5)
 
-	if src_rgb > GPU_ONE_MINUS_CONSTANT_ALPHA then
+	if src_rgb > GPU_SRC_ALPHA_SATURATE then
 		vm.error = string.format("attempt to set invalid blend source RGB factor `%d`", src_rgb)
 		return false
 	end
 
-	if dest_rgb > GPU_ONE_MINUS_CONSTANT_ALPHA then
+	if dest_rgb > GPU_SRC_ALPHA_SATURATE then
 		vm.error = string.format("attempt to set invalid blend destination RGB factor `%d`", dest_rgb)
 		return false
 	end
 
-	if src_alpha > GPU_ONE_MINUS_CONSTANT_ALPHA then
+	if src_alpha > GPU_SRC_ALPHA_SATURATE then
 		vm.error = string.format("attempt to set invalid blend source alpha factor `%d`", src_alpha)
 		return false
 	end
 
-	if dest_alpha > GPU_ONE_MINUS_CONSTANT_ALPHA then
+	if dest_alpha > GPU_SRC_ALPHA_SATURATE then
 		vm.error = string.format("attempt to set invalid blend destination alpha factor `%d`", dest_alpha)
 		return false
 	end
 
-	if eq_rgb > GPU_MAX then
-		vm.error = string.format("attempt to set invalid blend RGB equation `%d`", eq_rgb)
-		return false
-	end
-
-	if eq_alpha > GPU_MAX then
-		vm.error = string.format("attempt to set invalid blend alpha equation `%d`", eq_alpha)
-		return false
-	end
-
-	gpu:blendFactorsEx(src_rgb, dest_rgb, src_alpha, dest_alpha, eq_rgb, eq_alpha)
+	gpu:blendFuncSeparate(src_rgb, dest_rgb, src_alpha, dest_alpha)
 
 	-- update render state
 	gpu.render_state.rgb_factors = (@uint8)((src_rgb << 4) | dest_rgb)
 	gpu.render_state.alpha_factors = (@uint8)((src_alpha << 4) | dest_alpha)
-	gpu.render_state.blend_equations = (@uint8)((eq_rgb << 4) | eq_alpha)
 
 	return true
 end
 
-local function apiBlendMode(): boolean
+local function apiBlending(): boolean
 	-- signature:
-	-- void blendMode(int mode);
+	-- void blending(int enabled);
 
 	local mode: uint32 = vm:getArgU(0)
 
-	if mode > rl.blendMode.CUSTOM_SEPARATE then
-		vm.error = string.format("attempt to set invalid blend mode `%d`", mode)
-		return false
+	gpu:blendMode(mode ~= 0)
+
+	if mode ~= 0 then
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_BLENDING_BIT
+	else
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_BLENDING_BIT
 	end
-
-	gpu:blendMode(mode)
-
-	gpu.render_state.flags_00sttbbb = (gpu.render_state.flags_00sttbbb & ~GPU_BLEND_MODE_MASK) | mode
 
 	return true
 end
@@ -547,7 +614,7 @@ local function apiCamera2D(): boolean
 	
 	gpu:camera2D(id)
 
-	gpu.render_state.flags_tmccs0fl = (gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT)
+	gpu.render_state.flags_tmccsbfl = (gpu.render_state.flags_tmccsbfl & ~GPU_DEPTH_TEST_BIT)
 
 	return true
 end
@@ -560,7 +627,7 @@ local function apiCamera3D(): boolean
 	
 	gpu:camera3D(id)
 
-	gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
+	gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_DEPTH_TEST_BIT
 
 	return true
 end
@@ -670,6 +737,29 @@ local function apiCollide(): boolean
 	end
 end
 
+local function apiColor1i(): boolean
+	-- signature:
+	-- void color1i(int rgba);
+
+	gpu:color(vm:getArgU(0))
+	
+	return true
+end
+
+local function apiColor4i(): boolean
+	-- signature:
+	-- void color4i(int r, int g, int b, int a);
+
+	local r: uint32 = vm:getArgU(0) & 0xFF
+	local g: uint32 = vm:getArgU(1) & 0xFF
+	local b: uint32 = vm:getArgU(2) & 0xFF
+	local a: uint32 = vm:getArgU(3) & 0xFF
+
+	gpu:color((r << 24) | (g << 16) | (b << 8) | a)
+	
+	return true
+end
+
 local function apiColorMask(): boolean
 	-- signature:
 	-- void colorMask(int mask);
@@ -707,7 +797,7 @@ local function apiCullMode(): boolean
 
 	gpu:cullMode(mode)
 
-	gpu.render_state.flags_tmccs0fl = (gpu.render_state.flags_tmccs0fl & ~GPU_CULL_MODE_MASK) | (@uint8)(mode << 4)
+	gpu.render_state.flags_tmccsbfl = (gpu.render_state.flags_tmccsbfl & ~GPU_CULL_MODE_MASK) | (@uint8)(mode << 4)
 
 	return true
 end
@@ -749,10 +839,10 @@ local function apiDepthMask(): boolean
 
 	if enable ~= 0 then
 		gpu:depthMask(true)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_MASK_BIT
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_DEPTH_MASK_BIT
 	else
 		gpu:depthMask(false)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_MASK_BIT
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_DEPTH_MASK_BIT
 	end
 
 	return true
@@ -766,18 +856,31 @@ local function apiDepthTest(): boolean
 
 	if enable ~= 0 then
 		gpu:depthTest(true)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_DEPTH_TEST_BIT
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_DEPTH_TEST_BIT
 	else
 		gpu:depthTest(false)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_DEPTH_TEST_BIT
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_DEPTH_TEST_BIT
 	end
 
 	return true
 end
 
-local function apiDrawObj(): boolean
+local function apiDrawObjCustom(): boolean
 	-- signature:
-	-- void drawObj(int id);
+	-- void drawObjCustom(int mode, int start, int n);
+
+	local mode: uint32 = vm:getArgU(0)
+	local start: uint32 = vm:getArgU(1)
+	local n: uint32 = vm:getArgU(2)
+
+	gpu:drawObjEx(mode, start, n)
+
+	return true
+end
+
+local function apiDrawObjEntry(): boolean
+	-- signature:
+	-- void drawObjEntry(int id);
 
 	local id: uint32 = vm:getArgU(0)
 
@@ -791,24 +894,11 @@ local function apiDrawObj(): boolean
 	return true
 end
 
-local function apiDrawObjEx(): boolean
+local function apiEnd(): boolean
 	-- signature:
-	-- void drawObjEx(int mode, int start, int n);
+	-- void end();
 
-	local mode: uint32 = vm:getArgU(0)
-	local start: uint32 = vm:getArgU(1)
-	local n: uint32 = vm:getArgU(2)
-
-	gpu:drawObjEx(mode, start, n)
-
-	return true
-end
-
-local function apiEndMesh(): boolean
-	-- signature:
-	-- void endMesh();
-
-	gpu:endMesh()
+	gpu:ending()
 	
 	return true
 end
@@ -824,9 +914,26 @@ local function apiFloor(): boolean
 	return true
 end
 
+local function apiFog(): boolean
+	-- signature:
+	-- void fog(int enabled);
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode ~= 0 then
+		gpu:fogMode(true)
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_FOG_BIT
+	else
+		gpu:fogMode(false)
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_FOG_BIT
+	end
+
+	return true
+end
+
 local function apiFogColor(): boolean
 	-- signature:
-	-- void fogColor(float color);
+	-- void fogColor(int color);
 
 	local col: uint32 = vm:getArgU(0)
 	
@@ -846,23 +953,6 @@ local function apiFogEnd(): boolean
 	gpu:fogEnd(fend)
 
 	util.pokeF(&gpu.render_state.fog_end0, fend)
-
-	return true
-end
-
-local function apiFogMode(): boolean
-	-- signature:
-	-- void fogMode(int mode);
-
-	local mode: uint32 = vm:getArgU(0)
-
-	if mode ~= 0 then
-		gpu:fogMode(true)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_FOG_BIT
-	else
-		gpu:fogMode(false)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_FOG_BIT
-	end
 
 	return true
 end
@@ -1063,15 +1153,6 @@ local function apiGetRaycastPoint(): boolean
 	return true
 end
 
-local function apiGetTopMatrix(): boolean
-	-- signature:
-	-- matrix getTopMatrix();
-
-	vm:pushMat(rlgl.getMatrixTransform())
-
-	return true
-end
-
 local function apiGetTrackBPM(): boolean
 	-- signature:
 	-- int getTrackBPM(int track);
@@ -1102,6 +1183,15 @@ local function apiGetTrackVolume(): boolean
 
 	vm:pushU(soundchip:getTrackVolume(track))
 	
+	return true
+end
+
+local function apiGetTransformMatrix(): boolean
+	-- signature:
+	-- matrix getTransformMatrix();
+
+	vm:pushMat(rlgl.getMatrixTransform())
+
 	return true
 end
 
@@ -1183,14 +1273,19 @@ local function apiInitMemCard(): boolean
 	return vm:loadMemCard(new_id)
 end
 
-local function apiLightingMode(): boolean
+local function apiLighting(): boolean
 	-- signature:
-	-- void lightingMode(int mode);
+	-- void lighting(int enabled);
 
 	local mode: uint32 = vm:getArgU(0)
 
-	-- note: lightingMode() updates the GPU render state
 	gpu:lightingMode(mode ~= 0)
+
+	if mode ~= 0 then
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_LIGHTING_BIT
+	else
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_LIGHTING_BIT
+	end
 
 	return true
 end
@@ -1546,61 +1641,6 @@ local function apiMemset(): boolean
 	return true
 end
 
-local function apiMeshColor(): boolean
-	-- signature:
-	-- void meshColor(int col);
-
-	local col: uint32 = vm:getArgU(0)
-	
-	gpu:vertColor(col)
-	
-	return true
-end
-
-local function apiMeshNormal(): boolean
-	-- signature:
-	-- void meshNormal(vec3 normal);
-
-	local v: rl.vector3 = vm:getArgV3(0)
-	
-	gpu:vertNormal(v)
-	
-	return true
-end
-
-local function apiMeshUV(): boolean
-	-- signature:
-	-- void meshUV(vec2 uv);
-
-	local v: rl.vector2 = vm:getArgV2(0)
-	
-	gpu:vertUV(v)
-	
-	return true
-end
-
-local function apiMeshVertex(): boolean
-	-- signature:
-	-- void meshVertex(vec3 v);
-
-	local v: rl.vector3 = vm:getArgV3(0)
-
-	gpu:vertex(v)
-	
-	return true
-end
-
-local function apiMeshVertex2D(): boolean
-	-- signature:
-	-- void meshVertex2D(vec2 v);
-
-	local v: rl.vector2 = vm:getArgV2(0)
-
-	gpu:vertex2D(v)
-	
-	return true
-end
-
 local function apiMidf(): boolean
 	-- signature:
 	-- float midf(float a, float b, float c);
@@ -1773,6 +1813,30 @@ local function apiMuteTracks(): boolean
 	return true
 end
 
+local function apiNormal3f(): boolean
+	-- signature:
+	-- void normal3f(float x, float y, float z);
+
+	gpu:normal(
+		{
+			vm:getArgF(0),
+			vm:getArgF(1),
+			vm:getArgF(2)
+		}
+	)
+	
+	return true
+end
+
+local function apiNormalv3(): boolean
+	-- signature:
+	-- void normalv3(vec3 norm);
+
+	gpu:normal(vm:getArgV3(0))
+	
+	return true
+end
+
 local function apiOrtho(): boolean
 	-- signature:
 	-- void ortho(float left, float right, float bottom, float top, float near, float far);
@@ -1907,29 +1971,7 @@ local function apiPlayTrack(): boolean
 	return true
 end
 
-local function apiPlayWav(): boolean
-	-- signature:
-	-- void playWav(int track, int id, int note, float volume, int loop_mode);
-
-	local track: uint8 = (@uint8)(vm:getArgU(0))
-	local id: uint32 = vm:getArgU(1)
-	local note: uint8 = (@uint8)(vm:getArgU(2))
-	local volume: float32 = vm:getArgF(3)
-	local loop_mode: float32 = vm:getArgU(4)
-
-	if id > 511 then
-		vm.error = string.format("attempt to load invalid WAVMAP entry `%d`", id)
-		return false
-	end
-
-	volume = util.midF(0.0, volume, 100.0)
-
-	soundchip:playWav(track, id, note, volume, loop_mode)
-
-	return true
-end
-
-local function apiPlayWavEx(): boolean
+local function apiPlayWavCustom(): boolean
 	-- signature:
 	--[[
 		void playWavEx(
@@ -1964,6 +2006,28 @@ local function apiPlayWavEx(): boolean
 		volume,
 		loop_mode
 	)
+
+	return true
+end
+
+local function apiPlayWavEntry(): boolean
+	-- signature:
+	-- void playWavEntry(int id, int track, int note, float volume, int loop_mode);
+
+	local id: uint32 = vm:getArgU(0)
+	local track: uint8 = (@uint8)(vm:getArgU(1))
+	local note: uint8 = (@uint8)(vm:getArgU(2))
+	local volume: float32 = vm:getArgF(3)
+	local loop_mode: float32 = vm:getArgU(4)
+
+	if id > 511 then
+		vm.error = string.format("attempt to load invalid WAVMAP entry `%d`", id)
+		return false
+	end
+
+	volume = util.midF(0.0, volume, 100.0)
+
+	soundchip:playWav(track, id, note, volume, loop_mode)
 
 	return true
 end
@@ -2041,7 +2105,7 @@ local function apiPolygonMode(): boolean
 	
 	local mode: uint32 = vm:getArgU(0)
 
-	if mode > GPU_FILL then
+	if mode > GPU_POLY_FILL then
 		-- invalid mode
 		return false
 	end
@@ -2357,6 +2421,7 @@ local function apiPrint2D(): boolean
 					i = i + 1
 				case '%'_u8 then
 					gpu:drawChar2D(c, &cur_x, y, ray_col)
+					i = i + 1
 				else
 					vm.error = string.format("invalid format specifier `%%%c`", c)
 					return false
@@ -2421,18 +2486,9 @@ local function apiRandf(): boolean
 		min, max = max, min
 	end
 
-	local x: float32 = math.random() -- gets a float in [0, 1)
+	local x: float32 = math.random() -- get random float in [0, 1)
 
 	vm:pushF(min + x * (max - min))
-
-	return true
-end
-
-local function apiRandfEx(): boolean
-	-- signature:
-	-- float randfEx();
-
-	vm:pushF(math.random())
 
 	return true
 end
@@ -2449,35 +2505,6 @@ local function apiRandi(): boolean
 	end
 
 	vm:pushI(math.random(min, max))
-
-	return true
-end
-
-local function apiRandiEx(): boolean
-	-- signature:
-	-- int randiEx();
-
-	vm:pushI(math.random(0)) -- get int will all random bits
-
-	return true
-end
-
-local function apiRandomize(): boolean
-	-- signature:
-	-- void randomize();
-
-	math.randomseed()
-
-	return true
-end
-
-local function apiRandomizeEx(): boolean
-	-- signature:
-	-- void randomizeEx(int seed);
-
-	local seed: uint32 = vm:getArgU(0)
-
-	math.randomseed(seed)
 
 	return true
 end
@@ -2568,15 +2595,28 @@ local function apiResumeTracks(): boolean
 	return true
 end
 
-local function apiRotate(): boolean
+local function apiRotate3f(): boolean
 	-- signature:
-	-- void rotate(vec3 rot);
+	-- void rotate3f(float angle, float x, float y, float z);
 
-	local v: rl.vector3 = vm:getArgV3(0)
+	rlgl.rotatef(
+		vm:getArgF(0),
+		vm:getArgF(1),
+		vm:getArgF(2),
+		vm:getArgF(3)
+	)
 	
-	rlgl.rotatef(v.z, 0, 0, 1)
-	rlgl.rotatef(v.y, 0, 1, 0)
-	rlgl.rotatef(v.x, 1, 0, 0)
+	return true
+end
+
+local function apiRotatev3(): boolean
+	-- signature:
+	-- void rotatev3(float angle, vec3 axis);
+
+	local angle: float32 = vm:getArgF(0)
+	local axis: rl.vector3 = vm:getArgV3(1)
+
+	rlgl.rotatef(angle, axis.x, axis.y, axis.z)
 	
 	return true
 end
@@ -2592,13 +2632,26 @@ local function apiRound(): boolean
 	return true
 end
 
-local function apiScale(): boolean
+local function apiScale3f(): boolean
 	-- signature:
-	-- void scale(vec3 sca);
+	-- void scale3f(float x, float y, float z);
+
+	rlgl.scalef(
+		vm:getArgF(0),
+		vm:getArgF(1),
+		vm:getArgF(2)
+	)
 	
-	local v: rl.vector3 = vm:getArgV3(0)
-	
-	rlgl.scalef(v.x, v.y, v.z)
+	return true
+end
+
+local function apiScalev3(): boolean
+	-- signature:
+	-- void scalev3(vec3 size);
+
+	local size: rl.vector3 = vm:getArgV3(0)
+
+	rlgl.scalef(size.x, size.y, size.z)
 	
 	return true
 end
@@ -2622,7 +2675,7 @@ local function apiScissor(): boolean
 	return true
 end
 
-local function apiScissorMode(): boolean
+local function apiScissorTest(): boolean
 	-- signature:
 	-- void scissorMode(int enabled);
 	
@@ -2630,10 +2683,10 @@ local function apiScissorMode(): boolean
 	
 	if enabled ~= 0 then
 		gpu:scissorMode(true)
-		gpu.render_state.flags_00sttbbb = gpu.render_state.flags_00sttbbb | GPU_SCISSOR_BIT
+		gpu.render_state.flags_f0stt000 = gpu.render_state.flags_f0stt000 | GPU_SCISSOR_BIT
 	else
 		gpu:scissorMode(false)
-		gpu.render_state.flags_00sttbbb = gpu.render_state.flags_00sttbbb & ~GPU_SCISSOR_BIT
+		gpu.render_state.flags_f0stt000 = gpu.render_state.flags_f0stt000 & ~GPU_SCISSOR_BIT
 	end
 	
 	return true
@@ -2750,30 +2803,6 @@ end
 
 local function apiSprite2D(): boolean
 	-- signature:
-	-- void sprite2D(int srcx, int srcy, int srcw, int srch, int destx, int desty);
-
-	local srcx: int32 = vm:getArgI(0)
-	local srcy: int32 = vm:getArgI(1)
-	local srcw: int32 = vm:getArgI(2)
-	local srch: int32 = vm:getArgI(3)
-	local destx: int32 = vm:getArgI(4)
-	local desty: int32 = vm:getArgI(5)
-
-	srcw = math.clamp(srcw, 1, 256)
-	srch = math.clamp(srch, 1, 256)
-	srcx = math.clamp(srcx, 0, 1024 - srcw)
-	srcy = math.clamp(srcy, 0, 1024 - srch)
-
-	local src_rect: rl.rectangle = { (@float32)(srcx), (@float32)(srcy), (@float32)(srcw), (@float32)(srch) };
-	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(srcw), (@float32)(srch) };
-
-	rl.drawTexturePro(gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
-
-	return true
-end
-
-local function apiSprite2DEx(): boolean
-	-- signature:
 	-- void sprite2DEx(int srcx, int srcy, int srcw, int srch, int destx, int desy, int destw, int desth);
 
 	local srcx: int32 = vm:getArgI(0)
@@ -2794,6 +2823,21 @@ local function apiSprite2DEx(): boolean
 	local dest_rect: rl.rectangle = { (@float32)(destx), (@float32)(desty), (@float32)(destw), (@float32)(desth) };
 
 	rl.drawTexturePro(gpu.gfx_texture, src_rect, dest_rect, {0.0, 0.0}, 0.0, rl.WHITE)
+
+	return true
+end
+
+local function apiSrand(): boolean
+	-- signature:
+	-- void srand(int seed);
+
+	local seed: uint32 = vm:getArgU(0)
+
+	if seed == 0 then
+		math.randomseed()
+	else
+		math.randomseed(seed)
+	end
 
 	return true
 end
@@ -2866,23 +2910,6 @@ local function apiStencilMask(): boolean
 	return true
 end
 
-local function apiStencilMode(): boolean
-	-- signature:
-	-- void stencilMode(int mode)
-
-	local mode: uint32 = vm:getArgU(0)
-
-	if mode ~= 0 then
-		gpu:stencilMode(true)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl | GPU_STENCIL_BIT
-	else
-		gpu:stencilMode(false)
-		gpu.render_state.flags_tmccs0fl = gpu.render_state.flags_tmccs0fl & ~GPU_STENCIL_BIT
-	end
-
-	return true
-end
-
 local function apiStencilOp(): boolean
 	-- signature:
 	-- void stencilOp(int face, int sfail, int dpfail, int dppass)
@@ -2927,6 +2954,23 @@ local function apiStencilOp(): boolean
 			gpu.render_state.stencil_sfails = (uint8)(sfail << 4) | (uint8)(sfail)
 			gpu.render_state.stencil_dpfails = (uint8)(dpfail << 4) | (uint8)(dpfail)
 			gpu.render_state.stencil_dppasses = (uint8)(dppass << 4) | (uint8)(dppass)
+	end
+
+	return true
+end
+
+local function apiStencilTest(): boolean
+	-- signature:
+	-- void stencilTest(int mode)
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode ~= 0 then
+		gpu:stencilMode(true)
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl | GPU_STENCIL_BIT
+	else
+		gpu:stencilMode(false)
+		gpu.render_state.flags_tmccsbfl = gpu.render_state.flags_tmccsbfl & ~GPU_STENCIL_BIT
 	end
 
 	return true
@@ -3070,6 +3114,23 @@ local function apiTexture(): boolean
 	return true
 end
 
+local function apiTextureFilter(): boolean
+	-- signature:
+	-- void textureFilter(int mode);
+
+	local mode: uint32 = vm:getArgU(0)
+
+	if mode ~= 0 then
+		mode = 1
+	end
+
+	gpu:textureFilter(mode)
+
+	gpu.render_state.flags_f0stt000 = (gpu.render_state.flags_f0stt000 & ~GPU_TEXTURE_FILTER_MASK) | (uint8)(mode << 7)
+
+	return true
+end
+
 local function apiTextureMode(): boolean
 	-- signature:
 	-- void textureMode(int mode);
@@ -3083,7 +3144,7 @@ local function apiTextureMode(): boolean
 
 	gpu:textureMode(mode)
 
-	gpu.render_state.flags_00sttbbb = (gpu.render_state.flags_00sttbbb & ~GPU_TEXTURE_MODE_MASK) | (uint8)(mode << 3)
+	gpu.render_state.flags_f0stt000 = (gpu.render_state.flags_f0stt000 & ~GPU_TEXTURE_MODE_MASK) | (uint8)(mode << 3)
 
 	return true
 end
@@ -3097,13 +3158,26 @@ local function apiTime(): boolean
 	return true
 end
 
-local function apiTranslate(): boolean
+local function apiTranslate3f(): boolean
 	-- signature:
-	-- void translate(vec3 pos);
+	-- void translate3f(float x, float y, float z);
 
-	local v: rl.vector3 = vm:getArgV3(0)
+	rlgl.translatef(
+		vm:getArgF(0),
+		vm:getArgF(1),
+		vm:getArgF(2)
+	)
 	
-	rlgl.translatef(v.x, v.y, v.z)
+	return true
+end
+
+local function apiTranslatev3(): boolean
+	-- signature:
+	-- void translatev3(vec3 position);
+
+	local position: rl.vector3 = vm:getArgV3(0)
+
+	rlgl.translatef(position.x, position.y, position.z)
 	
 	return true
 end
@@ -3131,6 +3205,24 @@ local function apiUnmuteTracks(): boolean
 		end
 	end
 
+	return true
+end
+
+local function apiUV2f(): boolean
+	-- signature:
+	-- void uv2f(float x, float y);
+
+	gpu:uv({vm:getArgF(0), vm:getArgF(1)})
+	
+	return true
+end
+
+local function apiUVv2(): boolean
+	-- signature:
+	-- void uvv2(vec2 texcoord);
+
+	gpu:uv(vm:getArgV2(0))
+	
 	return true
 end
 
@@ -3568,6 +3660,37 @@ local function apiVec3MoveToward(): boolean
 	return true
 end
 
+local function apiVec3MultMatrix(): boolean
+	-- signature:
+	-- vec3 vec3MultMatrix(vec3 v, matrix m);
+
+	local v: rl.vector3 = vm:getArgV3(0)
+	local m: rl.matrix = vm:getArgMat(3)
+
+	local v4x: float32 = v.x
+	local v4y: float32 = v.y
+	local v4z: float32 = v.z
+	local v4w: float32 = 1.0
+
+	--[[
+		rl.matrix:
+		m0: float32, m4: float32, m8: float32, m12: float32,
+		m1: float32, m5: float32, m9: float32, m13: float32,
+		m2: float32, m6: float32, m10: float32, m14: float32,
+		m3: float32, m7: float32, m11: float32, m15: float32
+	]]
+
+	local result: rl.vector3 = {
+		(m.m0 * v4x) + (m.m4 * v4y) + (m.m8 * v4z) + (m.m12 * v4w),
+		(m.m1 * v4x) + (m.m5 * v4y) + (m.m9 * v4z) + (m.m13 * v4w),
+		(m.m2 * v4x) + (m.m6 * v4y) + (m.m10 * v4z) + (m.m14 * v4w)
+	}
+
+	vm:pushV3(result)
+
+	return true
+end
+
 local function apiVec3Normalize(): boolean
 	-- signature:
 	-- vec3 vec3Normalize(vec3 v);
@@ -3614,6 +3737,48 @@ local function apiVec3ToScreen(): boolean
 	--vm:pushV2(rl.getWorldToScreenEx(pos, gpu.cameras[camera_id], gpu.viewport_w, gpu.viewport_h))
 	vm:pushV2({0.0, 0.0})
 
+	return true
+end
+
+local function apiVertex2f(): boolean
+	-- signature:
+	-- void vertex2f(float x, float y);
+
+	gpu:vertex2D({vm:getArgF(0), vm:getArgF(1)})
+	
+	return true
+end
+
+local function apiVertex3f(): boolean
+	-- signature:
+	-- void vertex3f(float x, float y, float z);
+
+	gpu:vertex(
+		{
+			vm:getArgF(0),
+			vm:getArgF(1),
+			vm:getArgF(2)
+		}
+	)
+	
+	return true
+end
+
+local function apiVertexv2(): boolean
+	-- signature:
+	-- void vertexv2(vec2 position);
+
+	gpu:vertex2D(vm:getArgV2(0))
+	
+	return true
+end
+
+local function apiVertexv3(): boolean
+	-- signature:
+	-- void vertexv3(vec3 position);
+
+	gpu:vertex(vm:getArgV3(0))
+	
 	return true
 end
 
@@ -3767,22 +3932,22 @@ function EVM:registerBuiltins(): void
 	sid.is_complete = true
 	self.struct_string = sid
 
-	-- define vertex struct
-	local vertex_struct: *Struct = new(@Struct)
-	local vertex_position: *Identifier = new(@Identifier)
-	local vertex_normal: *Identifier = new(@Identifier)
-	local vertex_uv: *Identifier = new(@Identifier)
-	local vertex_color: *Identifier = new(@Identifier)
-	vertex_struct.name = "vertex"
-	$vertex_position = {name="position", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
-	$vertex_normal = {name="normal", index=3, type_info={EVMType.VEC3, self.struct_vec3}}
-	$vertex_uv = {name="uv", index=6, type_info={EVMType.VEC2, self.struct_vec2}}
-	$vertex_color = {name="color", index=8, type_info={EVMType.INT}}
-	vertex_struct:addMember(vertex_position)
-	vertex_struct:addMember(vertex_normal)
-	vertex_struct:addMember(vertex_uv)
-	vertex_struct:addMember(vertex_color)
-	vertex_struct.is_complete = true
+	-- define objvertex struct
+	local objvertex_struct: *Struct = new(@Struct)
+	local objvertex_position: *Identifier = new(@Identifier)
+	local objvertex_normal: *Identifier = new(@Identifier)
+	local objvertex_uv: *Identifier = new(@Identifier)
+	local objvertex_color: *Identifier = new(@Identifier)
+	objvertex_struct.name = "objvertex"
+	$objvertex_position = {name="position", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
+	$objvertex_normal = {name="normal", index=3, type_info={EVMType.VEC3, self.struct_vec3}}
+	$objvertex_uv = {name="uv", index=6, type_info={EVMType.VEC2, self.struct_vec2}}
+	$objvertex_color = {name="color", index=8, type_info={EVMType.INT}}
+	objvertex_struct:addMember(objvertex_position)
+	objvertex_struct:addMember(objvertex_normal)
+	objvertex_struct:addMember(objvertex_uv)
+	objvertex_struct:addMember(objvertex_color)
+	objvertex_struct.is_complete = true
 
 	-- define cam2d struct
 	local cam2d_struct: *Struct = new(@Struct)
@@ -3807,17 +3972,23 @@ function EVM:registerBuiltins(): void
 	local cam3d_target: *Identifier = new(@Identifier)
 	local cam3d_up: *Identifier = new(@Identifier)
 	local cam3d_fov: *Identifier = new(@Identifier)
+	local cam3d_near: *Identifier = new(@Identifier)
+	local cam3d_far: *Identifier = new(@Identifier)
 	local cam3d_projection: *Identifier = new(@Identifier)
 	cam3d_struct.name = "cam3d"
 	$cam3d_position = {name="position", index=0, type_info={EVMType.VEC3, self.struct_vec3}}
 	$cam3d_target = {name="target", index=3, type_info={EVMType.VEC3, self.struct_vec3}}
 	$cam3d_up = {name="up", index=6, type_info={EVMType.VEC3, self.struct_vec3}}
 	$cam3d_fov = {name="fov", index=9, type_info={EVMType.FLOAT}}
-	$cam3d_projection = {name="projection", index=10, type_info={EVMType.INT}}
+	$cam3d_near = {name="near", index=10, type_info={EVMType.FLOAT}}
+	$cam3d_far = {name="far", index=11, type_info={EVMType.FLOAT}}
+	$cam3d_projection = {name="projection", index=12, type_info={EVMType.INT}}
 	cam3d_struct:addMember(cam3d_position)
 	cam3d_struct:addMember(cam3d_target)
 	cam3d_struct:addMember(cam3d_up)
 	cam3d_struct:addMember(cam3d_fov)
+	cam3d_struct:addMember(cam3d_near)
+	cam3d_struct:addMember(cam3d_far)
 	cam3d_struct:addMember(cam3d_projection)
 	cam3d_struct.is_complete = true
 
@@ -3956,7 +4127,7 @@ function EVM:registerBuiltins(): void
 
 	local builtin_structs: []Identifier = {
 		{name="matrix",      type_info={EVMType.STRUCT, matrix_struct}},
-		{name="vertex",      type_info={EVMType.STRUCT, vertex_struct}},
+		{name="objvertex",   type_info={EVMType.STRUCT, objvertex_struct}},
 		{name="cam2d",       type_info={EVMType.STRUCT, cam2d_struct}},
 		{name="cam3d",       type_info={EVMType.STRUCT, cam3d_struct}},
 		{name="light",       type_info={EVMType.STRUCT, light_struct}},
@@ -3996,9 +4167,9 @@ function EVM:registerBuiltins(): void
 		{name="SCREEN_HEIGHT", type_info={EVMType.INT}, const_val=GPU_VSCREEN_H},
 		{name="FONT_WIDTH", type_info={EVMType.INT}, const_val=6},
 		{name="FONT_HEIGHT", type_info={EVMType.INT}, const_val=9},
-		{name="MESH_LINES", type_info={EVMType.INT}, const_val=GPU_LINES},
-		{name="MESH_TRIANGLES", type_info={EVMType.INT}, const_val=GPU_TRIANGLES},
-		{name="MESH_QUADS", type_info={EVMType.INT}, const_val=GPU_QUADS},
+		{name="LINES", type_info={EVMType.INT}, const_val=GPU_LINES},
+		{name="TRIANGLES", type_info={EVMType.INT}, const_val=GPU_TRIANGLES},
+		{name="QUADS", type_info={EVMType.INT}, const_val=GPU_QUADS},
 		{name="MAT_PROJECTION", type_info={EVMType.INT}, const_val=GPU_PROJECTION},
 		{name="MAT_MODELVIEW", type_info={EVMType.INT}, const_val=GPU_MODELVIEW},
 		{name="CLEAR_NONE", type_info={EVMType.INT}, const_val=0},
@@ -4018,14 +4189,6 @@ function EVM:registerBuiltins(): void
 		{name="CULL_BACK", type_info={EVMType.INT}, const_val=0},
 		{name="CULL_FRONT", type_info={EVMType.INT}, const_val=1},
 		{name="CULL_NONE", type_info={EVMType.INT}, const_val=2},
-		{name="BLEND_ALPHA", type_info={EVMType.INT}, const_val=0},
-		{name="BLEND_ADD", type_info={EVMType.INT}, const_val=1},
-		{name="BLEND_MULTIPLY", type_info={EVMType.INT}, const_val=2},
-		{name="BLEND_ADD_ALT", type_info={EVMType.INT}, const_val=3},
-		{name="BLEND_SUBTRACT", type_info={EVMType.INT}, const_val=4},
-		{name="BLEND_PREMULTIPLY", type_info={EVMType.INT}, const_val=5},
-		{name="BLEND_CUSTOM", type_info={EVMType.INT}, const_val=6},
-		{name="BLEND_CUSTOM_EX", type_info={EVMType.INT}, const_val=7},
 		{name="CAM_PERSPECTIVE", type_info={EVMType.INT}, const_val=0},
 		{name="CAM_ORTHOGRAPHIC", type_info={EVMType.INT}, const_val=1},
 		{name="LIGHT_POINT", type_info={EVMType.INT}, const_val=0},
@@ -4033,9 +4196,9 @@ function EVM:registerBuiltins(): void
 		{name="FACE_FRONT", type_info={EVMType.INT}, const_val=GPU_FRONT},
 		{name="FACE_BACK", type_info={EVMType.INT}, const_val=GPU_BACK},
 		{name="FACE_BOTH", type_info={EVMType.INT}, const_val=GPU_FRONT_AND_BACK},
-		{name="POLY_POINT", type_info={EVMType.INT}, const_val=GPU_POINT},
-		{name="POLY_LINE", type_info={EVMType.INT}, const_val=GPU_LINE},
-		{name="POLY_FILL", type_info={EVMType.INT}, const_val=GPU_FILL},
+		{name="POLY_POINTS", type_info={EVMType.INT}, const_val=GPU_POLY_POINTS},
+		{name="POLY_LINES", type_info={EVMType.INT}, const_val=GPU_POLY_LINES},
+		{name="POLY_FILL", type_info={EVMType.INT}, const_val=GPU_POLY_FILL},
 		{name="FUNC_LESS", type_info={EVMType.INT}, const_val=GPU_LESS},
 		{name="FUNC_LEQUAL", type_info={EVMType.INT}, const_val=GPU_LEQUAL},
 		{name="FUNC_GREATER", type_info={EVMType.INT}, const_val=GPU_GREATER},
@@ -4044,26 +4207,26 @@ function EVM:registerBuiltins(): void
 		{name="FUNC_NOTEQUAL", type_info={EVMType.INT}, const_val=GPU_NOTEQUAL},
 		{name="FUNC_ALWAYS", type_info={EVMType.INT}, const_val=GPU_ALWAYS},
 		{name="FUNC_NEVER", type_info={EVMType.INT}, const_val=GPU_NEVER},
-		{name="FACTOR_ZERO", type_info={EVMType.INT}, const_val=GPU_BLEND_ZERO},
-		{name="FACTOR_ONE", type_info={EVMType.INT}, const_val=GPU_BLEND_ONE},
-		{name="FACTOR_SRC_RGB", type_info={EVMType.INT}, const_val=GPU_SRC_COLOR},
-		{name="FACTOR_ONE_MINUS_SRC_RGB", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_SRC_COLOR},
-		{name="FACTOR_DST_RGB", type_info={EVMType.INT}, const_val=GPU_DST_COLOR},
-		{name="FACTOR_ONE_MINUS_DST_RGB", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_DST_COLOR},
-		{name="FACTOR_SRC_ALPHA", type_info={EVMType.INT}, const_val=GPU_SRC_ALPHA},
-		{name="FACTOR_ONE_MINUS_SRC_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_SRC_ALPHA},
-		{name="FACTOR_DST_ALPHA", type_info={EVMType.INT}, const_val=GPU_DST_ALPHA},
-		{name="FACTOR_ONE_MINUS_DST_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_DST_ALPHA},
-		{name="FACTOR_CONSTANT_RGB", type_info={EVMType.INT}, const_val=GPU_CONSTANT_COLOR},
-		{name="FACTOR_ONE_MINUS_CONSTANT_RGB", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_CONSTANT_COLOR},
-		{name="FACTOR_CONSTANT_ALPHA", type_info={EVMType.INT}, const_val=GPU_CONSTANT_ALPHA},
-		{name="FACTOR_ONE_MINUS_CONSTANT_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_CONSTANT_ALPHA},
-		{name="FACTOR_SRC_ALPHA_SATURATE", type_info={EVMType.INT}, const_val=GPU_SRC_ALPHA_SATURATE},
-		{name="EQ_ADD", type_info={EVMType.INT}, const_val=GPU_ADD},
-		{name="EQ_SUBTRACT", type_info={EVMType.INT}, const_val=GPU_SUBTRACT},
-		{name="EQ_SUBTRACT_REVERSE", type_info={EVMType.INT}, const_val=GPU_REVERSE_SUBTRACT},
-		{name="EQ_MIN", type_info={EVMType.INT}, const_val=GPU_MIN},
-		{name="EQ_MAX", type_info={EVMType.INT}, const_val=GPU_MAX},
+		{name="BLEND_ZERO", type_info={EVMType.INT}, const_val=GPU_BLEND_ZERO},
+		{name="BLEND_ONE", type_info={EVMType.INT}, const_val=GPU_BLEND_ONE},
+		{name="BLEND_SRC_COLOR", type_info={EVMType.INT}, const_val=GPU_SRC_COLOR},
+		{name="BLEND_ONE_MINUS_SRC_COLOR", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_SRC_COLOR},
+		{name="BLEND_DST_COLOR", type_info={EVMType.INT}, const_val=GPU_DST_COLOR},
+		{name="BLEND_ONE_MINUS_DST_COLOR", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_DST_COLOR},
+		{name="BLEND_SRC_ALPHA", type_info={EVMType.INT}, const_val=GPU_SRC_ALPHA},
+		{name="BLEND_ONE_MINUS_SRC_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_SRC_ALPHA},
+		{name="BLEND_DST_ALPHA", type_info={EVMType.INT}, const_val=GPU_DST_ALPHA},
+		{name="BLEND_ONE_MINUS_DST_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_DST_ALPHA},
+		{name="BLEND_CONSTANT_COLOR", type_info={EVMType.INT}, const_val=GPU_CONSTANT_COLOR},
+		{name="BLEND_ONE_MINUS_CONSTANT_COLOR", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_CONSTANT_COLOR},
+		{name="BLEND_CONSTANT_ALPHA", type_info={EVMType.INT}, const_val=GPU_CONSTANT_ALPHA},
+		{name="BLEND_ONE_MINUS_CONSTANT_ALPHA", type_info={EVMType.INT}, const_val=GPU_ONE_MINUS_CONSTANT_ALPHA},
+		{name="BLEND_SRC_ALPHA_SATURATE", type_info={EVMType.INT}, const_val=GPU_SRC_ALPHA_SATURATE},
+		{name="BLEND_ADD", type_info={EVMType.INT}, const_val=GPU_ADD},
+		{name="BLEND_SUBTRACT", type_info={EVMType.INT}, const_val=GPU_SUBTRACT},
+		{name="BLEND_SUBTRACT_REVERSE", type_info={EVMType.INT}, const_val=GPU_REVERSE_SUBTRACT},
+		{name="BLEND_MIN", type_info={EVMType.INT}, const_val=GPU_MIN},
+		{name="BLEND_MAX", type_info={EVMType.INT}, const_val=GPU_MAX},
 		{name="STENCIL_KEEP", type_info={EVMType.INT}, const_val=GPU_KEEP},
 		{name="STENCIL_REPLACE", type_info={EVMType.INT}, const_val=GPU_REPLACE},
 		{name="STENCIL_INC", type_info={EVMType.INT}, const_val=GPU_INCR},
@@ -4212,40 +4375,68 @@ function EVM:registerAPI(): void
 			argdata={{EVMType.FLOAT}},
 			func=apiAmbientFactor
 		},
-        {
-			name="beginMesh",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.INT}},
-			func=apiBeginMesh
-		},
-        {
-			name="blendFactors",
-			type_info={EVMType.VOID},
+		{
+			name="axis",
+			type_info={EVMType.INT},
 			argdata={
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT}
 			},
-			func=apiBlendFactors
+			func=apiAxis
+		},
+        {
+			name="begin",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiBegin
 		},
 		{
-			name="blendFactorsEx",
+			name="blendColor",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiBlendColor
+		},
+		{
+			name="blendEquation",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiBlendEquation
+		},
+		{
+			name="blendEquationSeparate",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiBlendEquationSeparate
+		},
+        {
+			name="blendFunc",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiBlendFunc
+		},
+		{
+			name="blendFuncSeparate",
 			type_info={EVMType.VOID},
 			argdata={
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
 				{EVMType.INT}
 			},
-			func=apiBlendFactorsEx
+			func=apiBlendFuncSeparate
 		},
         {
-			name="blendMode",
+			name="blending",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
-			func=apiBlendMode
+			func=apiBlending
 		},
         {
 			name="cam3DForward",
@@ -4310,6 +4501,23 @@ function EVM:registerAPI(): void
 			},
 			func=apiCollide
 		},
+		{
+			name="color1i",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiColor1i
+		},
+		{
+			name="color4i",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.INT},
+				{EVMType.INT},
+				{EVMType.INT},
+				{EVMType.INT}
+			},
+			func=apiColor4i
+		},
         {
 			name="colorMask",
 			type_info={EVMType.VOID},
@@ -4352,34 +4560,38 @@ function EVM:registerAPI(): void
 			argdata={{EVMType.INT}},
 			func=apiDepthTest
 		},
-        {
-			name="drawObj",
+		{
+			name="drawObjCustom",
 			type_info={EVMType.VOID},
 			argdata={
+				{EVMType.INT},
+				{EVMType.INT},
 				{EVMType.INT}
 			},
-			func=apiDrawObj
+			func=apiDrawObjCustom
 		},
 		{
-			name="drawObjEx",
+			name="drawObjEntry",
 			type_info={EVMType.VOID},
-			argdata={
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT}
-			},
-			func=apiDrawObjEx
+			argdata={{EVMType.INT}},
+			func=apiDrawObjEntry
 		},
         {
-			name="endMesh",
+			name="end",
 			type_info={EVMType.VOID},
-			func=apiEndMesh
+			func=apiEnd
 		},
         {
 			name="floor",
 			type_info={EVMType.FLOAT},
 			argdata={{EVMType.FLOAT}},
 			func=apiFloor
+		},
+		{
+			name="fog",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiFog
 		},
         {
 			name="fogColor",
@@ -4392,12 +4604,6 @@ function EVM:registerAPI(): void
 			type_info={EVMType.VOID},
 			argdata={{EVMType.FLOAT}},
 			func=apiFogEnd
-		},
-        {
-			name="fogMode",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.INT}},
-			func=apiFogMode
 		},
         {
 			name="fogStart",
@@ -4501,11 +4707,6 @@ function EVM:registerAPI(): void
 			func=apiGetRaycastPoint
 		},
         {
-			name="getTopMatrix",
-			type_info={EVMType.STRUCT, matrix_struct},
-			func=apiGetTopMatrix
-		},
-        {
 			name="getTrackBPM",
 			type_info={EVMType.INT},
 			argdata={{EVMType.INT}},
@@ -4522,6 +4723,11 @@ function EVM:registerAPI(): void
 			type_info={EVMType.INT},
 			argdata={{EVMType.INT}},
 			func=apiGetTrackVolume
+		},
+		{
+			name="getTransformMatrix",
+			type_info={EVMType.STRUCT, matrix_struct},
+			func=apiGetTransformMatrix
 		},
 		{
 			name="getWavEntry",
@@ -4550,10 +4756,10 @@ function EVM:registerAPI(): void
 			func=apiInitMemCard
 		},
         {
-			name="lightingMode",
+			name="lighting",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
-			func=apiLightingMode
+			func=apiLighting
 		},
         {
 			name="loadObjBank",
@@ -4715,36 +4921,6 @@ function EVM:registerAPI(): void
 			func=apiMemset
 		},
 		{
-			name="meshColor",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.INT}},
-			func=apiMeshColor
-		},
-		{
-			name="meshNormal",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.VEC3, self.struct_vec3}},
-			func=apiMeshNormal
-		},
-		{
-			name="meshUV",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.VEC2, self.struct_vec2}},
-			func=apiMeshUV
-		},
-		{
-			name="meshVertex",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.VEC3, self.struct_vec3}},
-			func=apiMeshVertex
-		},
-		{
-			name="meshVertex2D",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.VEC2, self.struct_vec2}},
-			func=apiMeshVertex2D
-		},
-		{
 			name="midf",
 			type_info={EVMType.FLOAT},
 			argdata={
@@ -4827,6 +5003,22 @@ function EVM:registerAPI(): void
 			func=apiMuteTracks
 		},
 		{
+			name="normal3f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiNormal3f
+		},
+		{
+			name="normalv3",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.VEC3, self.struct_vec3}},
+			func=apiNormalv3
+		},
+		{
 			name="ortho",
 			type_info={EVMType.VOID},
 			argdata={
@@ -4894,31 +5086,31 @@ function EVM:registerAPI(): void
 			func=apiPlayTrack
 		},
 		{
-			name="playWav",
+			name="playWavCustom",
 			type_info={EVMType.VOID},
 			argdata={
+				{EVMType.INT},
+				{EVMType.INT},
+				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.FLOAT},
 				{EVMType.INT}
 			},
-			func=apiPlayWav
+			func=apiPlayWavCustom
 		},
 		{
-			name="playWavEx",
+			name="playWavEntry",
 			type_info={EVMType.VOID},
 			argdata={
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.FLOAT},
 				{EVMType.INT}
 			},
-			func=apiPlayWavEx
+			func=apiPlayWavEntry
 		},
 		{
 			name="poke8",
@@ -5010,11 +5202,6 @@ function EVM:registerAPI(): void
 			func=apiRandf
 		},
 		{
-			name="randfEx",
-			type_info={EVMType.FLOAT},
-			func=apiRandfEx
-		},
-		{
 			name="randi",
 			type_info={EVMType.INT},
 			argdata={
@@ -5022,22 +5209,6 @@ function EVM:registerAPI(): void
 				{EVMType.INT}
 			},
 			func=apiRandi
-		},
-		{
-			name="randiEx",
-			type_info={EVMType.INT},
-			func=apiRandiEx
-		},
-		{
-			name="randomize",
-			type_info={EVMType.VOID},
-			func=apiRandomize
-		},
-		{
-			name="randomizeEx",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.INT}},
-			func=apiRandomizeEx
 		},
 		{
 			name="raycast",
@@ -5090,10 +5261,24 @@ function EVM:registerAPI(): void
 			func=apiResumeTracks
 		},
 		{
-			name="rotate",
+			name="rotate3f",
 			type_info={EVMType.VOID},
-			argdata={{EVMType.VEC3, self.struct_vec3}},
-			func=apiRotate
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiRotate3f
+		},
+		{
+			name="rotatev3",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.VEC3, self.struct_vec3}
+			},
+			func=apiRotatev3
 		},
 		{
 			name="round",
@@ -5102,10 +5287,20 @@ function EVM:registerAPI(): void
 			func=apiRound
 		},
 		{
-			name="scale",
+			name="scale3f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiScale3f
+		},
+		{
+			name="scalev3",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.VEC3, self.struct_vec3}},
-			func=apiScale
+			func=apiScalev3
 		},
 		{
 			name="scissor",
@@ -5119,10 +5314,10 @@ function EVM:registerAPI(): void
 			func=apiScissor
 		},
 		{
-			name="scissorMode",
+			name="scissorTest",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
-			func=apiScissorMode
+			func=apiScissorTest
 		},
 		{
 			name="setModelViewMatrix",
@@ -5200,24 +5395,17 @@ function EVM:registerAPI(): void
 				{EVMType.INT},
 				{EVMType.INT},
 				{EVMType.INT},
+				{EVMType.INT},
+				{EVMType.INT},
 				{EVMType.INT}
 			},
 			func=apiSprite2D
 		},
 		{
-			name="sprite2DEx",
+			name="srand",
 			type_info={EVMType.VOID},
-			argdata={
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT},
-				{EVMType.INT}
-			},
-			func=apiSprite2DEx
+			argdata={{EVMType.INT}},
+			func=apiSrand
 		},
 		{
 			name="stencilFunc",
@@ -5240,12 +5428,6 @@ function EVM:registerAPI(): void
 			func=apiStencilMask
 		},
 		{
-			name="stencilMode",
-			type_info={EVMType.VOID},
-			argdata={{EVMType.INT}},
-			func=apiStencilMode
-		},
-		{
 			name="stencilOp",
 			type_info={EVMType.VOID},
 			argdata={
@@ -5255,6 +5437,12 @@ function EVM:registerAPI(): void
 				{EVMType.INT}
 			},
 			func=apiStencilOp
+		},
+		{
+			name="stencilTest",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiStencilTest
 		},
 		{
 			name="stopTrack",
@@ -5295,6 +5483,12 @@ function EVM:registerAPI(): void
 			func=apiTexture
 		},
 		{
+			name="textureFilter",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.INT}},
+			func=apiTextureFilter
+		},
+		{
 			name="textureMode",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
@@ -5306,10 +5500,20 @@ function EVM:registerAPI(): void
 			func=apiTime
 		},
 		{
-			name="translate",
+			name="translate3f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiTranslate3f
+		},
+		{
+			name="translatev3",
 			type_info={EVMType.VOID},
 			argdata={{EVMType.VEC3, self.struct_vec3}},
-			func=apiTranslate
+			func=apiTranslatev3
 		},
 		{
 			name="unmuteTrack",
@@ -5322,6 +5526,21 @@ function EVM:registerAPI(): void
 			type_info={EVMType.VOID},
 			argdata={{EVMType.INT}},
 			func=apiUnmuteTracks
+		},
+		{
+			name="uv2f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiUV2f
+		},
+		{
+			name="uvv2",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.VEC2, self.struct_vec2}},
+			func=apiUVv2
 		},
 		{
 			name="vargc",
@@ -5543,6 +5762,15 @@ function EVM:registerAPI(): void
 			func=apiVec3MoveToward
 		},
 		{
+			name="vec3MultMatrix",
+			type_info={EVMType.VEC3, self.struct_vec3},
+			argdata={
+				{EVMType.VEC3, self.struct_vec3},
+				{EVMType.STRUCT, matrix_struct}
+			},
+			func=apiVec3MultMatrix
+		},
+		{
 			name="vec3Normalize",
 			type_info={EVMType.VEC3, self.struct_vec3},
 			argdata={{EVMType.VEC3, self.struct_vec3}},
@@ -5575,6 +5803,37 @@ function EVM:registerAPI(): void
 				{EVMType.INT}
 			},
 			func=apiVec3ToScreen
+		},
+		{
+			name="vertex2f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiVertex2f
+		},
+		{
+			name="vertex3f",
+			type_info={EVMType.VOID},
+			argdata={
+				{EVMType.FLOAT},
+				{EVMType.FLOAT},
+				{EVMType.FLOAT}
+			},
+			func=apiVertex3f
+		},
+		{
+			name="vertexv2",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.VEC2, self.struct_vec2}},
+			func=apiVertexv2
+		},
+		{
+			name="vertexv3",
+			type_info={EVMType.VOID},
+			argdata={{EVMType.VEC3, self.struct_vec3}},
+			func=apiVertexv3
 		},
 		{
 			name="viewport",

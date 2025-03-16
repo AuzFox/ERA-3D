@@ -32,7 +32,7 @@ global function stateModelUpdate(): void
 			
 			core.model_to_import = rl.loadModel(model_load_path)
 
-            if not rl.isModelReady(core.model_to_import) then
+            if not rl.isModelValid(core.model_to_import) then
                 core:log(LogEntryType.HOST_ERROR, "failed to open model file", true)
                 core.has_loaded_model = false
                 return

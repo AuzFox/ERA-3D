@@ -135,10 +135,6 @@ function StateMachine:cleanup(): void
         rl.unloadTexture(core.import_texture)
     end
 
-    if core.has_loaded_sample then
-        rl.unloadWave(core.sample_to_import)
-    end
-
     if core.has_loaded_model then
         rl.unloadModel(core.model_to_import)
     end

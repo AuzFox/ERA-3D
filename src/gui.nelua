@@ -1,6 +1,7 @@
 require("definitions")
 
 local MAX_ZOOM <comptime> = 12
+local MAX_ZOOM_SAMPLE <comptime> = 16
 local MAX_EDIT_INDEX <comptime> = 10
 
 local zoom_table: []int32 = {
@@ -16,7 +17,11 @@ local zoom_table: []int32 = {
     24,
     32,
     48,
-    64
+    64, -- max zoom for textureview
+    96,
+    128,
+    192,
+    256 -- max zoom for sample import
 }
 
 local edit_buffer: [11]uint8
@@ -198,6 +203,16 @@ global gui.ColorBox = @record {
 
 global gui.locked: boolean = false
 global gui.edit_vb: *gui.ValueBox
+
+function gui.getZoom(index: int32): (int32, int32)
+    if index < 0 then
+        index = 0
+    elseif index > MAX_ZOOM_SAMPLE then
+        index = MAX_ZOOM_SAMPLE
+    end
+
+    return index, zoom_table[index]
+end
 
 function gui.updateButton(button: *gui.Button): boolean
     if gui.locked then
@@ -613,34 +628,34 @@ function gui.drawTextureView(view: *gui.TextureView): void
     local checker_tex_width: float32 = (@float32)(view.texture.width /// 32)
     local checker_tex_height: float32 = (@float32)(view.texture.height /// 32)
     
-    gpu:beginMeshWithTexture(GPU_QUADS, gpu.gfx_checker_texture.id)
-        gpu:vertColor(0xFFFFFFFF)
-        gpu:vertUV({0.0, 0.0})
+    gpu:beginWithTexture(GPU_QUADS, gpu.gfx_checker_texture.id)
+        gpu:color(0xFFFFFFFF)
+        gpu:uv({0.0, 0.0})
         gpu:vertex2D({base_dest_x, base_dest_y})
-        gpu:vertUV({0.0, checker_tex_height})
+        gpu:uv({0.0, checker_tex_height})
         gpu:vertex2D({base_dest_x, base_dest_y + base_dest_height})
-        gpu:vertUV({checker_tex_width, checker_tex_height})
+        gpu:uv({checker_tex_width, checker_tex_height})
         gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y + base_dest_height})
-        gpu:vertUV({checker_tex_width, 0.0})
+        gpu:uv({checker_tex_width, 0.0})
         gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y})
-    gpu:endMeshWithTexture()
+    gpu:endingWithTexture()
 
     if view.draw_callback ~= nilptr then
         view.draw_callback()
     else
         -- bottom image
         if view.texture.id ~= 0 then
-            gpu:beginMeshWithTexture(GPU_QUADS, view.texture.id)
-                gpu:vertColor(0xFFFFFFFF)
-                gpu:vertUV({0.0, 0.0})
+            gpu:beginWithTexture(GPU_QUADS, view.texture.id)
+                gpu:color(0xFFFFFFFF)
+                gpu:uv({0.0, 0.0})
                 gpu:vertex2D({base_dest_x, base_dest_y})
-                gpu:vertUV({0.0, 1.0})
+                gpu:uv({0.0, 1.0})
                 gpu:vertex2D({base_dest_x, base_dest_y + base_dest_height})
-                gpu:vertUV({1.0, 1.0})
+                gpu:uv({1.0, 1.0})
                 gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y + base_dest_height})
-                gpu:vertUV({1.0, 0.0})
+                gpu:uv({1.0, 0.0})
                 gpu:vertex2D({base_dest_x + base_dest_width, base_dest_y})
-            gpu:endMeshWithTexture()
+            gpu:endingWithTexture()
         end
     end
     

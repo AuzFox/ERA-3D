@@ -124,7 +124,7 @@ global function stateTextureUpdate(): void
 		if image_load_path ~= nilptr then
 			core.image_to_import = rl.loadImage(image_load_path)
 
-            if not rl.isImageReady(core.image_to_import) then
+            if not rl.isImageValid(core.image_to_import) then
                 core:log(LogEntryType.HOST_ERROR, "failed to open image file", true)
                 return
             end
@@ -145,7 +145,7 @@ global function stateTextureUpdate(): void
             -- load image to import as texture
             core.import_texture = rl.loadTextureFromImage(core.image_to_import)
 
-            if not rl.isTextureReady(core.import_texture) then
+            if not rl.isTextureValid(core.import_texture) then
                 core:log(LogEntryType.HOST_ERROR, "failed to load image: could not upload to GPU", true)
                 rl.unloadImage(core.image_to_import)
                 core.has_loaded_image = false

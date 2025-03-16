@@ -474,16 +474,15 @@ function SoundChip:loadSeqBank(bank: uint8): void
 	memory.copy(&self.seqmem, src, MEMORY_SEQMEM_SIZE_BYTES)
 end
 
-function SoundChip:loadSampleData(bank_index: uint32, start_index: uint32): void
-	start_index = start_index * 2
+-- loads sample data into WAVMEM
+function SoundChip:loadSampleDataIntoWAVMEM(frames: *[0]BKFrame, frame_count: uint64): void
+	memory.copy(&self.wavmem, frames, frame_count * 2 * #BKFrame)
+end
 
-	local frames: *[0]BKFrame = (@*[0]BKFrame)(core.sample_to_import.data)
-	local frame_count: uint64 = core.sample_to_import.frameCount * 2
-	local bank_ptr: *[0]BKFrame = (@*[0]BKFrame)(&self.wavbank_ptr[MEMORY_WAVMEM_SIZE_ELEMENTS * bank_index])
-
-	for i: uint64 = 0, < frame_count do
-		bank_ptr[start_index + i] = frames[i]
-	end
+-- loads sample data from WAVMEM into a WAVBANK
+function SoundChip:loadSampleDataFromWAVMEM(bank_index: uint8, wavbank_sample_index: uint32, wavmem_sample_index: uint32, frame_count: uint64): void
+	local bank_ptr: *[0]BKFrame = &self.wavbank_ptr[MEMORY_WAVMEM_SIZE_ELEMENTS * bank_index]
+	memory.copy(&bank_ptr[wavbank_sample_index], &self.wavmem[wavmem_sample_index], frame_count * 2 * #BKFrame)
 end
 
 function SoundChip:resetSoundchip(): void

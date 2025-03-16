@@ -366,16 +366,16 @@ local function runConsoleCommand(): void
 				core:log(LogEntryType.INFO, " ", false)
 				core:log(LogEntryType.INFO, "    if no arguments are given, lists all settings", false)
 			else
-				local doc_str: string = docs.getDocString(help_cmd)
-				if doc_str.data ~= nilptr then
-					core.current_doc_str = doc_str
-					core.log_prev_update_fn = core.log_update_fn
-					core.log_prev_draw_fn = core.log_draw_fn
-					core.log_update_fn = docStringUpdate
-					core.log_draw_fn = docStringDraw
-				else
+				--local doc_str: string = docs.getDocString(help_cmd)
+				--if doc_str.data ~= nilptr then
+				--	core.current_doc_str = doc_str
+				--	core.log_prev_update_fn = core.log_update_fn
+				--	core.log_prev_draw_fn = core.log_draw_fn
+				--	core.log_update_fn = docStringUpdate
+				--	core.log_draw_fn = docStringDraw
+				--else
 					core:log(LogEntryType.HOST_ERROR, "help: help page not found", false)
-				end
+				--end
 			end
 		else
 			core:log(LogEntryType.HOST_ERROR, "help: invalid arguments", false)

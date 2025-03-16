@@ -432,8 +432,8 @@ end
 global function stateTrackerUpdate(): void
     if input.is_ctrl_down and rl.isKeyPressed(rl.keyboardKey.I) then
         core:popup(LogEntryType.HOST_ERROR, "sample importing is disabled for now")
-
         --[[
+        soundchip:stopAllTracks()
 
         local sample_load_path: cstring = tinyfd.openFileDialog(
 			"Load Sample",
@@ -445,30 +445,30 @@ global function stateTrackerUpdate(): void
 		)
 
 		if sample_load_path ~= nilptr then
-            core.sample_to_import = rl.loadWave(sample_load_path)
+            local sample_to_import: rl.wave = rl.loadWave(sample_load_path)
 
-            if not rl.isWaveReady(core.sample_to_import) then
+            if not rl.isWaveValid(sample_to_import) then
                 core:log(LogEntryType.HOST_ERROR, "failed to open sample file", true)
-                core.has_loaded_sample = false
                 return
             end
 
-            if core.sample_to_import.sampleRate ~= SOUNDCHIP_SAMPLE_RATE or core.sample_to_import.sampleSize ~= 16 or core.sample_to_import.channels ~= 2 then
-                rl.waveFormat(&core.sample_to_import, SOUNDCHIP_SAMPLE_RATE, 16, 2)
+            if sample_to_import.sampleRate ~= SOUNDCHIP_SAMPLE_RATE or sample_to_import.sampleSize ~= 16 or sample_to_import.channels ~= 2 then
+                rl.waveFormat(&sample_to_import, SOUNDCHIP_SAMPLE_RATE, 16, 2)
             end
 
-            if core.sample_to_import.frameCount > (MEMORY_WAVMEM_SIZE_ELEMENTS /// 2) then
+            if sample_to_import.frameCount > (MEMORY_WAVMEM_SIZE_ELEMENTS /// 2) then
                 core:log(LogEntryType.HOST_ERROR, "failed to load sample: file is too large", true)
-                rl.unloadWave(core.sample_to_import)
-                core.has_loaded_sample = false
+                rl.unloadWave(sample_to_import)
                 return
             end
 
-            core.has_loaded_sample = true
+            core.sample_frame_count = sample_to_import.frameCount
+            soundchip:loadSampleDataIntoWAVMEM((@*[0]BKFrame)(sample_to_import.data), core.sample_frame_count)
+            rl.unloadWave(sample_to_import)
+
             statemachine.queued_dialog = DialogID.SAMPLE_CONFIG
 		end
-
-        ]]
+        ]]--
 
         return
     end

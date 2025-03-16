@@ -26,7 +26,7 @@ Check out the [ERA-3D Docs](https://auzfox.github.io/ERA-3D-Docs/)!
 For building instructions, see the [Building](https://auzfox.github.io/ERA-3D-Docs/building/) page of the documentation.
 
 ## Libraries Used
-- [raylib v5.0](https://github.com/raysan5/raylib)
+- [raylib v5.5](https://github.com/raysan5/raylib)
 - [Raylib.nelua](https://github.com/AuzFox/Raylib.nelua)
 - [E3DBlipKit](https://github.com/AuzFox/E3DBlipKit)
 - [zip](https://github.com/kuba--/zip)

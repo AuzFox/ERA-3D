@@ -128,17 +128,17 @@ local function texbank_draw_callback(): void
     gpu:stencilMask(GPU_FRONT_AND_BACK, 0) -- don't write to stencil buffer
 
     -- draw texbank texture
-    gpu:beginMeshWithTexture(GPU_QUADS, texbank_view.texture.id)
-        gpu:vertColor(0xFFFFFFFF)
-        gpu:vertUV({0.0, 0.0})
+    gpu:beginWithTexture(GPU_QUADS, texbank_view.texture.id)
+        gpu:color(0xFFFFFFFF)
+        gpu:uv({0.0, 0.0})
         gpu:vertex2D({texbank_x, texbank_y})
-        gpu:vertUV({0.0, 1.0})
+        gpu:uv({0.0, 1.0})
         gpu:vertex2D({texbank_x, texbank_y + texbank_h})
-        gpu:vertUV({1.0, 1.0})
+        gpu:uv({1.0, 1.0})
         gpu:vertex2D({texbank_x + texbank_w, texbank_y + texbank_h})
-        gpu:vertUV({1.0, 0.0})
+        gpu:uv({1.0, 0.0})
         gpu:vertex2D({texbank_x + texbank_w, texbank_y})
-    gpu:endMeshWithTexture()
+    gpu:endingWithTexture()
 
     gpu:stencilMode(false)
 
@@ -231,17 +231,17 @@ local function source_draw_callback(): void
     local dim_h: int32 = src_h_vb.value * source_view.pixel_size
     
     -- draw import texture
-    gpu:beginMeshWithTexture(GPU_QUADS, source_view.texture.id)
-        gpu:vertColor(0xFFFFFFFF)
-        gpu:vertUV({0.0, 0.0})
+    gpu:beginWithTexture(GPU_QUADS, source_view.texture.id)
+        gpu:color(0xFFFFFFFF)
+        gpu:uv({0.0, 0.0})
         gpu:vertex2D({source_x, source_y})
-        gpu:vertUV({0.0, 1.0})
+        gpu:uv({0.0, 1.0})
         gpu:vertex2D({source_x, source_y + source_h})
-        gpu:vertUV({1.0, 1.0})
+        gpu:uv({1.0, 1.0})
         gpu:vertex2D({source_x + source_w, source_y + source_h})
-        gpu:vertUV({1.0, 0.0})
+        gpu:uv({1.0, 0.0})
         gpu:vertex2D({source_x + source_w, source_y})
-    gpu:endMeshWithTexture()
+    gpu:endingWithTexture()
 
     gpu:stencilMode(true)
     gpu:stencilMask(GPU_FRONT_AND_BACK, 0xFF) -- write to stencil buffer
